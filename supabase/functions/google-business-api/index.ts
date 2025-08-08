@@ -29,42 +29,59 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     
-    // Get the session to access provider tokens
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    // Try to get user info and provider token
+    // Get the user info
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth error:', authError);
       throw new Error('Unauthorized');
     }
 
-    // Get Google access token from provider_token in user app_metadata or identities
+    console.log('=== DEBUGGING USER OBJECT ===');
+    console.log('User ID:', user.id);
+    console.log('User metadata:', JSON.stringify(user.user_metadata, null, 2));
+    console.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
+    console.log('Identities:', JSON.stringify(user.identities, null, 2));
+    console.log('Provider token from user_metadata:', user.user_metadata?.provider_token);
+    console.log('Access token from user_metadata:', user.user_metadata?.access_token);
+    
+    // Get Google access token from various possible locations
     let googleAccessToken = null;
     
-    // Check if we have provider token in identities
+    // Check identities for Google provider
     if (user.identities && user.identities.length > 0) {
       const googleIdentity = user.identities.find(identity => identity.provider === 'google');
-      if (googleIdentity && googleIdentity.access_token) {
+      console.log('Google identity found:', !!googleIdentity);
+      if (googleIdentity) {
+        console.log('Google identity keys:', Object.keys(googleIdentity));
         googleAccessToken = googleIdentity.access_token;
+        console.log('Access token from identity:', !!googleAccessToken);
       }
     }
     
-    // Fallback: check user_metadata for provider_token
+    // Check user_metadata
     if (!googleAccessToken && user.user_metadata?.provider_token) {
       googleAccessToken = user.user_metadata.provider_token;
+      console.log('Using provider_token from user_metadata');
     }
     
-    // Another fallback: check app_metadata
+    // Check user_metadata for access_token
+    if (!googleAccessToken && user.user_metadata?.access_token) {
+      googleAccessToken = user.user_metadata.access_token;
+      console.log('Using access_token from user_metadata');
+    }
+    
+    // Check app_metadata
     if (!googleAccessToken && user.app_metadata?.provider_token) {
       googleAccessToken = user.app_metadata.provider_token;
+      console.log('Using provider_token from app_metadata');
     }
 
+    console.log('Final Google access token found:', !!googleAccessToken);
+    console.log('=== END DEBUGGING ===');
+
     if (!googleAccessToken) {
-      console.error('User metadata:', JSON.stringify(user.user_metadata, null, 2));
-      console.error('App metadata:', JSON.stringify(user.app_metadata, null, 2));
-      console.error('Identities:', JSON.stringify(user.identities, null, 2));
-      throw new Error('No Google access token found. Please sign in with Google again.');
+      throw new Error('No Google access token found. The user needs to re-authenticate with Google to grant business access permissions.');
     }
 
     switch (action) {
