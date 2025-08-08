@@ -21,24 +21,50 @@ serve(async (req) => {
   try {
     const { action, locationId, query, startDate, endDate } = await req.json();
     
-    // Get user from auth header
+    // Get user session with access token
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Get the session to access provider tokens
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    // Try to get user info and provider token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
       throw new Error('Unauthorized');
     }
 
-    // Get user's Google access token from user metadata
-    const googleAccessToken = user.user_metadata?.access_token;
+    // Get Google access token from provider_token in user app_metadata or identities
+    let googleAccessToken = null;
+    
+    // Check if we have provider token in identities
+    if (user.identities && user.identities.length > 0) {
+      const googleIdentity = user.identities.find(identity => identity.provider === 'google');
+      if (googleIdentity && googleIdentity.access_token) {
+        googleAccessToken = googleIdentity.access_token;
+      }
+    }
+    
+    // Fallback: check user_metadata for provider_token
+    if (!googleAccessToken && user.user_metadata?.provider_token) {
+      googleAccessToken = user.user_metadata.provider_token;
+    }
+    
+    // Another fallback: check app_metadata
+    if (!googleAccessToken && user.app_metadata?.provider_token) {
+      googleAccessToken = user.app_metadata.provider_token;
+    }
+
     if (!googleAccessToken) {
-      throw new Error('No Google access token found. Please sign in with Google.');
+      console.error('User metadata:', JSON.stringify(user.user_metadata, null, 2));
+      console.error('App metadata:', JSON.stringify(user.app_metadata, null, 2));
+      console.error('Identities:', JSON.stringify(user.identities, null, 2));
+      throw new Error('No Google access token found. Please sign in with Google again.');
     }
 
     switch (action) {
