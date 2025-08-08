@@ -19,7 +19,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, locationId, query, startDate, endDate } = await req.json();
+    const body = await req.json();
+    const { action, locationId, query, startDate, endDate, review_id, reply_text } = body;
 
     // Supabase Auth
     const authHeader = req.headers.get("Authorization");
@@ -66,6 +67,12 @@ serve(async (req) => {
           startDate,
           endDate,
         );
+
+      case "reply_to_review":
+        if (!locationId || !reply_text || !review_id) {
+          return jsonError("Missing required fields for reply_to_review", 400);
+        }
+        return await replyToReview(locationId, review_id, reply_text, googleAccessToken);
 
       default:
         return jsonError("Invalid action", 400);
@@ -204,10 +211,13 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
         const data = await googleApiRequest(url, accessToken);
         const formatted = (data.reviews || []).map((r: any) => ({
           id: r.reviewId,
+          google_review_id: r.reviewId,
           author_name: r.reviewer?.displayName || "Anonymous",
           rating: r.starRating || 0,
           text: r.comment || "",
           review_date: r.createTime || new Date().toISOString(),
+          reply_text: r.reviewReply?.comment || null,
+          reply_date: r.reviewReply?.updateTime || null,
           ai_sentiment: null,
           ai_tags: [],
         }));
@@ -275,4 +285,39 @@ async function fetchLocationAnalytics(
 
   const response = await googleApiRequest(url, accessToken, "GET", params);
   return json({ analytics: response });
+}
+
+async function replyToReview(locationId: string, reviewId: string, replyText: string, accessToken: string) {
+  try {
+    const accountIds = await getAllAccountIds(accessToken);
+    
+    for (const accountId of accountIds) {
+      try {
+        const url = `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}/reviews/${reviewId}/reply`;
+        
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            comment: replyText
+          })
+        });
+
+        if (response.ok) {
+          return json({ success: true, message: 'Reply sent successfully' });
+        }
+      } catch (error) {
+        console.log(`Failed to reply to review ${reviewId} in ${accountId}:`, error);
+        continue;
+      }
+    }
+    
+    throw new Error('Failed to send reply to any account');
+  } catch (error) {
+    console.error('Error replying to review:', error);
+    throw error;
+  }
 }

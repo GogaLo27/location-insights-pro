@@ -110,7 +110,8 @@ Keep the response under 150 words.`;
       const { error } = await supabase.functions.invoke("google-business-api", {
         body: {
           action: "reply_to_review",
-          review_id: review.google_review_id,
+          locationId: review.google_review_id.split('/').slice(-3, -1).join('/'),
+          review_id: review.google_review_id.split('/').pop(),
           reply_text: replyText,
         },
         headers: {

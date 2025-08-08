@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { MessageSquare, Star, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
+import { Search, Star, Filter, RefreshCw, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -19,36 +19,32 @@ interface Review {
   id: string;
   google_review_id: string;
   author_name: string;
-  author_photo_url: string | null;
   rating: number;
   text: string | null;
-  reply_text: string | null;
   review_date: string;
+  reply_text: string | null;
   reply_date: string | null;
   ai_sentiment: "positive" | "negative" | "neutral" | null;
   ai_tags: string[] | null;
-  location_id: string;
-  location_name?: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  google_place_id: string;
 }
 
 const Reviews = () => {
   const { user, loading: authLoading } = useAuth();
+  const { selectedLocation } = useLocation();
   const { toast } = useToast();
-  const { selectedLocation: globalSelectedLocation } = useLocation();
-
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
 
-  // --- helper to ensure we always have tokens
+  useEffect(() => {
+    if (user && selectedLocation) {
+      fetchReviews();
+    }
+  }, [user, selectedLocation]);
+
   const getSessionTokens = async () => {
     let { data: { session } } = await supabase.auth.getSession();
     if (!session?.provider_token) {
@@ -61,121 +57,80 @@ const Reviews = () => {
     };
   };
 
-  useEffect(() => {
-    if (!user || !globalSelectedLocation) return;
-    (async () => {
-      await fetchReviews();
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, globalSelectedLocation]);
-
-
   const fetchReviews = async () => {
+    if (!selectedLocation?.google_place_id) return;
+    
+    setLoading(true);
     try {
-      setLoading(true);
-
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) {
-        setReviews([]);
-        return;
-      }
+      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
 
-      // Use global selected location
-      if (!globalSelectedLocation) {
-        setReviews([]);
-        return;
-      }
-
-      const locationId = globalSelectedLocation.google_place_id.split('/').pop();
       const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_reviews", locationId },
+        body: {
+          action: "fetch_reviews",
+          locationId: selectedLocation.google_place_id,
+        },
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
           "X-Google-Token": googleAccessToken,
         },
       });
 
-      if (error) {
-        console.error("fetch_reviews error:", error);
+      if (error) throw error;
+      
+      // Analyze reviews with AI
+      const reviewsData = data.reviews || [];
+      if (reviewsData.length > 0) {
+        try {
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+            body: { reviews: reviewsData },
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (!analysisError && analysisData?.reviews) {
+            setReviews(analysisData.reviews);
+          } else {
+            setReviews(reviewsData);
+          }
+        } catch (analysisError) {
+          console.error('Error analyzing reviews:', analysisError);
+          setReviews(reviewsData);
+        }
+      } else {
         setReviews([]);
-        return;
       }
-
-      setReviews(data?.reviews || []);
-    } catch (e) {
-      console.error("Error fetching reviews:", e);
-      setReviews([]);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch reviews",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRefetchReviews = async (locationId?: string) => {
-    try {
-      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) {
-        throw new Error("Missing tokens");
-      }
-
-      const idToUse = locationId || (globalSelectedLocation?.google_place_id.split('/').pop());
-      if (!idToUse) {
-        toast({ title: "Select a location", description: "Choose a location to refresh reviews." });
-        return;
-      }
-
-      const { error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_reviews", locationId: idToUse },
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
-        },
-      });
-
-      if (error) throw error;
-
-      toast({ title: "Success", description: "Reviews refreshed successfully" });
-      await fetchReviews();
-    } catch (error) {
-      console.error("Error refreshing reviews:", error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh reviews",
-        variant: "destructive",
-      });
+  const getSentimentColor = (sentiment: string | null) => {
+    switch (sentiment) {
+      case "positive": return "text-success border-success";
+      case "negative": return "text-destructive border-destructive"; 
+      case "neutral": return "text-muted-foreground border-muted-foreground";
+      default: return "text-muted-foreground border-muted-foreground";
     }
   };
 
-  const handleReplyToReview = async (googleReviewId: string, replyText: string) => {
-    try {
-      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
-
-      // NOTE: Your backend does NOT implement 'reply_to_review' yet.
-      const { error } = await supabase.functions.invoke("google-business-api", {
-        body: {
-          action: "reply_to_review",
-          review_id: googleReviewId,
-          reply_text: replyText,
-        },
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
-        },
-      });
-
-      if (error) throw error;
-
-      toast({ title: "Success", description: "Reply sent successfully" });
-      await fetchReviews();
-    } catch (error) {
-      console.error("Error replying to review:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send reply (server action not implemented)",
-        variant: "destructive",
-      });
+  const getSentimentBg = (sentiment: string | null) => {
+    switch (sentiment) {
+      case "positive": return "bg-success/10";
+      case "negative": return "bg-destructive/10"; 
+      case "neutral": return "bg-muted/50";
+      default: return "bg-muted/50";
     }
   };
+
+  // Get unique tags for filter
+  const allTags = Array.from(new Set(reviews.flatMap(review => review.ai_tags || [])));
 
   const filteredReviews = reviews.filter((review) => {
     const matchesSearch =
@@ -189,8 +144,26 @@ const Reviews = () => {
     const matchesRating =
       ratingFilter === "all" || String(review.rating) === ratingFilter;
 
-    return matchesSearch && matchesSentiment && matchesRating;
+    const matchesTag =
+      tagFilter === "all" || (review.ai_tags && review.ai_tags.includes(tagFilter));
+
+    return matchesSearch && matchesSentiment && matchesRating && matchesTag;
   });
+
+  const getAverageRating = () => {
+    if (reviews.length === 0) return 0;
+    return (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1);
+  };
+
+  const getSentimentCounts = () => {
+    const counts = { positive: 0, negative: 0, neutral: 0 };
+    reviews.forEach(review => {
+      if (review.ai_sentiment) {
+        counts[review.ai_sentiment]++;
+      }
+    });
+    return counts;
+  };
 
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -207,6 +180,8 @@ const Reviews = () => {
     );
   }
 
+  const sentimentCounts = getSentimentCounts();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -214,227 +189,232 @@ const Reviews = () => {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-semibold">Reviews</h1>
+            <div className="flex items-center space-x-4 ml-4">
+              <h1 className="text-xl font-semibold">Reviews</h1>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              <div className="text-sm text-muted-foreground">
-                {globalSelectedLocation ? (
-                  <span className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-accent" />
-                    Showing reviews for: <strong>{globalSelectedLocation.location_name}</strong>
-                  </span>
-                ) : (
-                  "Select a location to view reviews"
-                )}
-              </div>
+              <Button onClick={fetchReviews} size="sm">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
             </div>
           </header>
-
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex justify-between items-center mb-8">
+          
+          <div className="flex-1 space-y-6 p-8 pt-6">
+            {selectedLocation && (
               <div>
-                <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Customer Reviews
-                </h1>
-                <p className="text-muted-foreground">
-                  Manage and analyze your Google Business reviews with AI insights
+                <h1 className="text-3xl font-bold mb-2">{selectedLocation.location_name} Reviews</h1>
+                <p className="text-muted-foreground mb-6">
+                  Manage and respond to customer reviews for this location
                 </p>
               </div>
-              <Button
-                onClick={() => handleRefetchReviews()}
-                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Refresh Reviews
-              </Button>
+            )}
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card className="border-accent/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Reviews</p>
+                      <p className="text-2xl font-bold text-accent">{reviews.length}</p>
+                    </div>
+                    <MessageSquare className="h-8 w-8 text-accent" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-accent/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Average Rating</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-2xl font-bold text-accent">{getAverageRating()}</p>
+                        <Star className="h-5 w-5 text-accent fill-accent" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-green-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Positive</p>
+                      <p className="text-2xl font-bold text-green-600">{sentimentCounts.positive}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Negative</p>
+                      <p className="text-2xl font-bold text-red-600">{sentimentCounts.negative}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Filters */}
-            <Card className="mb-6 border-accent/20 shadow-md backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center text-foreground">
-                  <Filter className="w-5 h-5 mr-2 text-accent" />
-                  Smart Filters
+            <Card className="border-accent/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-accent" />
+                  Filters
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block text-foreground">Search Reviews</label>
+              <CardContent>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex-1 min-w-64">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-accent w-4 h-4" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                       <Input
                         placeholder="Search reviews..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 border-accent/20 focus:border-accent bg-background/50"
+                        className="pl-10 border-accent/20 focus:border-accent"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block text-foreground">AI Sentiment</label>
-                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
-                      <SelectTrigger className="border-accent/20 focus:border-accent bg-background/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Sentiments</SelectItem>
-                        <SelectItem value="positive">😊 Positive</SelectItem>
-                        <SelectItem value="negative">😞 Negative</SelectItem>
-                        <SelectItem value="neutral">😐 Neutral</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block text-foreground">Star Rating</label>
-                    <Select value={ratingFilter} onValueChange={setRatingFilter}>
-                      <SelectTrigger className="border-accent/20 focus:border-accent bg-background/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Ratings</SelectItem>
-                        <SelectItem value="5">⭐⭐⭐⭐⭐ 5 Stars</SelectItem>
-                        <SelectItem value="4">⭐⭐⭐⭐ 4 Stars</SelectItem>
-                        <SelectItem value="3">⭐⭐⭐ 3 Stars</SelectItem>
-                        <SelectItem value="2">⭐⭐ 2 Stars</SelectItem>
-                        <SelectItem value="1">⭐ 1 Star</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  
+                  <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="All Sentiments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sentiments</SelectItem>
+                      <SelectItem value="positive">Positive</SelectItem>
+                      <SelectItem value="negative">Negative</SelectItem>
+                      <SelectItem value="neutral">Neutral</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="All Ratings" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Ratings</SelectItem>
+                      <SelectItem value="1">1 Star</SelectItem>
+                      <SelectItem value="2">2 Stars</SelectItem>
+                      <SelectItem value="3">3 Stars</SelectItem>
+                      <SelectItem value="4">4 Stars</SelectItem>
+                      <SelectItem value="5">5 Stars</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={tagFilter} onValueChange={setTagFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="All Tags" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tags</SelectItem>
+                      {allTags.map((tag) => (
+                        <SelectItem key={tag} value={tag}>
+                          {tag}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
 
             {/* Reviews List */}
-            {filteredReviews.length === 0 ? (
-              <Card className="border-accent/20 shadow-md">
-                <CardContent className="text-center py-12">
-                  <div className="relative">
-                    <MessageSquare className="w-16 h-16 text-accent mx-auto mb-4 opacity-80" />
-                    <Sparkles className="w-6 h-6 text-accent absolute top-0 right-1/2 transform translate-x-8 animate-pulse" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2 text-foreground">No reviews found</h3>
-                  <p className="text-muted-foreground mb-6">
-                    {reviews.length === 0
-                      ? "Fetch reviews from your Google Business locations to get started."
-                      : "No reviews match your current filters."}
-                  </p>
-                  {reviews.length === 0 && (
-                    <Button 
-                      onClick={() => handleRefetchReviews()}
-                      className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                    >
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Fetch Reviews
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {filteredReviews.map((review) => (
-                  <Card key={review.id} className="border-accent/10 shadow-md hover:shadow-lg transition-all duration-200 backdrop-blur-sm bg-card/80">
+            <div className="space-y-4">
+              {filteredReviews.length === 0 ? (
+                <Card className="border-accent/20">
+                  <CardContent className="p-8 text-center">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No reviews found</h3>
+                    <p className="text-muted-foreground">
+                      {reviews.length === 0 ? "No reviews available for this location." : "No reviews match your current filters."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredReviews.map((review) => (
+                  <Card key={review.id} className={`border-accent/20 ${getSentimentBg(review.ai_sentiment)}`}>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center space-x-4">
-                          {review.author_photo_url ? (
-                            <img
-                              src={review.author_photo_url}
-                              alt={review.author_name}
-                              className="w-12 h-12 rounded-full ring-2 ring-accent/20"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-lg">
-                              {review.author_name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <div>
-                            <h4 className="font-semibold text-foreground text-lg">{review.author_name}</h4>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <TrendingUp className="w-3 h-3" />
-                              {format(new Date(review.review_date), "MMM d, yyyy")}
-                            </p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-semibold text-foreground">{review.author_name}</h3>
+                            {review.ai_sentiment && (
+                              <Badge variant="outline" className={getSentimentColor(review.ai_sentiment)}>
+                                {review.ai_sentiment}
+                              </Badge>
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(review.review_date), 'MMM dd, yyyy')}
+                            </span>
                           </div>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <div className="flex">
+                          
+                          <div className="flex items-center gap-1 mb-2">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`w-5 h-5 transition-colors ${
+                                className={`w-4 h-4 ${
                                   i < (review.rating || 0)
-                                    ? "text-accent fill-current"
+                                    ? "text-accent fill-accent"
                                     : "text-muted-foreground"
                                 }`}
                               />
                             ))}
                           </div>
-                          {review.ai_sentiment && (
-                            <Badge
-                              variant={
-                                review.ai_sentiment === "positive"
-                                  ? "default"
-                                  : review.ai_sentiment === "negative"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                              className="font-medium"
-                            >
-                              {review.ai_sentiment === "positive" && "😊"}
-                              {review.ai_sentiment === "negative" && "😞"}
-                              {review.ai_sentiment === "neutral" && "😐"}
-                              {" " + review.ai_sentiment}
-                            </Badge>
+                          
+                          {review.text && (
+                            <p className="text-foreground mb-3 leading-relaxed">
+                              "{review.text}"
+                            </p>
+                          )}
+                          
+                          {review.ai_tags && review.ai_tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {review.ai_tags.map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {review.reply_text && (
+                            <div className="mt-4 p-3 bg-accent/5 border-l-2 border-accent rounded-r">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center">
+                                  <span className="text-xs text-white font-medium">B</span>
+                                </div>
+                                <span className="text-sm font-medium text-accent">Business Reply</span>
+                                {review.reply_date && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(review.reply_date), 'MMM dd, yyyy')}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-foreground">{review.reply_text}</p>
+                            </div>
                           )}
                         </div>
-                      </div>
-
-                      {review.text && (
-                        <div className="bg-muted/30 p-4 rounded-lg mb-4 border border-accent/10">
-                          <p className="text-foreground leading-relaxed italic">"{review.text}"</p>
-                        </div>
-                      )}
-
-                      {review.ai_tags && review.ai_tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {review.ai_tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="border-accent/30 text-accent hover:bg-accent/10">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      {review.reply_text && (
-                        <div className="bg-gradient-to-r from-accent/5 to-primary/5 p-4 rounded-lg mb-4 border border-accent/20">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">B</span>
-                            </div>
-                            <p className="text-sm font-medium text-foreground">Business Reply</p>
-                          </div>
-                          <p className="text-sm text-foreground/90 leading-relaxed">{review.reply_text}</p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {review.reply_date &&
-                              format(new Date(review.reply_date), "MMM d, yyyy")}
-                          </p>
-                        </div>
-                      )}
-
-                      {!review.reply_text && (
-                        <div className="pt-4 border-t border-accent/10">
-                          <ReplyDialog
-                            review={review}
-                            onReplySubmitted={() => fetchReviews()}
+                        
+                        <div className="ml-4">
+                          <ReplyDialog 
+                            review={review} 
+                            onReplySubmitted={fetchReviews}
                           />
                         </div>
-                      )}
+                      </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
         </SidebarInset>
       </div>

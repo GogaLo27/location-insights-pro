@@ -12,6 +12,7 @@ import Reviews from "./pages/Reviews";
 import Analytics from "./pages/Analytics";
 import Sentiment from "./pages/Sentiment";
 import PlanSelection from "./pages/PlanSelection";
+import PlanManagement from "./pages/PlanManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

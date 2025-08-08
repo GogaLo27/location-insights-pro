@@ -57,10 +57,17 @@ const Analytics = () => {
 
   const fetchLocations = async () => {
     try {
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
           action: 'fetch_user_locations'
-        }
+        },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          "X-Google-Token": googleAccessToken,
+        },
       });
 
       if (!error && data?.locations) {
@@ -74,6 +81,18 @@ const Analytics = () => {
     }
   };
 
+  const getSessionTokens = async () => {
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session?.provider_token) {
+      await supabase.auth.refreshSession();
+      ({ data: { session } } = await supabase.auth.getSession());
+    }
+    return {
+      supabaseJwt: session?.access_token || "",
+      googleAccessToken: session?.provider_token || "",
+    };
+  };
+
   const fetchAnalytics = async () => {
     if (!selectedLocation) return;
     
@@ -83,21 +102,28 @@ const Analytics = () => {
       const endDate = new Date();
       const startDate = subDays(endDate, parseInt(dateRange));
       
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+      
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
           action: 'fetch_analytics',
-          location_id: selectedLocation,
-          start_date: {
+          locationId: selectedLocation,
+          startDate: {
             year: startDate.getFullYear(),
             month: startDate.getMonth() + 1,
             day: startDate.getDate()
           },
-          end_date: {
+          endDate: {
             year: endDate.getFullYear(),
             month: endDate.getMonth() + 1,
             day: endDate.getDate()
           }
-        }
+        },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          "X-Google-Token": googleAccessToken,
+        },
       });
 
       if (!error && data?.analytics?.multiDailyMetricsTimeSeries) {

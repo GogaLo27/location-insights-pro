@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      reviews: {
+        Row: {
+          ai_sentiment: string | null
+          ai_tags: string[] | null
+          author_name: string
+          created_at: string
+          google_review_id: string
+          id: string
+          location_id: string
+          rating: number
+          reply_date: string | null
+          reply_text: string | null
+          review_date: string
+          text: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_sentiment?: string | null
+          ai_tags?: string[] | null
+          author_name: string
+          created_at?: string
+          google_review_id: string
+          id?: string
+          location_id: string
+          rating: number
+          reply_date?: string | null
+          reply_text?: string | null
+          review_date: string
+          text?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_sentiment?: string | null
+          ai_tags?: string[] | null
+          author_name?: string
+          created_at?: string
+          google_review_id?: string
+          id?: string
+          location_id?: string
+          rating?: number
+          reply_date?: string | null
+          reply_text?: string | null
+          review_date?: string
+          text?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_plans: {
+        Row: {
+          created_at: string
+          id: string
+          plan_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_selected_locations: {
         Row: {
           created_at: string

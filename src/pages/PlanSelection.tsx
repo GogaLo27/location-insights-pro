@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { CheckCircle, MapPin, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const PlanSelection = () => {
   const { user, loading: authLoading } = useAuth();
@@ -15,52 +16,70 @@ const PlanSelection = () => {
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
+  const handlePlanSelect = async (planType: string) => {
+    if (!user) return;
+
+    setSelectedPlan(planType);
+
+    try {
+      const { error } = await supabase
+        .from('user_plans')
+        .upsert({
+          user_id: user.id,
+          plan_type: planType,
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Plan Selected",
+        description: `You've successfully selected the ${planType} plan.`,
+      });
+
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error selecting plan:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save plan selection.",
+        variant: "destructive",
+      });
+      setSelectedPlan(null);
+    }
+  };
+
   const plans = [
     {
-      id: "free",
-      name: "Free",
-      price: "$0",
+      id: "starter",
+      name: "Starter",
+      price: "$29",
       description: "Perfect for small businesses",
-      features: ["Up to 2 locations", "Up to 100 reviews", "Basic analytics", "Email support"],
-      locations: 2,
+      features: ["Up to 3 locations", "Basic analytics", "Review monitoring", "Email support"],
+      locations: 3,
       reviews: 100,
     },
     {
-      id: "pro",
-      name: "Pro",
-      price: "$29",
+      id: "professional",
+      name: "Professional",
+      price: "$79",
       description: "For growing businesses",
-      features: ["Up to 10 locations", "Up to 500 reviews", "Advanced analytics", "Priority support", "AI insights"],
+      features: ["Up to 10 locations", "Advanced analytics", "AI review analysis", "Priority support", "Custom reports"],
       locations: 10,
       reviews: 500,
       popular: true
     },
     {
-      id: "unlimited",
-      name: "Unlimited",
-      price: "$99",
+      id: "enterprise",
+      name: "Enterprise",
+      price: "$199",
       description: "For enterprises",
-      features: ["Unlimited locations", "Unlimited reviews", "Full analytics suite", "24/7 support", "Custom integrations"],
+      features: ["Unlimited locations", "Full analytics suite", "AI-powered insights", "24/7 support", "Custom integrations", "Dedicated account manager"],
       locations: -1, // -1 means unlimited
       reviews: -1,
     }
   ];
-
-  const handlePlanSelection = async (planId: string) => {
-    setSelectedPlan(planId);
-    
-    // For now, just set the plan to free and redirect to dashboard
-    // In a real app, you'd integrate with Stripe or other payment provider
-    toast({
-      title: "Plan Selected",
-      description: `You've selected the ${plans.find(p => p.id === planId)?.name} plan.`,
-    });
-
-    // Simulate API call delay
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 1000);
-  };
 
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -106,7 +125,6 @@ const PlanSelection = () => {
                   className={`relative cursor-pointer transition-all hover:shadow-lg ${
                     plan.popular ? 'border-primary shadow-lg scale-105' : ''
                   } ${selectedPlan === plan.id ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => handlePlanSelection(plan.id)}
                 >
                   {plan.popular && (
                     <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
@@ -148,8 +166,9 @@ const PlanSelection = () => {
                       className="w-full" 
                       variant={plan.popular ? "default" : "outline"}
                       disabled={selectedPlan === plan.id}
+                      onClick={() => handlePlanSelect(plan.id)}
                     >
-                      {selectedPlan === plan.id ? 'Selected...' : 'Select Plan'}
+                      {selectedPlan === plan.id ? 'Selecting...' : 'Select Plan'}
                     </Button>
                   </CardContent>
                 </Card>
