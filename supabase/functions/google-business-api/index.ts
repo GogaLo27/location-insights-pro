@@ -12,6 +12,8 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// scopes needed: https://www.googleapis.com/auth/business.manage
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
@@ -25,15 +27,21 @@ serve(async (req) => {
 
     // ---- Auth: Supabase user (JWT from client)
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return jsonError("No authorization header", 401);
-
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonError("No authorization header", 401);
+    }
     const supabaseJwt = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(supabaseJwt);
     if (authError || !user) return jsonError("Unauthorized", 401);
 
     // ---- Google access token (from client)
     const googleAccessToken = req.headers.get("X-Google-Token");
-    if (!googleAccessToken) return jsonError("Missing Google access token in 'X-Google-Token'", 400);
+    if (!googleAccessToken) {
+      return jsonError(
+        "Missing Google access token. Send Supabase session.provider_token in 'X-Google-Token' header.",
+        400
+      );
+    }
 
     switch (action) {
       case "get_user_locations":
@@ -54,7 +62,7 @@ serve(async (req) => {
 
       case "reply_to_review":
         if (!locationId) return jsonError("Missing 'locationId' for reply_to_review", 400);
-        if (!review_id) return jsonError("Missing 'review_id' for reply_to_review", 400);
+        if (!review_id) return jsonError("Missing 'review_id' (Google reviewId) for reply_to_review", 400);
         if (!replyText) return jsonError("Missing 'replyText' for reply_to_review", 400);
         return await replyToReview(locationId, review_id, replyText, googleAccessToken);
 
@@ -62,7 +70,7 @@ serve(async (req) => {
         return jsonError("Invalid action", 400);
     }
   } catch (error) {
-    console.error("Error in google-business-api:", error);
+    console.error("Error in google-business-api function:", error);
     return new Response(JSON.stringify({ error: error?.message ?? "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -102,10 +110,10 @@ async function googleApiRequest(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Google API Error ${response.status} @ ${url}: ${errorText}`);
+    console.error(`Google API Error: ${response.status} - ${errorText}`);
     throw new Error(`Google API request failed: ${response.status}`);
   }
-  if (response.status === 204) return {};
+  if (response.status === 204) return {}; // no content
   return await response.json();
 }
 
@@ -117,17 +125,17 @@ async function getAllAccountIds(accessToken: string) {
   if (!data.accounts || data.accounts.length === 0) {
     throw new Error("No Google Business accounts found");
   }
-  return data.accounts.map((acc: any) => acc.name); // "accounts/123"
+  // names like "accounts/1234567890"
+  return data.accounts.map((acc: any) => acc.name);
 }
 
-/** v4 GET location metadata (averageRating / totalReviewCount) */
+/** v4 GET location metadata (for avg rating / total review count). */
 async function getV4LocationMetadata(accountId: string, locationId: string, accessToken: string) {
   const url = `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}`;
   const data = await googleApiRequest(url, accessToken, "GET");
-  return {
-    averageRating: data?.metadata?.averageRating ?? null,
-    totalReviewCount: data?.metadata?.totalReviewCount ?? null,
-  };
+  const avg = data?.metadata?.averageRating ?? null;
+  const total = data?.metadata?.totalReviewCount ?? null;
+  return { averageRating: avg, totalReviewCount: total };
 }
 
 async function fetchUserLocations(_userId: string, accessToken: string) {
@@ -156,11 +164,11 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
         const locations = data.locations || [];
 
         for (const loc of locations) {
-          const id = loc.name?.split("/").pop() as string; // locationId
+          const id = loc.name?.split("/").pop(); // locationId
           let averageRating: number | null = null;
           let totalReviewCount: number | null = null;
           try {
-            const meta = await getV4LocationMetadata(accountId, id, accessToken);
+            const meta = await getV4LocationMetadata(accountId, id!, accessToken);
             averageRating = meta.averageRating;
             totalReviewCount = meta.totalReviewCount;
           } catch (_e) {
@@ -176,8 +184,8 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
               : null,
             phone: loc.phoneNumbers?.primaryPhone || null,
             website: loc.websiteUri || null,
-            rating: averageRating,                 // ✅ now filled
-            total_reviews: totalReviewCount || 0,  // ✅ now filled
+            rating: averageRating,
+            total_reviews: totalReviewCount || 0,
             latitude: loc.latlng?.latitude || null,
             longitude: loc.latlng?.longitude || null,
             status: "active",
@@ -200,6 +208,7 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
 }
 
 async function searchLocations(userId: string, query: string, accessToken: string) {
+  // naive: fetch then filter
   const res = await fetchUserLocations(userId, accessToken);
   const data = await res.json();
   const q = query.toLowerCase();
@@ -209,6 +218,7 @@ async function searchLocations(userId: string, query: string, accessToken: strin
   return json({ locations: filtered });
 }
 
+// ✅ map "ONE..FIVE" -> 1..5
 function mapStarRatingToNumber(star: string | undefined): number {
   switch (star) {
     case "ONE": return 1;
@@ -239,7 +249,7 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
             google_review_id: r.reviewId,
             author_name: r.reviewer?.displayName || "Anonymous",
             author_photo_url: r.reviewer?.profilePhotoUrl || null,
-            rating: mapStarRatingToNumber(r.starRating), // ✅ convert enum → number
+            rating: mapStarRatingToNumber(r.starRating), // ✅ FIXED
             text: r.comment || "",
             review_date: r.createTime || new Date().toISOString(),
             reply_text: r.reviewReply?.comment || null,
@@ -252,10 +262,9 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
           nextPageToken = data.nextPageToken ?? null;
         } while (nextPageToken);
 
-        // success for owning account → stop trying others
-        break;
-      } catch (e) {
-        console.log(`No reviews for location ${locationId} in ${accountId} or insufficient perms:`, e?.message);
+        break; // owning account found
+      } catch (_e) {
+        console.log(`No reviews for location ${locationId} in ${accountId}`);
         continue;
       }
     }
@@ -275,7 +284,7 @@ async function replyToReview(locationId: string, reviewId: string, replyText: st
       await googleApiRequest(url, accessToken, "PUT", undefined, { comment: replyText });
       return json({ ok: true });
     } catch (e) {
-      console.log(`Failed replying under ${accountId} for review ${reviewId}: ${e?.message}`);
+      console.log(`Failed replying under ${accountId} for review ${reviewId}: ${e}`);
     }
   }
   return jsonError("Failed to send reply. Ensure the account owns the location and has permissions.", 400);
