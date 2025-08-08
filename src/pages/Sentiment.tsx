@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import LocationSelector from "@/components/LocationSelector";
 import { MapPin, TrendingUp, TrendingDown, Minus, Calendar as CalendarIcon, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -214,8 +215,8 @@ const Sentiment = () => {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-semibold">Sentiment Analysis</h1>
+            <div className="flex items-center space-x-4 ml-4">
+              <LocationSelector />
             </div>
             <div className="flex items-center space-x-4 ml-auto">
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>

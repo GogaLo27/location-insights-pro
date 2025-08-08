@@ -2,7 +2,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import LocationSelector from "@/components/LocationSelector";
 import {
   Sidebar,
   SidebarContent,
@@ -54,11 +53,6 @@ export function AppSidebar() {
             <span className="font-bold text-lg">Location Insights Pro</span>
           )}
         </div>
-        {!collapsed && (
-          <div className="px-4 pb-4">
-            <LocationSelector />
-          </div>
-        )}
       </SidebarHeader>
 
       <SidebarContent>

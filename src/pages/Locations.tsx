@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import LocationSelector from "@/components/LocationSelector";
 import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -254,6 +255,9 @@ const Locations = () => {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
+            <div className="flex items-center space-x-4 ml-4">
+              <LocationSelector />
+            </div>
             <div className="flex items-center space-x-4 ml-auto">
               <Badge variant="secondary" className="capitalize">
                 {profile?.subscription_plan || 'free'} Plan
