@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, locationId, placeId } = await req.json();
+    const { action, locationId, placeId, query } = await req.json();
     
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -34,8 +34,12 @@ serve(async (req) => {
     }
 
     switch (action) {
-      case 'fetch_locations':
+      case 'get_user_locations':
+      case 'fetch_user_locations':
         return await fetchUserLocations(user.id);
+      
+      case 'search_locations':
+        return await searchLocations(user.id, query);
       
       case 'add_location':
         return await addLocation(user.id, placeId);
@@ -70,14 +74,64 @@ async function fetchUserLocations(userId: string) {
       google_place_id: 'ChIJ123example',
       name: 'Demo Restaurant',
       address: '123 Main St, City, State',
+      phone: '+1-555-0123',
+      website: 'https://demo-restaurant.com',
       rating: 4.5,
       total_reviews: 125,
-      status: 'active'
+      latitude: 40.7128,
+      longitude: -74.0060,
+      status: 'active',
+      last_fetched_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'loc_2',
+      google_place_id: 'ChIJ456example',
+      name: 'Sample Cafe',
+      address: '456 Oak Ave, City, State',
+      phone: '+1-555-0456',
+      website: 'https://sample-cafe.com',
+      rating: 4.2,
+      total_reviews: 89,
+      latitude: 40.7580,
+      longitude: -73.9855,
+      status: 'active',
+      last_fetched_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
   ];
 
   return new Response(
     JSON.stringify({ locations: mockLocations }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function searchLocations(userId: string, query: string) {
+  // Mock search results based on query
+  const searchResults = [
+    {
+      id: `loc_${Date.now()}`,
+      google_place_id: `search_${Date.now()}`,
+      name: `${query} - Search Result`,
+      address: '789 Search St, Query City, State',
+      phone: '+1-555-0789',
+      website: null,
+      rating: 4.3,
+      total_reviews: 67,
+      latitude: 40.7614,
+      longitude: -73.9776,
+      status: 'active',
+      last_fetched_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ];
+
+  return new Response(
+    JSON.stringify({ locations: searchResults }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
