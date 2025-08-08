@@ -27,9 +27,11 @@ serve(async (req) => {
     const analyzedReviews = [];
 
     for (const review of reviews) {
-      const prompt = `Analyze this customer review and provide:
+      const prompt = `Analyze this customer review comprehensively and provide:
 1. Sentiment (positive, negative, or neutral)
-2. Up to 3 relevant tags/categories
+2. Up to 5 relevant tags/categories (e.g., "service", "food quality", "cleanliness", "staff", "wait time", "pricing", "atmosphere")
+3. Key issues mentioned (if negative/neutral)
+4. Suggestions for improvement based on the review
 
 Review: "${review.text}"
 Rating: ${review.rating}/5 stars
@@ -37,7 +39,9 @@ Rating: ${review.rating}/5 stars
 Return ONLY a JSON object with this exact format:
 {
   "sentiment": "positive|negative|neutral",
-  "tags": ["tag1", "tag2", "tag3"]
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "issues": ["issue1", "issue2"],
+  "suggestions": ["suggestion1", "suggestion2"]
 }`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -76,14 +80,18 @@ Return ONLY a JSON object with this exact format:
         analyzedReviews.push({
           ...review,
           ai_sentiment: analysis.sentiment,
-          ai_tags: analysis.tags || []
+          ai_tags: analysis.tags || [],
+          ai_issues: analysis.issues || [],
+          ai_suggestions: analysis.suggestions || []
         });
       } catch (parseError) {
         // Fallback if JSON parsing fails
         analyzedReviews.push({
           ...review,
           ai_sentiment: review.rating >= 4 ? 'positive' : review.rating <= 2 ? 'negative' : 'neutral',
-          ai_tags: ['general']
+          ai_tags: ['general'],
+          ai_issues: [],
+          ai_suggestions: []
         });
       }
     }
