@@ -42,10 +42,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithGoogle = async () => {
+    // Check if user already has a plan first
+    const { data: { session } } = await supabase.auth.getSession();
+    let redirectUrl = `${window.location.origin}/plan-selection`;
+    
+    if (session?.user) {
+      const { data: planData } = await supabase
+        .from('user_plans')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+      
+      if (planData) {
+        redirectUrl = `${window.location.origin}/dashboard`;
+      }
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/plan-selection`,
+        redirectTo: redirectUrl,
         scopes: 'profile email https://www.googleapis.com/auth/business.manage',
         queryParams: {
           access_type: 'offline',

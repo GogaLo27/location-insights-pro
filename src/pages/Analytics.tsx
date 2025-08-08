@@ -103,7 +103,12 @@ const Analytics = () => {
       const startDate = subDays(endDate, parseInt(dateRange));
       
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+      if (!supabaseJwt || !googleAccessToken) {
+        console.error("Missing authentication tokens");
+        setAnalyticsData([]);
+        setLoading(false);
+        return;
+      }
       
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
@@ -129,16 +134,29 @@ const Analytics = () => {
       if (!error && data?.analytics) {
         const processedData = processAnalyticsData(data.analytics);
         setAnalyticsData(processedData);
+        
+        // If no data, show helpful message
+        if (processedData.length === 0) {
+          toast({
+            title: "No Analytics Data",
+            description: "No analytics data available for the selected period. Try a different date range.",
+          });
+        }
       } else {
         console.error('Analytics fetch error:', error);
         setAnalyticsData([]);
+        toast({
+          title: "Analytics Error",
+          description: error?.message || "Failed to load analytics data",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error fetching analytics:', error);
       setAnalyticsData([]);
       toast({
-        title: "Analytics Unavailable",
-        description: "Unable to load analytics data at this time",
+        title: "Connection Error",
+        description: "Unable to connect to analytics service",
         variant: "destructive",
       });
     } finally {

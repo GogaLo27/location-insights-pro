@@ -3,6 +3,7 @@ import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -461,16 +462,178 @@ const Sentiment = () => {
                     </p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
+                 <Card>
+                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                     <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+                     <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                   </CardHeader>
+                   <CardContent>
                     <div className="text-2xl font-bold">{stats.avgRating.toFixed(1)}</div>
                     <p className="text-xs text-muted-foreground">
                       Sentiment: {stats.avgSentimentScore.toFixed(2)}
                     </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Detailed Analysis and Recommendations */}
+            {stats && (
+              <div className="grid gap-6">
+                {/* Business Health Overview */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Business Health Overview</CardTitle>
+                    <CardDescription>Comprehensive analysis based on customer feedback</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Performance Indicators */}
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="text-center p-4 border rounded-lg">
+                        <div className="text-2xl font-bold text-primary mb-2">
+                          {stats.avgRating.toFixed(1)}/5.0
+                        </div>
+                        <p className="text-sm text-muted-foreground">Average Rating</p>
+                        <p className="text-xs mt-1">
+                          {stats.avgRating >= 4.5 ? "Excellent" : 
+                           stats.avgRating >= 4.0 ? "Very Good" : 
+                           stats.avgRating >= 3.5 ? "Good" : 
+                           stats.avgRating >= 3.0 ? "Average" : "Needs Improvement"}
+                        </p>
+                      </div>
+                      <div className="text-center p-4 border rounded-lg">
+                        <div className="text-2xl font-bold text-primary mb-2">
+                          {stats.positivePercentage.toFixed(0)}%
+                        </div>
+                        <p className="text-sm text-muted-foreground">Positive Sentiment</p>
+                        <p className="text-xs mt-1">
+                          {stats.positivePercentage >= 80 ? "Outstanding" : 
+                           stats.positivePercentage >= 70 ? "Strong" : 
+                           stats.positivePercentage >= 60 ? "Good" : 
+                           stats.positivePercentage >= 50 ? "Fair" : "Critical"}
+                        </p>
+                      </div>
+                      <div className="text-center p-4 border rounded-lg">
+                        <div className="text-2xl font-bold text-primary mb-2">
+                          {stats.total}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Total Reviews</p>
+                        <p className="text-xs mt-1">Review Volume</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Strengths */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-success">🌟 What You're Doing Right</CardTitle>
+                      <CardDescription>Your key strengths based on positive feedback</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium text-success mb-2">Top Praised Areas:</h4>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {Array.from(new Set(sentimentData.flatMap(d => d.top_positive_tags || []))).slice(0, 6).map((tag, i) => (
+                              <Badge key={i} className="sentiment-positive">{tag}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {stats.positivePercentage >= 70 && (
+                          <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
+                            <p className="text-sm text-success font-medium">✅ Strong Performance</p>
+                            <p className="text-xs text-success/80 mt-1">
+                              With {stats.positivePercentage.toFixed(0)}% positive reviews, you're exceeding customer expectations!
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Areas for Improvement */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-amber-600">🎯 Focus Areas</CardTitle>
+                      <CardDescription>Priority areas for business improvement</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium text-amber-600 mb-2">Common Concerns:</h4>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {Array.from(new Set(sentimentData.flatMap(d => d.top_negative_tags || []))).slice(0, 6).map((tag, i) => (
+                              <Badge key={i} className="sentiment-negative">{tag}</Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Critical Issues */}
+                        {Array.from(new Set(sentimentData.flatMap(d => d.top_issues || []))).slice(0, 3).map((issue, i) => (
+                          <div key={i} className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <p className="text-sm text-amber-800 dark:text-amber-200">⚠️ {issue}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Actionable Recommendations */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-primary">🚀 Action Plan</CardTitle>
+                    <CardDescription>AI-powered recommendations to boost your ratings</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <h4 className="font-medium text-primary mb-3">Immediate Actions:</h4>
+                        <div className="space-y-3">
+                          {Array.from(new Set(sentimentData.flatMap(d => d.top_suggestions || []))).slice(0, 3).map((suggestion, i) => (
+                            <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/10 rounded-lg">
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium mt-0.5">
+                                {i + 1}
+                              </div>
+                              <p className="text-sm flex-1">{suggestion}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-primary mb-3">Strategic Focus:</h4>
+                        <div className="space-y-3">
+                          {stats.negativePercentage > 20 && (
+                            <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                              <p className="text-sm text-red-800 dark:text-red-200 font-medium">📊 Address Negative Feedback</p>
+                              <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                                {stats.negativePercentage.toFixed(0)}% negative reviews require immediate attention
+                              </p>
+                            </div>
+                          )}
+                          
+                          {stats.avgRating < 4.0 && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                              <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">⭐ Boost Overall Rating</p>
+                              <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
+                                Target 4.0+ rating to improve visibility and trust
+                              </p>
+                            </div>
+                          )}
+                          
+                          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">💬 Engage Proactively</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                              Respond to reviews to show you value customer feedback
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

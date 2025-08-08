@@ -5,14 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Search, Star, Filter, RefreshCw, MessageSquare, Bot } from "lucide-react";
+import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useLocation } from "@/contexts/LocationContext";
+import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import ReplyDialog from "@/components/ReplyDialog";
 
 interface Review {
@@ -38,15 +40,25 @@ const Reviews = () => {
   const { selectedLocation } = useLocation();
   const { toast } = useToast();
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
+  
+  const { 
+    isAnalyzing, 
+    progress, 
+    total, 
+    completed, 
+    startProgress, 
+    updateProgress, 
+    finishProgress 
+  } = useAnalysisProgress();
 
   useEffect(() => {
     if (user && selectedLocation) {
-      fetchReviews();
+      fetchReviews(false); // Load cached reviews quickly
     }
   }, [user, selectedLocation]);
 
@@ -77,67 +89,82 @@ const Reviews = () => {
     return tail || gp;
   };
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (forceRefresh = false) => {
     const locationId = resolveLocationId();
     if (!locationId) return;
 
-    setLoading(true);
+    if (forceRefresh) setLoading(true);
+    
     try {
-      // First, load saved reviews from database
+      // First, quickly load saved reviews from database for instant display
       const { data: savedReviews, error: dbError } = await supabase
         .from('saved_reviews')
         .select('*')
         .eq('location_id', locationId)
-        .order('review_date', { ascending: false });
+        .order('review_date', { ascending: false })
+        .limit(50); // Limit for performance
 
-      if (dbError) console.error('Database error:', dbError);
+      if (!dbError && savedReviews) {
+        setReviews(savedReviews.map(review => ({
+          ...review,
+          ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
+        })));
+      }
 
-      // Then fetch fresh reviews from Google
-      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+      // Only fetch from Google if forcing refresh or no saved reviews
+      if (forceRefresh || !savedReviews || savedReviews.length === 0) {
+        const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+        if (!supabaseJwt || !googleAccessToken) {
+          console.warn("Missing tokens - using cached reviews");
+          return;
+        }
 
-      const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: {
-          action: "fetch_reviews",
-          locationId,
-        },
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
-        },
-      });
+        const { data, error } = await supabase.functions.invoke("google-business-api", {
+          body: {
+            action: "fetch_reviews",
+            locationId,
+          },
+          headers: {
+            Authorization: `Bearer ${supabaseJwt}`,
+            "X-Google-Token": googleAccessToken,
+          },
+        });
 
-      if (error) throw error;
+        if (!error && data?.reviews) {
+          const googleReviews = data.reviews.map((review: any) => ({
+            ...review,
+            location_id: locationId
+          }));
 
-      const googleReviews = (data?.reviews || []).map((review: any) => ({
-        ...review,
-        location_id: locationId
-      }));
+          // Merge with saved reviews and save new ones
+          await saveReviewsToDatabase(googleReviews, locationId);
 
-      // Merge with saved reviews and save new ones
-      await saveReviewsToDatabase(googleReviews, locationId);
+          // Get updated reviews from database
+          const { data: updatedReviews } = await supabase
+            .from('saved_reviews')
+            .select('*')
+            .eq('location_id', locationId)
+            .order('review_date', { ascending: false });
 
-      // Get updated reviews from database
-      const { data: updatedReviews } = await supabase
-        .from('saved_reviews')
-        .select('*')
-        .eq('location_id', locationId)
-        .order('review_date', { ascending: false });
-
-      setReviews((updatedReviews || []).map(review => ({
-        ...review,
-        ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
-      })));
+          if (updatedReviews) {
+            setReviews(updatedReviews.map(review => ({
+              ...review,
+              ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
+            })));
+          }
+        }
+      }
     } catch (error) {
       console.error("Error fetching reviews:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch reviews",
-        variant: "destructive",
-      });
-      setReviews([]);
+      if (forceRefresh) {
+        toast({
+          title: "Error",
+          description: "Failed to refresh reviews",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (forceRefresh) setLoading(false);
     }
   };
 
@@ -179,10 +206,11 @@ const Reviews = () => {
   };
 
   const runAIAnalysis = async () => {
-    if (!user) return;
+    if (!user || isAnalyzing) return;
     
-    setLoading(true);
     try {
+      startProgress();
+      
       // Get reviews that haven't been analyzed yet
       const { data: unanalyzedReviews } = await supabase
         .from('saved_reviews')
@@ -195,40 +223,54 @@ const Reviews = () => {
           title: "Info",
           description: "All reviews are already analyzed",
         });
+        finishProgress();
         return;
       }
 
-      const { supabaseJwt } = await getSessionTokens();
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
-        body: { reviews: unanalyzedReviews },
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-        },
-      });
+      updateProgress(0, unanalyzedReviews.length);
 
-      if (!analysisError && analysisData?.reviews) {
-        // Update database with AI analysis
-        for (const analyzedReview of analysisData.reviews) {
-          await supabase
-            .from('saved_reviews')
-            .update({
-              ai_sentiment: analyzedReview.ai_sentiment,
-              ai_tags: analyzedReview.ai_tags,
-              ai_issues: analyzedReview.ai_issues,
-              ai_suggestions: analyzedReview.ai_suggestions,
-              ai_analyzed_at: new Date().toISOString(),
-            })
-            .eq('google_review_id', analyzedReview.google_review_id);
-        }
+      // Process reviews in batches for better UX
+      const batchSize = 5;
+      let processedCount = 0;
 
-        toast({
-          title: "Success",
-          description: `Analyzed ${analysisData.reviews.length} reviews`,
+      for (let i = 0; i < unanalyzedReviews.length; i += batchSize) {
+        const batch = unanalyzedReviews.slice(i, i + batchSize);
+        
+        const { supabaseJwt } = await getSessionTokens();
+        const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+          body: { reviews: batch },
+          headers: {
+            Authorization: `Bearer ${supabaseJwt}`,
+          },
         });
 
-        // Refresh reviews
-        fetchReviews();
+        if (!analysisError && analysisData?.reviews) {
+          // Update database with AI analysis
+          for (const analyzedReview of analysisData.reviews) {
+            await supabase
+              .from('saved_reviews')
+              .update({
+                ai_sentiment: analyzedReview.ai_sentiment,
+                ai_tags: analyzedReview.ai_tags,
+                ai_issues: analyzedReview.ai_issues,
+                ai_suggestions: analyzedReview.ai_suggestions,
+                ai_analyzed_at: new Date().toISOString(),
+              })
+              .eq('google_review_id', analyzedReview.google_review_id);
+          }
+          
+          processedCount += batch.length;
+          updateProgress(processedCount, unanalyzedReviews.length);
+        }
       }
+
+      toast({
+        title: "Success",
+        description: `Analyzed ${processedCount} reviews`,
+      });
+
+      finishProgress();
+      fetchReviews(false);
     } catch (error) {
       console.error('Error running AI analysis:', error);
       toast({
@@ -236,8 +278,7 @@ const Reviews = () => {
         description: "Failed to analyze reviews",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      finishProgress();
     }
   };
 
@@ -317,11 +358,20 @@ const Reviews = () => {
               <h1 className="text-xl font-semibold">Reviews</h1>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              <Button onClick={runAIAnalysis} size="sm" variant="outline">
-                <Bot className="w-4 h-4 mr-2" />
-                AI Analysis
+              <Button 
+                onClick={runAIAnalysis} 
+                size="sm" 
+                variant="outline"
+                disabled={isAnalyzing}
+              >
+                {isAnalyzing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Bot className="w-4 h-4 mr-2" />
+                )}
+                {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
               </Button>
-              <Button onClick={fetchReviews} size="sm">
+              <Button onClick={() => fetchReviews(true)} size="sm" disabled={isAnalyzing}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
@@ -329,6 +379,23 @@ const Reviews = () => {
           </header>
           
           <div className="flex-1 space-y-6 p-8 pt-6">
+            {/* Analysis Progress Bar */}
+            {(isAnalyzing || progress > 0) && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>AI Analysis Progress</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="w-full" />
+                    <p className="text-xs text-muted-foreground">
+                      {isAnalyzing ? `Processing review ${completed} of ${total}...` : 'Analysis complete!'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Card>
@@ -499,9 +566,13 @@ const Reviews = () => {
                               {review.ai_sentiment}
                             </Badge>
                           )}
-                          {!review.reply_text && (
-                            <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
-                          )}
+          {review.reply_text ? (
+            <Badge variant="outline" className="text-success border-success">
+              Replied
+            </Badge>
+          ) : (
+            <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
+          )}
                         </div>
                       </div>
                     </CardHeader>
