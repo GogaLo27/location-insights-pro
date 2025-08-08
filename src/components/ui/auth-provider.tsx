@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/plan-selection`,
-        scopes: 'profile email https://www.googleapis.com/auth/business.manage',
+        scopes: 'profile email https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/businessprofileperformance.readonly',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'

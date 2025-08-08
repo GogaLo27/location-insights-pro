@@ -26,64 +26,74 @@ serve(async (req) => {
     
     // Get user session with access token
     const authHeader = req.headers.get('Authorization');
-    console.log('Auth header present:', !!authHeader);
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('Token extracted, length:', token.length);
     
     // Get the user info
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    console.log('Auth error:', authError);
-    console.log('User found:', !!user);
 
     if (authError || !user) {
-      console.error('Auth failed:', authError);
+      console.error('Auth error:', authError);
       throw new Error('Unauthorized');
     }
 
-    console.log('=== USER DATA AVAILABLE ===');
-    console.log('User ID:', user.id);
-    console.log('User email:', user.email);
-    console.log('User created at:', user.created_at);
-    console.log('User metadata keys:', Object.keys(user.user_metadata || {}));
-    console.log('App metadata keys:', Object.keys(user.app_metadata || {}));
-    console.log('Identities count:', user.identities?.length || 0);
+    // The problem: Supabase doesn't store Google access tokens automatically
+    // We need to get a fresh token using the refresh token or re-authenticate
     
-    // Print all identities
-    if (user.identities) {
-      user.identities.forEach((identity, index) => {
-        console.log(`Identity ${index}:`, {
-          provider: identity.provider,
-          id: identity.id,
-          hasAccessToken: !!identity.access_token,
-          keys: Object.keys(identity)
-        });
-      });
+    // Check if we have the necessary Google credentials stored
+    let googleAccessToken = null;
+    
+    // Try to get access token from user metadata (if we stored it there)
+    if (user.user_metadata?.google_access_token) {
+      googleAccessToken = user.user_metadata.google_access_token;
+      console.log('Found stored Google access token');
     }
     
-    console.log('Raw user metadata:', user.user_metadata);
-    console.log('Raw app metadata:', user.app_metadata);
-    
-    // Just return mock data for now to test if the function works
-    console.log('=== RETURNING MOCK DATA ===');
-    return new Response(
-      JSON.stringify({ 
-        locations: [
-          {
-            id: 'test-123',
-            name: 'Test Business',
-            address: '123 Test St, Test City',
-            phone: '+1-555-0123',
-            rating: 4.5,
-            total_reviews: 42
+    // If no stored token, we need to get a fresh one using Google API
+    if (!googleAccessToken) {
+      // Check if we have refresh token
+      const refreshToken = user.user_metadata?.google_refresh_token;
+      
+      if (refreshToken) {
+        console.log('Attempting to refresh Google access token');
+        try {
+          const response = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_id: googleClientId,
+              client_secret: googleClientSecret,
+              refresh_token: refreshToken,
+              grant_type: 'refresh_token',
+            }),
+          });
+          
+          if (response.ok) {
+            const tokenData = await response.json();
+            googleAccessToken = tokenData.access_token;
+            console.log('Successfully refreshed Google access token');
+            
+            // Store the new access token in user metadata
+            await supabase.auth.updateUser({
+              data: { google_access_token: googleAccessToken }
+            });
+          } else {
+            console.error('Failed to refresh token:', await response.text());
           }
-        ]
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+        } catch (error) {
+          console.error('Error refreshing token:', error);
+        }
+      }
+    }
+
+    if (!googleAccessToken) {
+      throw new Error('No Google access token available. Please re-authenticate with Google to grant access to your Google Business data.');
+    }
 
     switch (action) {
       case 'get_user_locations':
