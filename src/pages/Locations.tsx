@@ -1,60 +1,89 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Search, Plus, RefreshCw, Star } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Location {
   id: string;
   google_place_id: string;
   name: string;
-  address: string;
-  rating: number;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  rating: number | null;
   total_reviews: number;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
+  last_fetched_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  subscription_plan: string;
+  locations_limit: number;
+  reviews_limit: number;
 }
 
 const Locations = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [locations, setLocations] = useState<Location[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [addingLocation, setAddingLocation] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     if (user) {
+      fetchProfile();
       fetchLocations();
     }
   }, [user]);
 
-  const getAuthToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || '';
+  const fetchProfile = async () => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      setProfile(profile);
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
   const fetchLocations = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/functions/v1/google-business-api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`,
-        },
-        body: JSON.stringify({ action: 'fetch_locations' }),
-      });
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
 
-      const data = await response.json();
-      if (response.ok) {
-        setLocations(data.locations || []);
-      } else {
-        throw new Error(data.error);
+      if (error) {
+        throw error;
       }
+
+      setLocations(data || []);
     } catch (error) {
       console.error('Error fetching locations:', error);
       toast({
@@ -67,49 +96,69 @@ const Locations = () => {
     }
   };
 
-  const addLocation = async () => {
-    if (!searchQuery.trim()) return;
-
-    try {
-      setAddingLocation(true);
-      const response = await fetch('/functions/v1/google-business-api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`,
-        },
-        body: JSON.stringify({ 
-          action: 'add_location',
-          placeId: searchQuery 
-        }),
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        setLocations([...locations, data.location]);
-        setSearchQuery("");
-        toast({
-          title: "Success",
-          description: "Location added successfully",
-        });
-      } else {
-        throw new Error(data.error);
-      }
-    } catch (error) {
-      console.error('Error adding location:', error);
+  const handleSearchLocations = async () => {
+    if (!searchTerm.trim()) {
       toast({
         title: "Error",
-        description: "Failed to add location",
+        description: "Please enter a search term",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (profile && locations.length >= profile.locations_limit) {
+      toast({
+        title: "Limit Reached",
+        description: `You've reached your limit of ${profile.locations_limit} locations. Upgrade your plan to add more.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'search_locations',
+          query: searchTerm 
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: `Found ${data?.locations?.length || 0} locations`,
+      });
+      
+      fetchLocations();
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search locations",
         variant: "destructive",
       });
     } finally {
-      setAddingLocation(false);
+      setIsSearching(false);
     }
   };
 
-  if (!user) {
-    window.location.href = '/';
-    return null;
+  if (!user && !authLoading) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-muted-foreground">Loading locations...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -117,64 +166,80 @@ const Locations = () => {
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <MapPin className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-semibold">Locations</h1>
+          <div className="flex items-center space-x-4">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-xl">Location Insights Pro</span>
+            <nav className="flex items-center space-x-6 ml-8">
+              <Button variant="ghost" onClick={() => window.location.href = '/dashboard'}>Dashboard</Button>
+              <Button variant="outline">Locations</Button>
+              <Button variant="ghost" onClick={() => window.location.href = '/reviews'}>Reviews</Button>
+              <Button variant="ghost" onClick={() => window.location.href = '/sentiment'}>Sentiment</Button>
+            </nav>
           </div>
-          <Button onClick={fetchLocations} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center space-x-4">
+            <Badge variant="secondary" className="capitalize">
+              {profile?.subscription_plan || 'free'} Plan
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {locations.length} of {profile?.locations_limit || 2} locations used
+            </span>
+          </div>
         </div>
       </header>
 
       <div className="container mx-auto py-8 px-4">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Business Locations</h1>
+            <p className="text-muted-foreground">
+              Manage your Google Business locations and track their performance
+            </p>
+          </div>
+        </div>
+
         {/* Search and Add Location */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Add New Location</CardTitle>
             <CardDescription>
-              Search for your Google Business location and add it to your dashboard
+              Search for your Google Business location to start tracking reviews and analytics
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
               <div className="flex-1">
                 <Input
-                  placeholder="Enter Google Place ID or search for your business..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addLocation()}
+                  placeholder="Search for your business name or address..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchLocations()}
                 />
               </div>
               <Button 
-                onClick={addLocation} 
-                disabled={!searchQuery.trim() || addingLocation}
+                onClick={handleSearchLocations} 
+                disabled={!searchTerm.trim() || isSearching}
               >
-                {addingLocation ? (
+                {isSearching ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Search className="w-4 h-4 mr-2" />
                 )}
-                Add Location
+                Search Locations
               </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Locations List */}
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg text-muted-foreground">Loading locations...</p>
-          </div>
-        ) : locations.length === 0 ? (
+        {locations.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
               <MapPin className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No locations found</h3>
               <p className="text-muted-foreground mb-6">
-                Add your first Google Business location to get started
+                Search and add your Google Business locations to get started with review management and analytics.
               </p>
             </CardContent>
           </Card>
@@ -203,18 +268,32 @@ const Locations = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                        <span className="font-medium">{location.rating}</span>
+                        <span className="font-medium">{location.rating?.toFixed(1) || 'N/A'}</span>
                       </div>
                       <span className="text-sm text-muted-foreground">
                         {location.total_reviews} reviews
                       </span>
                     </div>
                     
+                    {location.phone && (
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <Phone className="w-4 h-4" />
+                        <span>{location.phone}</span>
+                      </div>
+                    )}
+                    
+                    {location.website && (
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <Globe className="w-4 h-4" />
+                        <span className="truncate">{location.website}</span>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" size="sm" className="w-full">
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/reviews'}>
                         View Reviews
                       </Button>
-                      <Button variant="outline" size="sm" className="w-full">
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/sentiment'}>
                         Analytics
                       </Button>
                     </div>
