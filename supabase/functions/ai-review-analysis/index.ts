@@ -1,128 +1,294 @@
+// /supabase/functions/google-business-api/index.ts
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-google-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { reviewText, action = 'analyze' } = await req.json();
+    const { action, locationId, query, startDate, endDate } = await req.json();
 
-    if (action === 'analyze') {
-      return await analyzeReview(reviewText);
-    } else if (action === 'generate_reply') {
-      return await generateReply(reviewText);
+    // ---- Supabase Auth
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonError("No authorization header", 401);
     }
 
-    throw new Error('Invalid action');
+    const supabaseJwt = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(supabaseJwt);
+    if (authError || !user) {
+      return jsonError("Unauthorized", 401);
+    }
 
+    // ---- Google token
+    const googleAccessToken = req.headers.get("X-Google-Token");
+    if (!googleAccessToken) {
+      return jsonError(
+        "Missing Google access token. Send session.provider_token in 'X-Google-Token'.",
+        400,
+      );
+    }
+
+    // ---- Route actions
+    switch (action) {
+      case "get_user_locations":
+      case "fetch_user_locations":
+        return await fetchUserLocations(user.id, googleAccessToken);
+
+      case "search_locations":
+        if (!query) return jsonError("Missing 'query'", 400);
+        return await searchLocations(user.id, query, googleAccessToken);
+
+      case "fetch_reviews":
+        if (!locationId) return jsonError("Missing 'locationId'", 400);
+        return await fetchLocationReviews(locationId, googleAccessToken);
+
+      case "fetch_analytics":
+        if (!locationId) return jsonError("Missing 'locationId'", 400);
+        return await fetchLocationAnalytics(
+          locationId,
+          googleAccessToken,
+          startDate,
+          endDate,
+        );
+
+      default:
+        return jsonError("Invalid action", 400);
+    }
   } catch (error) {
-    console.error('Error in ai-review-analysis function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    console.error("Error in google-business-api function:", error);
+    return jsonError(error?.message ?? "Internal error", 500);
   }
 });
 
-async function analyzeReview(reviewText: string) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an AI that analyzes customer reviews for businesses. For each review, you must:
+// ---------- Helpers
 
-1. Determine sentiment: positive, negative, or neutral
-2. Extract 3-5 relevant tags that describe the main topics (e.g., "food", "service", "ambiance", "price", "cleanliness")
-3. Provide a brief analysis explaining the sentiment and key points
-
-Respond in JSON format with this structure:
-{
-  "sentiment": "positive|negative|neutral",
-  "tags": ["tag1", "tag2", "tag3"],
-  "analysis": "Brief explanation of the sentiment and key points",
-  "sentiment_score": 0.85 // number between -1 (very negative) and 1 (very positive)
-}`
-        },
-        {
-          role: 'user',
-          content: `Analyze this review: "${reviewText}"`
-        }
-      ],
-      temperature: 0.3,
-    }),
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-  const data = await response.json();
-  const analysisText = data.choices[0].message.content;
-  
-  try {
-    const analysis = JSON.parse(analysisText);
-    return new Response(
-      JSON.stringify(analysis),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (parseError) {
-    throw new Error('Failed to parse AI analysis response');
-  }
 }
 
-async function generateReply(reviewText: string) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
+function jsonError(message: string, status = 400) {
+  return json({ error: message }, status);
+}
+
+async function googleApiRequest(
+  url: string,
+  accessToken: string,
+  method = "GET",
+  params?: Record<string, string>,
+) {
+  const urlWithParams = params
+    ? `${url}?${new URLSearchParams(params).toString()}`
+    : url;
+
+  const response = await fetch(urlWithParams, {
+    method,
     headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a professional customer service representative writing replies to Google Business reviews. Your replies should be:
-
-1. Professional and courteous
-2. Acknowledge the customer's feedback (positive or negative)
-3. Thank them for their review
-4. For negative reviews, show empathy and offer to resolve issues
-5. For positive reviews, express gratitude and encourage return visits
-6. Keep replies concise (2-3 sentences max)
-7. Always maintain a professional tone
-
-Generate a appropriate reply for the given review.`
-        },
-        {
-          role: 'user',
-          content: `Generate a professional reply for this review: "${reviewText}"`
-        }
-      ],
-      temperature: 0.7,
-    }),
   });
 
-  const data = await response.json();
-  const reply = data.choices[0].message.content;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Google API Error: ${response.status} - ${errorText}`);
+    throw new Error(`Google API request failed: ${response.status}`);
+  }
 
-  return new Response(
-    JSON.stringify({ reply }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  return await response.json();
+}
+
+async function getAllAccountIds(accessToken: string) {
+  const data = await googleApiRequest(
+    "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+    accessToken,
   );
+
+  if (!data.accounts?.length) {
+    throw new Error("No Google Business accounts found");
+  }
+
+  // Keep full "accounts/123" path so URLs are correct
+  return data.accounts.map((acc: any) => acc.name);
+}
+
+async function fetchUserLocations(userId: string, accessToken: string) {
+  const accountIds = await getAllAccountIds(accessToken);
+  console.log("Found Google Business accounts:", accountIds);
+
+  const allLocations: any[] = [];
+
+  for (const accountId of accountIds) {
+    let nextPageToken: string | null = null;
+
+    do {
+      const params: Record<string, string> = {
+        readMask:
+          "name,title,phoneNumbers,storefrontAddress,languageCode,storeCode,categories,websiteUri,regularHours,specialHours,serviceArea,labels,latlng,openInfo,metadata,profile,moreHours,serviceItems",
+        pageSize: "100",
+      };
+
+      if (nextPageToken) params.pageToken = nextPageToken;
+
+      const data = await googleApiRequest(
+        `https://mybusinessbusinessinformation.googleapis.com/v1/${accountId}/locations`,
+        accessToken,
+        "GET",
+        params,
+      );
+
+      const locations = data.locations || [];
+      const formatted = locations.map((loc: any) => ({
+        id: loc.name?.split("/").pop(),
+        google_place_id: loc.name,
+        name: loc.title || "Unknown Location",
+        address: loc.storefrontAddress
+          ? `${loc.storefrontAddress.addressLines?.join(", ") || ""}, ${loc.storefrontAddress.locality || ""}, ${loc.storefrontAddress.administrativeArea || ""}`.trim()
+          : null,
+        phone: loc.phoneNumbers?.primaryPhone || null,
+        website: loc.websiteUri || null,
+        rating: loc.metadata?.averageRating || null,
+        total_reviews: loc.metadata?.newReviewCount || 0,
+        latitude: loc.latlng?.latitude || null,
+        longitude: loc.latlng?.longitude || null,
+        status: "active",
+        last_fetched_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      allLocations.push(...formatted);
+      nextPageToken = data.nextPageToken ?? null;
+
+      console.log(`Fetched ${formatted.length} locations from ${accountId}`);
+    } while (nextPageToken);
+  }
+
+  return json({ locations: allLocations });
+}
+
+async function searchLocations(userId: string, query: string, accessToken: string) {
+  const response = await fetchUserLocations(userId, accessToken);
+  const data = await response.json();
+
+  const q = query.toLowerCase();
+  const filtered = (data.locations as any[]).filter((location: any) =>
+    location.name?.toLowerCase().includes(q) ||
+    location.address?.toLowerCase().includes(q)
+  );
+
+  return json({ locations: filtered });
+}
+
+async function fetchLocationReviews(locationId: string, accessToken: string) {
+  const accountIds = await getAllAccountIds(accessToken); // ["accounts/123"]
+  let allReviews: any[] = [];
+
+  for (const accountPath of accountIds) { // keep full path
+    try {
+      let nextPageToken: string | null = null;
+
+      do {
+        const url =
+          `https://mybusiness.googleapis.com/v4/${accountPath}/locations/${locationId}/reviews` +
+          (nextPageToken ? `?pageToken=${nextPageToken}` : "");
+
+        const data = await googleApiRequest(url, accessToken);
+        const raw = data.reviews || [];
+
+        const formatted = raw.map((r: any) => ({
+          id: r.reviewId,
+          author_name: r.reviewer?.displayName || "Anonymous",
+          rating: r.starRating || 0,
+          text: r.comment || "",
+          review_date: r.createTime || new Date().toISOString(),
+          ai_sentiment: null,
+          ai_tags: [],
+        }));
+
+        allReviews.push(...formatted);
+        nextPageToken = data.nextPageToken ?? null;
+      } while (nextPageToken);
+
+      break; // found reviews for this account
+    } catch {
+      console.log(`No reviews for location ${locationId} in ${accountPath}`);
+      continue;
+    }
+  }
+
+  return json({ reviews: allReviews });
+}
+
+async function fetchLocationAnalytics(
+  locationId: string,
+  accessToken: string,
+  startDate?: any,
+  endDate?: any,
+) {
+  const today = new Date();
+  const defaultEnd = {
+    year: today.getFullYear(),
+    month: today.getMonth() + 1,
+    day: today.getDate(),
+  };
+
+  const ago = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const defaultStart = {
+    year: ago.getFullYear(),
+    month: ago.getMonth() + 1,
+    day: ago.getDate(),
+  };
+
+  const start = startDate || defaultStart;
+  const end = endDate || defaultEnd;
+
+  const params: Record<string, string> = {
+    dailyMetrics: [
+      "BUSINESS_IMPRESSIONS_MOBILE_SEARCH",
+      "BUSINESS_CONVERSATIONS",
+      "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH",
+      "BUSINESS_IMPRESSIONS_DESKTOP_MAPS",
+      "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
+      "BUSINESS_DIRECTION_REQUESTS",
+      "CALL_CLICKS",
+      "WEBSITE_CLICKS",
+      "BUSINESS_BOOKINGS",
+      "BUSINESS_FOOD_ORDERS",
+      "BUSINESS_FOOD_MENU_CLICKS",
+    ].join(","),
+    "dailyRange.start_date.year": String(start.year),
+    "dailyRange.start_date.month": String(start.month),
+    "dailyRange.start_date.day": String(start.day),
+    "dailyRange.end_date.year": String(end.year),
+    "dailyRange.end_date.month": String(end.month),
+    "dailyRange.end_date.day": String(end.day),
+  };
+
+  const url =
+    `https://businessprofileperformance.googleapis.com/v1/locations/${locationId}:fetchMultiDailyMetricsTimeSeries`;
+
+  const response = await googleApiRequest(url, accessToken, "GET", params);
+  return json({ analytics: response });
 }
