@@ -28,6 +28,7 @@ const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
   { title: "Locations", url: "/locations", icon: MapPin },
   { title: "Reviews", url: "/reviews", icon: MessageSquare },
+  { title: "Analytics", url: "/analytics", icon: TrendingUp },
   { title: "Sentiment", url: "/sentiment", icon: TrendingUp },
 ];
 
