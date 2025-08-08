@@ -26,6 +26,7 @@ interface Review {
   reply_date: string | null;
   ai_sentiment: "positive" | "negative" | "neutral" | null;
   ai_tags: string[] | null;
+  location_id: string;
 }
 
 const Reviews = () => {
@@ -94,7 +95,10 @@ const Reviews = () => {
 
       if (error) throw error;
 
-      const reviewsData = (data?.reviews || []) as Review[];
+      const reviewsData = (data?.reviews || []).map((review: any) => ({
+        ...review,
+        location_id: locationId // Add the location_id to each review
+      })) as Review[];
       setReviews(reviewsData);
     } catch (error) {
       console.error("Error fetching reviews:", error);
@@ -193,7 +197,213 @@ const Reviews = () => {
           </header>
           
           <div className="flex-1 space-y-6 p-8 pt-6">
-            {/* ...rest of your JSX exactly as you posted... */}
+            {/* Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{reviews.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Active reviews
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{getAverageRating()}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Out of 5 stars
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Positive</CardTitle>
+                  <div className="h-4 w-4 bg-success rounded-full" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{sentimentCounts.positive}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Positive reviews
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Negative</CardTitle>
+                  <div className="h-4 w-4 bg-destructive rounded-full" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{sentimentCounts.negative}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Negative reviews
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Filters */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Filter Reviews</CardTitle>
+                <CardDescription>Filter reviews by search, sentiment, rating, and tags</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Search</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search reviews..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Sentiment</label>
+                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Sentiments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Sentiments</SelectItem>
+                        <SelectItem value="positive">Positive</SelectItem>
+                        <SelectItem value="negative">Negative</SelectItem>
+                        <SelectItem value="neutral">Neutral</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Rating</label>
+                    <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Ratings" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Ratings</SelectItem>
+                        <SelectItem value="5">5 Stars</SelectItem>
+                        <SelectItem value="4">4 Stars</SelectItem>
+                        <SelectItem value="3">3 Stars</SelectItem>
+                        <SelectItem value="2">2 Stars</SelectItem>
+                        <SelectItem value="1">1 Star</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tags</label>
+                    <Select value={tagFilter} onValueChange={setTagFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Tags" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tags</SelectItem>
+                        {allTags.map((tag) => (
+                          <SelectItem key={tag} value={tag}>
+                            {tag}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Reviews List */}
+            <div className="space-y-4">
+              {filteredReviews.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No reviews found</h3>
+                    <p className="text-muted-foreground">
+                      {reviews.length === 0 
+                        ? "No reviews available for this location." 
+                        : "Try adjusting your filters to see more reviews."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredReviews.map((review) => (
+                  <Card key={review.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="text-lg">{review.author_name}</CardTitle>
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${
+                                    i < review.rating
+                                      ? "text-yellow-400 fill-current"
+                                      : "text-gray-300"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(review.review_date), "MMM d, yyyy")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {review.ai_sentiment && (
+                            <Badge 
+                              variant="outline" 
+                              className={`${getSentimentColor(review.ai_sentiment)} ${getSentimentBg(review.ai_sentiment)}`}
+                            >
+                              {review.ai_sentiment}
+                            </Badge>
+                          )}
+                          <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {review.text && (
+                        <p className="text-muted-foreground mb-4">{review.text}</p>
+                      )}
+                      
+                      {review.ai_tags && review.ai_tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {review.ai_tags.map((tag, index) => (
+                            <Badge key={index} variant="secondary">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {review.reply_text && (
+                        <div className="bg-muted/50 p-4 rounded-lg mt-4">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Badge variant="outline">Business Reply</Badge>
+                            {review.reply_date && (
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(review.reply_date), "MMM d, yyyy")}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm">{review.reply_text}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
           </div>
         </SidebarInset>
       </div>
