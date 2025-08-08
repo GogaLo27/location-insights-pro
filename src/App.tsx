@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/ui/auth-provider";
 import { LocationProvider } from "@/contexts/LocationContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Locations from "./pages/Locations";
@@ -27,12 +28,41 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Landing />} />
-              <Route path="/plan-selection" element={<PlanSelection />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/locations" element={<Locations />} />
-              <Route path="/reviews" element={<Reviews />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/sentiment" element={<Sentiment />} />
+              <Route path="/plan-selection" element={
+                <ProtectedRoute requiresPlan={false}>
+                  <PlanSelection />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/locations" element={
+                <ProtectedRoute>
+                  <Locations />
+                </ProtectedRoute>
+              } />
+              <Route path="/reviews" element={
+                <ProtectedRoute>
+                  <Reviews />
+                </ProtectedRoute>
+              } />
+              <Route path="/analytics" element={
+                <ProtectedRoute>
+                  <Analytics />
+                </ProtectedRoute>
+              } />
+              <Route path="/sentiment" element={
+                <ProtectedRoute>
+                  <Sentiment />
+                </ProtectedRoute>
+              } />
+              <Route path="/plan-management" element={
+                <ProtectedRoute>
+                  <PlanManagement />
+                </ProtectedRoute>
+              } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

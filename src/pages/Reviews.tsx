@@ -85,7 +85,7 @@ const Reviews = () => {
       const { data, error } = await supabase.functions.invoke("google-business-api", {
         body: {
           action: "fetch_reviews",
-          locationId, // ✅ now always the trailing id string Google v4 expects
+          locationId,
         },
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
@@ -95,10 +95,35 @@ const Reviews = () => {
 
       if (error) throw error;
 
-      const reviewsData = (data?.reviews || []).map((review: any) => ({
+      let reviewsData = (data?.reviews || []).map((review: any) => ({
         ...review,
-        location_id: locationId // Add the location_id to each review
+        location_id: locationId
       })) as Review[];
+
+      // Analyze reviews with AI if they don't have sentiment/tags
+      const reviewsToAnalyze = reviewsData.filter(review => !review.ai_sentiment || !review.ai_tags);
+      
+      if (reviewsToAnalyze.length > 0) {
+        try {
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+            body: { reviews: reviewsToAnalyze },
+            headers: {
+              Authorization: `Bearer ${supabaseJwt}`,
+            },
+          });
+
+          if (!analysisError && analysisData?.reviews) {
+            // Update the reviews with AI analysis
+            reviewsData = reviewsData.map(review => {
+              const analyzed = analysisData.reviews.find((r: any) => r.google_review_id === review.google_review_id);
+              return analyzed ? { ...review, ai_sentiment: analyzed.ai_sentiment, ai_tags: analyzed.ai_tags } : review;
+            });
+          }
+        } catch (analysisError) {
+          console.error('Error analyzing reviews:', analysisError);
+        }
+      }
+
       setReviews(reviewsData);
     } catch (error) {
       console.error("Error fetching reviews:", error);

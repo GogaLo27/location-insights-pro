@@ -22,7 +22,8 @@ const PlanSelection = () => {
     setSelectedPlan(planType);
 
     try {
-      const { error } = await supabase
+      // Save the plan
+      const { error: planError } = await supabase
         .from('user_plans')
         .upsert({
           user_id: user.id,
@@ -31,7 +32,46 @@ const PlanSelection = () => {
           onConflict: 'user_id'
         });
 
-      if (error) throw error;
+      if (planError) throw planError;
+
+      // Fetch user's locations
+      const getSessionTokens = async () => {
+        let { data: { session } } = await supabase.auth.getSession();
+        if (!session?.provider_token) {
+          await supabase.auth.refreshSession();
+          ({ data: { session } } = await supabase.auth.getSession());
+        }
+        return {
+          supabaseJwt: session?.access_token || "",
+          googleAccessToken: session?.provider_token || "",
+        };
+      };
+
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      
+      if (supabaseJwt && googleAccessToken) {
+        const { data } = await supabase.functions.invoke('google-business-api', {
+          body: { action: 'fetch_user_locations' },
+          headers: {
+            Authorization: `Bearer ${supabaseJwt}`,
+            'X-Google-Token': googleAccessToken,
+          },
+        });
+
+        // Auto-select first location if available
+        if (data?.locations && data.locations.length > 0) {
+          const firstLocation = data.locations[0];
+          await supabase
+            .from('user_selected_locations')
+            .upsert({
+              user_id: user.id,
+              google_place_id: firstLocation.google_place_id,
+              location_name: firstLocation.name,
+            }, {
+              onConflict: 'user_id'
+            });
+        }
+      }
 
       toast({
         title: "Plan Selected",
