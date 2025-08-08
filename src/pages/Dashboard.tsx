@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,13 +18,14 @@ interface Profile {
 }
 
 const Dashboard = () => {
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
+      setProfileLoading(true);
       fetchProfile();
     }
   }, [user]);
@@ -42,16 +44,15 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error:', error);
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   };
 
-  if (!user) {
-    window.location.href = '/';
-    return null;
+  if (!user && !authLoading) {
+    return <Navigate to="/" replace />;
   }
 
-  if (loading) {
+  if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
