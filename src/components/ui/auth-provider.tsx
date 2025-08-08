@@ -46,6 +46,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/dashboard`,
+        scopes: [
+          'openid',
+          'profile', 
+          'email',
+          'https://www.googleapis.com/auth/business.manage',
+          'https://www.googleapis.com/auth/businessprofileperformance.readonly'
+        ].join(' ')
       },
     });
     if (error) {
