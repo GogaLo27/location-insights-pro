@@ -9,7 +9,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,6 +20,10 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+    if (!prompt) {
+      throw new Error('Prompt is required');
+    }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -30,16 +33,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { 
-            role: 'system', 
-            content: `You are an AI assistant that helps businesses write professional, empathetic responses to customer reviews. Your responses should be:
-            - Professional and courteous
-            - Empathetic and understanding
-            - Specific to the customer's feedback
-            - Brief but meaningful (under 150 words)
-            - Focused on customer satisfaction
-            - Ending with an invitation for future business or direct contact if needed`
-          },
+          { role: 'system', content: 'You are a professional business reply generator. Generate helpful, empathetic, and professional responses to customer reviews.' },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
@@ -48,6 +42,7 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      console.error(`OpenAI API error: ${response.status}`);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 

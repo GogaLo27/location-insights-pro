@@ -92,16 +92,13 @@ const Dashboard = () => {
       }
 
       const locationId = selectedLocation.google_place_id.split('/').pop();
-      const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_reviews", locationId },
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
-        },
-      });
+      // Get reviews from saved_reviews table
+      const { data: reviews, error } = await supabase
+        .from('saved_reviews')
+        .select('*')
+        .eq('location_id', locationId);
 
-      if (!error && data?.reviews) {
-        const reviews = data.reviews;
+      if (!error && reviews) {
         const totalReviews = reviews.length;
         const averageRating = totalReviews > 0 
           ? reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / totalReviews 
@@ -158,20 +155,16 @@ const Dashboard = () => {
       }
 
       const locationId = selectedLocation.google_place_id.split('/').pop();
-      const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_reviews", locationId },
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
-        },
-      });
+      // Get recent reviews from saved_reviews table
+      const { data: reviews, error } = await supabase
+        .from('saved_reviews')
+        .select('*')
+        .eq('location_id', locationId)
+        .order('review_date', { ascending: false })
+        .limit(5);
 
-      if (!error && data?.reviews) {
-        // Get the 5 most recent reviews
-        const recent = data.reviews
-          .sort((a: any, b: any) => new Date(b.review_date).getTime() - new Date(a.review_date).getTime())
-          .slice(0, 5);
-        setRecentReviews(recent);
+      if (!error && reviews) {
+        setRecentReviews(reviews);
       }
     } catch (error) {
       console.error('Error fetching recent reviews:', error);

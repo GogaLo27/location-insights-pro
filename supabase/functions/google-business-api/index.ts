@@ -300,30 +300,32 @@ async function fetchLocationAnalytics(locationId: string, accessToken: string, s
     const start = startDate || defaultStart;
     const end = endDate || defaultEnd;
 
-    const params: Record<string, string> = {
+    const requestBody = {
       dailyMetrics: [
         "BUSINESS_IMPRESSIONS_MOBILE_SEARCH",
-        "BUSINESS_CONVERSATIONS",
         "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH",
         "BUSINESS_IMPRESSIONS_DESKTOP_MAPS",
         "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
         "BUSINESS_DIRECTION_REQUESTS",
         "CALL_CLICKS",
-        "WEBSITE_CLICKS",
-        "BUSINESS_BOOKINGS",
-        "BUSINESS_FOOD_ORDERS",
-        "BUSINESS_FOOD_MENU_CLICKS",
-      ].join(","),
-      "dailyRange.start_date.year": String(start.year),
-      "dailyRange.start_date.month": String(start.month),
-      "dailyRange.start_date.day": String(start.day),
-      "dailyRange.end_date.year": String(end.year),
-      "dailyRange.end_date.month": String(end.month),
-      "dailyRange.end_date.day": String(end.day),
+        "WEBSITE_CLICKS"
+      ],
+      dailyRange: {
+        startDate: {
+          year: start.year,
+          month: start.month,
+          day: start.day
+        },
+        endDate: {
+          year: end.year,
+          month: end.month,
+          day: end.day
+        }
+      }
     };
 
     const url = `https://businessprofileperformance.googleapis.com/v1/locations/${locationId}:fetchMultiDailyMetricsTimeSeries`;
-    const response = await googleApiRequest(url, accessToken, "GET", params);
+    const response = await googleApiRequest(url, accessToken, "POST", undefined, requestBody);
 
     return json({ analytics: response });
   } catch (error) {

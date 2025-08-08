@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Search, Star, Filter, RefreshCw, MessageSquare } from "lucide-react";
+import { Search, Star, Filter, RefreshCw, MessageSquare, Bot } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -27,6 +27,10 @@ interface Review {
   ai_sentiment: "positive" | "negative" | "neutral" | null;
   ai_tags: string[] | null;
   location_id: string;
+  user_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  ai_analyzed_at?: string | null;
 }
 
 const Reviews = () => {
@@ -79,6 +83,16 @@ const Reviews = () => {
 
     setLoading(true);
     try {
+      // First, load saved reviews from database
+      const { data: savedReviews, error: dbError } = await supabase
+        .from('saved_reviews')
+        .select('*')
+        .eq('location_id', locationId)
+        .order('review_date', { ascending: false });
+
+      if (dbError) console.error('Database error:', dbError);
+
+      // Then fetch fresh reviews from Google
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
 
@@ -95,36 +109,25 @@ const Reviews = () => {
 
       if (error) throw error;
 
-      let reviewsData = (data?.reviews || []).map((review: any) => ({
+      const googleReviews = (data?.reviews || []).map((review: any) => ({
         ...review,
         location_id: locationId
-      })) as Review[];
+      }));
 
-      // Analyze reviews with AI if they don't have sentiment/tags
-      const reviewsToAnalyze = reviewsData.filter(review => !review.ai_sentiment || !review.ai_tags);
-      
-      if (reviewsToAnalyze.length > 0) {
-        try {
-          const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
-            body: { reviews: reviewsToAnalyze },
-            headers: {
-              Authorization: `Bearer ${supabaseJwt}`,
-            },
-          });
+      // Merge with saved reviews and save new ones
+      await saveReviewsToDatabase(googleReviews, locationId);
 
-          if (!analysisError && analysisData?.reviews) {
-            // Update the reviews with AI analysis
-            reviewsData = reviewsData.map(review => {
-              const analyzed = analysisData.reviews.find((r: any) => r.google_review_id === review.google_review_id);
-              return analyzed ? { ...review, ai_sentiment: analyzed.ai_sentiment, ai_tags: analyzed.ai_tags } : review;
-            });
-          }
-        } catch (analysisError) {
-          console.error('Error analyzing reviews:', analysisError);
-        }
-      }
+      // Get updated reviews from database
+      const { data: updatedReviews } = await supabase
+        .from('saved_reviews')
+        .select('*')
+        .eq('location_id', locationId)
+        .order('review_date', { ascending: false });
 
-      setReviews(reviewsData);
+      setReviews((updatedReviews || []).map(review => ({
+        ...review,
+        ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
+      })));
     } catch (error) {
       console.error("Error fetching reviews:", error);
       toast({
@@ -133,6 +136,95 @@ const Reviews = () => {
         variant: "destructive",
       });
       setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveReviewsToDatabase = async (googleReviews: any[], locationId: string) => {
+    if (!user) return;
+
+    for (const review of googleReviews) {
+      try {
+        // Upsert review (insert or update if exists)
+        await supabase
+          .from('saved_reviews')
+          .upsert({
+            user_id: user.id,
+            google_review_id: review.google_review_id,
+            location_id: locationId,
+            author_name: review.author_name,
+            rating: review.rating,
+            text: review.text,
+            review_date: review.review_date,
+            reply_text: review.reply_text,
+            reply_date: review.reply_date,
+            ai_sentiment: review.ai_sentiment,
+            ai_tags: review.ai_tags,
+            ai_analyzed_at: review.ai_sentiment ? new Date().toISOString() : null,
+          });
+      } catch (error) {
+        console.error('Error saving review:', error);
+      }
+    }
+  };
+
+  const runAIAnalysis = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      // Get reviews that haven't been analyzed yet
+      const { data: unanalyzedReviews } = await supabase
+        .from('saved_reviews')
+        .select('*')
+        .eq('location_id', resolveLocationId())
+        .is('ai_analyzed_at', null);
+
+      if (!unanalyzedReviews || unanalyzedReviews.length === 0) {
+        toast({
+          title: "Info",
+          description: "All reviews are already analyzed",
+        });
+        return;
+      }
+
+      const { supabaseJwt } = await getSessionTokens();
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+        body: { reviews: unanalyzedReviews },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+        },
+      });
+
+      if (!analysisError && analysisData?.reviews) {
+        // Update database with AI analysis
+        for (const analyzedReview of analysisData.reviews) {
+          await supabase
+            .from('saved_reviews')
+            .update({
+              ai_sentiment: analyzedReview.ai_sentiment,
+              ai_tags: analyzedReview.ai_tags,
+              ai_analyzed_at: new Date().toISOString(),
+            })
+            .eq('google_review_id', analyzedReview.google_review_id);
+        }
+
+        toast({
+          title: "Success",
+          description: `Analyzed ${analysisData.reviews.length} reviews`,
+        });
+
+        // Refresh reviews
+        fetchReviews();
+      }
+    } catch (error) {
+      console.error('Error running AI analysis:', error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze reviews",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -214,6 +306,10 @@ const Reviews = () => {
               <h1 className="text-xl font-semibold">Reviews</h1>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
+              <Button onClick={runAIAnalysis} size="sm" variant="outline">
+                <Bot className="w-4 h-4 mr-2" />
+                AI Analysis
+              </Button>
               <Button onClick={fetchReviews} size="sm">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
@@ -392,7 +488,9 @@ const Reviews = () => {
                               {review.ai_sentiment}
                             </Badge>
                           )}
-                          <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
+                          {!review.reply_text && (
+                            <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
+                          )}
                         </div>
                       </div>
                     </CardHeader>

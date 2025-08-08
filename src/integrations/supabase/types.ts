@@ -109,6 +109,60 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_reviews: {
+        Row: {
+          ai_analyzed_at: string | null
+          ai_sentiment: string | null
+          ai_tags: string[] | null
+          author_name: string
+          created_at: string | null
+          google_review_id: string
+          id: string
+          location_id: string
+          rating: number
+          reply_date: string | null
+          reply_text: string | null
+          review_date: string
+          text: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_analyzed_at?: string | null
+          ai_sentiment?: string | null
+          ai_tags?: string[] | null
+          author_name: string
+          created_at?: string | null
+          google_review_id: string
+          id?: string
+          location_id: string
+          rating: number
+          reply_date?: string | null
+          reply_text?: string | null
+          review_date: string
+          text?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_analyzed_at?: string | null
+          ai_sentiment?: string | null
+          ai_tags?: string[] | null
+          author_name?: string
+          created_at?: string | null
+          google_review_id?: string
+          id?: string
+          location_id?: string
+          rating?: number
+          reply_date?: string | null
+          reply_text?: string | null
+          review_date?: string
+          text?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_plans: {
         Row: {
           created_at: string

@@ -78,19 +78,24 @@ const Sentiment = () => {
     try {
       setLoading(true);
       
-      // Use edge function to get sentiment data
-      const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
-        body: { 
-          action: 'get_sentiment_analysis',
-          location_id: selectedLocation !== "all" ? selectedLocation : undefined,
-          period_type: selectedPeriod,
-          start_date: format(dateRange.from, 'yyyy-MM-dd'),
-          end_date: format(dateRange.to, 'yyyy-MM-dd')
-        }
-      });
+      // Get sentiment data from saved reviews
+      let query = supabase
+        .from('saved_reviews')
+        .select('*')
+        .gte('review_date', format(dateRange.from, 'yyyy-MM-dd'))
+        .lte('review_date', format(dateRange.to, 'yyyy-MM-dd'))
+        .not('ai_sentiment', 'is', null);
 
-      if (!error && data?.sentiment_data) {
-        setSentimentData(data.sentiment_data);
+      if (selectedLocation !== "all") {
+        query = query.eq('location_id', selectedLocation);
+      }
+
+      const { data: reviews, error } = await query;
+
+      if (!error && reviews) {
+        // Process reviews into sentiment data by period
+        const processedData = processReviewsIntoSentimentData(reviews);
+        setSentimentData(processedData);
       } else {
         setSentimentData([]);
       }
@@ -100,6 +105,81 @@ const Sentiment = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const processReviewsIntoSentimentData = (reviews: any[]): SentimentData[] => {
+    const groupedData: { [key: string]: any } = {};
+
+    reviews.forEach(review => {
+      let key = '';
+      const reviewDate = new Date(review.review_date);
+      
+      switch (selectedPeriod) {
+        case 'daily':
+          key = format(reviewDate, 'yyyy-MM-dd');
+          break;
+        case 'weekly':
+          const weekStart = new Date(reviewDate);
+          weekStart.setDate(reviewDate.getDate() - reviewDate.getDay());
+          key = format(weekStart, 'yyyy-MM-dd');
+          break;
+        case 'monthly':
+          key = format(reviewDate, 'yyyy-MM');
+          break;
+        case 'yearly':
+          key = format(reviewDate, 'yyyy');
+          break;
+      }
+
+      if (!groupedData[key]) {
+        groupedData[key] = {
+          id: key,
+          analysis_date: key,
+          period_type: selectedPeriod,
+          positive_count: 0,
+          negative_count: 0,
+          neutral_count: 0,
+          ratings: [],
+          tags: []
+        };
+      }
+
+      // Count sentiment
+      if (review.ai_sentiment === 'positive') groupedData[key].positive_count++;
+      else if (review.ai_sentiment === 'negative') groupedData[key].negative_count++;
+      else groupedData[key].neutral_count++;
+
+      // Collect ratings and tags
+      groupedData[key].ratings.push(review.rating);
+      if (review.ai_tags) {
+        groupedData[key].tags.push(...review.ai_tags);
+      }
+    });
+
+    // Convert to final format
+    return Object.values(groupedData).map((data: any) => ({
+      ...data,
+      average_rating: data.ratings.length > 0 ? data.ratings.reduce((a: number, b: number) => a + b, 0) / data.ratings.length : 0,
+      sentiment_score: data.positive_count > 0 ? (data.positive_count / (data.positive_count + data.negative_count + data.neutral_count)) * 100 : 0,
+      top_positive_tags: getTopTags(data.tags, reviews.filter((r: any) => r.ai_sentiment === 'positive')),
+      top_negative_tags: getTopTags(data.tags, reviews.filter((r: any) => r.ai_sentiment === 'negative'))
+    }));
+  };
+
+  const getTopTags = (allTags: string[], sentimentReviews: any[]): string[] => {
+    const tagCounts: { [key: string]: number } = {};
+    sentimentReviews.forEach(review => {
+      if (review.ai_tags) {
+        review.ai_tags.forEach((tag: string) => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      }
+    });
+
+    return Object.entries(tagCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([tag]) => tag);
   };
 
   const handleGenerateSentiment = async () => {

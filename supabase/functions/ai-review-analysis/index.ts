@@ -20,6 +20,10 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+    if (!reviews || !Array.isArray(reviews)) {
+      throw new Error('Reviews array is required');
+    }
+
     const analyzedReviews = [];
 
     for (const review of reviews) {
