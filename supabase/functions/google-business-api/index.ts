@@ -19,70 +19,71 @@ serve(async (req) => {
   }
 
   try {
-    const { action, locationId, query, startDate, endDate } = await req.json();
+    console.log('=== FUNCTION CALLED ===');
+    const body = await req.json();
+    console.log('Request body:', JSON.stringify(body));
+    const { action, locationId, query, startDate, endDate } = body;
     
     // Get user session with access token
     const authHeader = req.headers.get('Authorization');
+    console.log('Auth header present:', !!authHeader);
     if (!authHeader) {
       throw new Error('No authorization header');
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
     
     // Get the user info
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    console.log('Auth error:', authError);
+    console.log('User found:', !!user);
 
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('Auth failed:', authError);
       throw new Error('Unauthorized');
     }
 
-    console.log('=== DEBUGGING USER OBJECT ===');
+    console.log('=== USER DATA AVAILABLE ===');
     console.log('User ID:', user.id);
-    console.log('User metadata:', JSON.stringify(user.user_metadata, null, 2));
-    console.log('App metadata:', JSON.stringify(user.app_metadata, null, 2));
-    console.log('Identities:', JSON.stringify(user.identities, null, 2));
-    console.log('Provider token from user_metadata:', user.user_metadata?.provider_token);
-    console.log('Access token from user_metadata:', user.user_metadata?.access_token);
+    console.log('User email:', user.email);
+    console.log('User created at:', user.created_at);
+    console.log('User metadata keys:', Object.keys(user.user_metadata || {}));
+    console.log('App metadata keys:', Object.keys(user.app_metadata || {}));
+    console.log('Identities count:', user.identities?.length || 0);
     
-    // Get Google access token from various possible locations
-    let googleAccessToken = null;
-    
-    // Check identities for Google provider
-    if (user.identities && user.identities.length > 0) {
-      const googleIdentity = user.identities.find(identity => identity.provider === 'google');
-      console.log('Google identity found:', !!googleIdentity);
-      if (googleIdentity) {
-        console.log('Google identity keys:', Object.keys(googleIdentity));
-        googleAccessToken = googleIdentity.access_token;
-        console.log('Access token from identity:', !!googleAccessToken);
-      }
+    // Print all identities
+    if (user.identities) {
+      user.identities.forEach((identity, index) => {
+        console.log(`Identity ${index}:`, {
+          provider: identity.provider,
+          id: identity.id,
+          hasAccessToken: !!identity.access_token,
+          keys: Object.keys(identity)
+        });
+      });
     }
     
-    // Check user_metadata
-    if (!googleAccessToken && user.user_metadata?.provider_token) {
-      googleAccessToken = user.user_metadata.provider_token;
-      console.log('Using provider_token from user_metadata');
-    }
+    console.log('Raw user metadata:', user.user_metadata);
+    console.log('Raw app metadata:', user.app_metadata);
     
-    // Check user_metadata for access_token
-    if (!googleAccessToken && user.user_metadata?.access_token) {
-      googleAccessToken = user.user_metadata.access_token;
-      console.log('Using access_token from user_metadata');
-    }
-    
-    // Check app_metadata
-    if (!googleAccessToken && user.app_metadata?.provider_token) {
-      googleAccessToken = user.app_metadata.provider_token;
-      console.log('Using provider_token from app_metadata');
-    }
-
-    console.log('Final Google access token found:', !!googleAccessToken);
-    console.log('=== END DEBUGGING ===');
-
-    if (!googleAccessToken) {
-      throw new Error('No Google access token found. The user needs to re-authenticate with Google to grant business access permissions.');
-    }
+    // Just return mock data for now to test if the function works
+    console.log('=== RETURNING MOCK DATA ===');
+    return new Response(
+      JSON.stringify({ 
+        locations: [
+          {
+            id: 'test-123',
+            name: 'Test Business',
+            address: '123 Test St, Test City',
+            phone: '+1-555-0123',
+            rating: 4.5,
+            total_reviews: 42
+          }
+        ]
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
     switch (action) {
       case 'get_user_locations':
