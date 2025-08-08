@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      review_analyses: {
+        Row: {
+          ai_sentiment: string | null
+          ai_summary: string | null
+          ai_tags: string[] | null
+          confidence_score: number | null
+          created_at: string
+          id: string
+          review_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_sentiment?: string | null
+          ai_summary?: string | null
+          ai_tags?: string[] | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          review_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_sentiment?: string | null
+          ai_summary?: string | null
+          ai_tags?: string[] | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          review_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_analyses_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           ai_sentiment: string | null

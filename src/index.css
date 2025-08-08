@@ -106,6 +106,20 @@ All colors MUST be HSL.
   }
 }
 
+@layer components {
+  .hover-scale {
+    @apply transition-transform duration-200 ease-in-out hover:scale-105 active:scale-95;
+  }
+  
+  .glass-effect {
+    @apply backdrop-blur-md bg-white/10 border border-white/20;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -107,7 +107,7 @@ const Analytics = () => {
       
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
-          action: 'fetch_analytics',
+          action: 'fetch_location_analytics',
           locationId: selectedLocation,
           startDate: {
             year: startDate.getFullYear(),
@@ -126,15 +126,19 @@ const Analytics = () => {
         },
       });
 
-      if (!error && data?.analytics?.multiDailyMetricsTimeSeries) {
-        const processedData = processAnalyticsData(data.analytics.multiDailyMetricsTimeSeries);
+      if (!error && data?.metrics) {
+        const processedData = processAnalyticsData(data.metrics);
         setAnalyticsData(processedData);
+      } else {
+        console.error('Analytics fetch error:', error);
+        setAnalyticsData([]);
       }
     } catch (error) {
       console.error('Error fetching analytics:', error);
+      setAnalyticsData([]);
       toast({
-        title: "Error",
-        description: "Failed to fetch analytics data",
+        title: "Analytics Unavailable",
+        description: "Unable to load analytics data at this time",
         variant: "destructive",
       });
     } finally {

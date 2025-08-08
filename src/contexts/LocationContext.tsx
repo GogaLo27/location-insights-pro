@@ -113,10 +113,14 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
           user_id: user.id,
           google_place_id: location.google_place_id,
           location_name: location.location_name,
+        }, {
+          onConflict: 'user_id'
         });
 
       if (!error) {
         setSelectedLocation(location);
+      } else {
+        console.error('Error updating selected location:', error);
       }
     } catch (error) {
       console.error('Error updating selected location:', error);
