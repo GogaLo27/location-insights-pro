@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { MessageSquare, Star, Filter, Reply, Search } from "lucide-react";
+import { MessageSquare, Star, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useLocation } from "@/contexts/LocationContext";
+import ReplyDialog from "@/components/ReplyDialog";
 
 interface Review {
   id: string;
@@ -38,11 +40,10 @@ interface Location {
 const Reviews = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { selectedLocation: globalSelectedLocation } = useLocation();
 
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
@@ -61,63 +62,13 @@ const Reviews = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      await fetchLocations();
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
+    if (!user || !globalSelectedLocation) return;
     (async () => {
       await fetchReviews();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLocation]);
+  }, [user, globalSelectedLocation]);
 
-  const fetchLocations = async () => {
-    try {
-      setLoading(true);
-      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign out and sign in with Google again to access your business data.",
-          variant: "destructive",
-        });
-        setLocations([]);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_user_locations" }, // backend supports 'get_user_locations' too
-        headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
-        },
-      });
-
-      if (error) {
-        console.error("fetch_user_locations error:", error);
-        setLocations([]);
-        return;
-      }
-
-      const list: Location[] = data?.locations || [];
-      setLocations(list);
-
-      // If "all" selected but we have locations, auto-select first so reviews can load
-      if (selectedLocation === "all" && list.length > 0) {
-        setSelectedLocation(list[0].id);
-      }
-    } catch (e) {
-      console.error("Error fetching locations:", e);
-      setLocations([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchReviews = async () => {
     try {
@@ -129,15 +80,15 @@ const Reviews = () => {
         return;
       }
 
-      // Require a specific location for now
-      if (selectedLocation === "all") {
+      // Use global selected location
+      if (!globalSelectedLocation) {
         setReviews([]);
         return;
       }
 
-      // Correct action + param name
+      const locationId = globalSelectedLocation.google_place_id.split('/').pop();
       const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_reviews", locationId: selectedLocation },
+        body: { action: "fetch_reviews", locationId },
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
           "X-Google-Token": googleAccessToken,
@@ -166,7 +117,7 @@ const Reviews = () => {
         throw new Error("Missing tokens");
       }
 
-      const idToUse = locationId || (selectedLocation !== "all" ? selectedLocation : undefined);
+      const idToUse = locationId || (globalSelectedLocation?.google_place_id.split('/').pop());
       if (!idToUse) {
         toast({ title: "Select a location", description: "Choose a location to refresh reviews." });
         return;
@@ -267,96 +218,87 @@ const Reviews = () => {
               <h1 className="text-lg font-semibold">Reviews</h1>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              <Select
-                value={selectedLocation}
-                onValueChange={async (value) => {
-                  setSelectedLocation(value);
-                }}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="text-sm text-muted-foreground">
+                {globalSelectedLocation ? (
+                  <span className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-accent" />
+                    Showing reviews for: <strong>{globalSelectedLocation.location_name}</strong>
+                  </span>
+                ) : (
+                  "Select a location to view reviews"
+                )}
+              </div>
             </div>
           </header>
 
           <div className="flex-1 space-y-4 p-8 pt-6">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h1 className="text-3xl font-bold mb-2">Customer Reviews</h1>
+                <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Customer Reviews
+                </h1>
                 <p className="text-muted-foreground">
                   Manage and analyze your Google Business reviews with AI insights
                 </p>
               </div>
               <Button
-                onClick={() =>
-                  handleRefetchReviews(
-                    selectedLocation !== "all" ? selectedLocation : undefined
-                  )
-                }
+                onClick={() => handleRefetchReviews()}
+                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-xl transition-all duration-200"
               >
-                <MessageSquare className="w-4 h-4 mr-2" />
+                <Sparkles className="w-4 h-4 mr-2" />
                 Refresh Reviews
               </Button>
             </div>
 
             {/* Filters */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Filter className="w-5 h-5 mr-2" />
-                  Filters
+            <Card className="mb-6 border-accent/20 shadow-lg backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-foreground">
+                  <Filter className="w-5 h-5 mr-2 text-accent" />
+                  Smart Filters
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Search</label>
+                    <label className="text-sm font-medium mb-2 block text-foreground">Search Reviews</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-accent w-4 h-4" />
                       <Input
                         placeholder="Search reviews..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 border-accent/20 focus:border-accent bg-background/50"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Sentiment</label>
+                    <label className="text-sm font-medium mb-2 block text-foreground">AI Sentiment</label>
                     <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="border-accent/20 focus:border-accent bg-background/50">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Sentiments</SelectItem>
-                        <SelectItem value="positive">Positive</SelectItem>
-                        <SelectItem value="negative">Negative</SelectItem>
-                        <SelectItem value="neutral">Neutral</SelectItem>
+                        <SelectItem value="positive">😊 Positive</SelectItem>
+                        <SelectItem value="negative">😞 Negative</SelectItem>
+                        <SelectItem value="neutral">😐 Neutral</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Rating</label>
+                    <label className="text-sm font-medium mb-2 block text-foreground">Star Rating</label>
                     <Select value={ratingFilter} onValueChange={setRatingFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="border-accent/20 focus:border-accent bg-background/50">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Ratings</SelectItem>
-                        <SelectItem value="5">5 Stars</SelectItem>
-                        <SelectItem value="4">4 Stars</SelectItem>
-                        <SelectItem value="3">3 Stars</SelectItem>
-                        <SelectItem value="2">2 Stars</SelectItem>
-                        <SelectItem value="1">1 Star</SelectItem>
+                        <SelectItem value="5">⭐⭐⭐⭐⭐ 5 Stars</SelectItem>
+                        <SelectItem value="4">⭐⭐⭐⭐ 4 Stars</SelectItem>
+                        <SelectItem value="3">⭐⭐⭐ 3 Stars</SelectItem>
+                        <SelectItem value="2">⭐⭐ 2 Stars</SelectItem>
+                        <SelectItem value="1">⭐ 1 Star</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -366,17 +308,23 @@ const Reviews = () => {
 
             {/* Reviews List */}
             {filteredReviews.length === 0 ? (
-              <Card>
+              <Card className="border-accent/20 shadow-lg">
                 <CardContent className="text-center py-12">
-                  <MessageSquare className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No reviews found</h3>
+                  <div className="relative">
+                    <MessageSquare className="w-16 h-16 text-accent mx-auto mb-4 opacity-80" />
+                    <Sparkles className="w-6 h-6 text-accent absolute top-0 right-1/2 transform translate-x-8 animate-pulse" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2 text-foreground">No reviews found</h3>
                   <p className="text-muted-foreground mb-6">
                     {reviews.length === 0
                       ? "Fetch reviews from your Google Business locations to get started."
                       : "No reviews match your current filters."}
                   </p>
                   {reviews.length === 0 && (
-                    <Button onClick={() => handleRefetchReviews()}>
+                    <Button 
+                      onClick={() => handleRefetchReviews()}
+                      className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                    >
                       <MessageSquare className="w-4 h-4 mr-2" />
                       Fetch Reviews
                     </Button>
@@ -384,35 +332,39 @@ const Reviews = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {filteredReviews.map((review) => (
-                  <Card key={review.id}>
+                  <Card key={review.id} className="border-accent/10 shadow-lg hover:shadow-xl transition-all duration-200 backdrop-blur-sm bg-card/80">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center space-x-3">
-                          {review.author_photo_url && (
+                        <div className="flex items-center space-x-4">
+                          {review.author_photo_url ? (
                             <img
                               src={review.author_photo_url}
                               alt={review.author_name}
-                              className="w-10 h-10 rounded-full"
+                              className="w-12 h-12 rounded-full ring-2 ring-accent/20"
                             />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-lg">
+                              {review.author_name.charAt(0).toUpperCase()}
+                            </div>
                           )}
                           <div>
-                            <h4 className="font-semibold">{review.author_name}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {review.location_name} •{" "}
+                            <h4 className="font-semibold text-foreground text-lg">{review.author_name}</h4>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <TrendingUp className="w-3 h-3" />
                               {format(new Date(review.review_date), "MMM d, yyyy")}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3">
                           <div className="flex">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`w-4 h-4 ${
+                                className={`w-5 h-5 transition-colors ${
                                   i < review.rating
-                                    ? "text-yellow-400 fill-current"
+                                    ? "text-accent fill-current"
                                     : "text-muted-foreground"
                                 }`}
                               />
@@ -427,21 +379,27 @@ const Reviews = () => {
                                   ? "destructive"
                                   : "secondary"
                               }
+                              className="font-medium"
                             >
-                              {review.ai_sentiment}
+                              {review.ai_sentiment === "positive" && "😊"}
+                              {review.ai_sentiment === "negative" && "😞"}
+                              {review.ai_sentiment === "neutral" && "😐"}
+                              {" " + review.ai_sentiment}
                             </Badge>
                           )}
                         </div>
                       </div>
 
                       {review.text && (
-                        <p className="text-muted-foreground mb-4">{review.text}</p>
+                        <div className="bg-muted/30 p-4 rounded-lg mb-4 border border-accent/10">
+                          <p className="text-foreground leading-relaxed italic">"{review.text}"</p>
+                        </div>
                       )}
 
                       {review.ai_tags && review.ai_tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-4">
                           {review.ai_tags.map((tag, index) => (
-                            <Badge key={index} variant="outline">
+                            <Badge key={index} variant="outline" className="border-accent/30 text-accent hover:bg-accent/10">
                               {tag}
                             </Badge>
                           ))}
@@ -449,10 +407,15 @@ const Reviews = () => {
                       )}
 
                       {review.reply_text && (
-                        <div className="bg-muted p-4 rounded-lg mb-4">
-                          <p className="text-sm font-medium mb-1">Business Reply:</p>
-                          <p className="text-sm">{review.reply_text}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                        <div className="bg-gradient-to-r from-accent/5 to-primary/5 p-4 rounded-lg mb-4 border border-accent/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">B</span>
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Business Reply</p>
+                          </div>
+                          <p className="text-sm text-foreground/90 leading-relaxed">{review.reply_text}</p>
+                          <p className="text-xs text-muted-foreground mt-2">
                             {review.reply_date &&
                               format(new Date(review.reply_date), "MMM d, yyyy")}
                           </p>
@@ -460,17 +423,12 @@ const Reviews = () => {
                       )}
 
                       {!review.reply_text && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const replyText = prompt("Enter your reply:");
-                            if (replyText) handleReplyToReview(review.google_review_id, replyText);
-                          }}
-                        >
-                          <Reply className="w-4 h-4 mr-2" />
-                          Reply
-                        </Button>
+                        <div className="pt-4 border-t border-accent/10">
+                          <ReplyDialog
+                            review={review}
+                            onReplySubmitted={() => fetchReviews()}
+                          />
+                        </div>
                       )}
                     </CardContent>
                   </Card>

@@ -1,5 +1,3 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/components/ui/auth-provider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,8 +6,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MapPin, ChevronDown } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "@/contexts/LocationContext";
 
 interface Location {
   id: string;
@@ -18,96 +16,28 @@ interface Location {
   address: string | null;
 }
 
-interface SelectedLocation {
-  google_place_id: string;
-  location_name: string;
-}
-
 const LocationSelector = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      fetchLocations();
-      fetchSelectedLocation();
-    }
-  }, [user]);
-
-  const fetchLocations = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const googleAccessToken = session?.provider_token;
-      
-      if (!googleAccessToken) {
-        setLocations([]);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { action: 'fetch_user_locations' },
-        headers: { 'X-Google-Token': googleAccessToken }
-      });
-
-      if (!error && data?.locations) {
-        setLocations(data.locations);
-      }
-    } catch (error) {
-      console.error('Error fetching locations:', error);
-    }
-  };
-
-  const fetchSelectedLocation = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_selected_locations')
-        .select('google_place_id, location_name')
-        .eq('user_id', user?.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        setSelectedLocation(data);
-      }
-    } catch (error) {
-      console.error('Error fetching selected location:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { locations, selectedLocation, setSelectedLocation, loading } = useLocation();
 
   const selectLocation = async (location: Location) => {
     try {
-      const { error } = await supabase
-        .from('user_selected_locations')
-        .upsert({
-          user_id: user?.id,
-          google_place_id: location.google_place_id,
-          location_name: location.name,
-        });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Failed to save selected location",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setSelectedLocation({
+      await setSelectedLocation({
         google_place_id: location.google_place_id,
         location_name: location.name,
       });
 
       toast({
-        title: "Success",
+        title: "Success", 
         description: `Selected ${location.name}`,
       });
     } catch (error) {
       console.error('Error selecting location:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save selected location",
+        variant: "destructive",
+      });
     }
   };
 

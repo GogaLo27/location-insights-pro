@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/ui/auth-provider";
+import { LocationProvider } from "@/contexts/LocationContext";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Locations from "./pages/Locations";
@@ -19,21 +20,23 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/plan-selection" element={<PlanSelection />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/locations" element={<Locations />} />
-            <Route path="/reviews" element={<Reviews />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/sentiment" element={<Sentiment />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <LocationProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/plan-selection" element={<PlanSelection />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/locations" element={<Locations />} />
+              <Route path="/reviews" element={<Reviews />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/sentiment" element={<Sentiment />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </LocationProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
