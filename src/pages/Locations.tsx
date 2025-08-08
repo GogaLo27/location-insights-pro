@@ -73,15 +73,28 @@ const Locations = () => {
     try {
       setLoading(true);
       
-      // Call edge function to handle database operations
+      // Get the current session with provider token
+      const { data: { session } } = await supabase.auth.getSession();
+      const googleAccessToken = session?.provider_token;
+      
+      if (!googleAccessToken) {
+        console.log('No Google access token found, user needs to re-authenticate');
+        setLocations([]);
+        return;
+      }
+      
+      // Call edge function with both Supabase JWT and Google token
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
           action: 'get_user_locations'
+        },
+        headers: {
+          'X-Google-Token': googleAccessToken
         }
       });
 
       if (error) {
-        console.log('No locations found, will fetch from Google on first search');
+        console.log('Error fetching locations:', error);
         setLocations([]);
       } else {
         setLocations(data?.locations || []);
@@ -96,9 +109,24 @@ const Locations = () => {
 
   const fetchFromGoogle = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const googleAccessToken = session?.provider_token;
+      
+      if (!googleAccessToken) {
+        toast({
+          title: "Error",
+          description: "Please sign in with Google to access your business data",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
           action: 'fetch_user_locations'
+        },
+        headers: {
+          'X-Google-Token': googleAccessToken
         }
       });
 
@@ -139,10 +167,26 @@ const Locations = () => {
 
     try {
       setIsSearching(true);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      const googleAccessToken = session?.provider_token;
+      
+      if (!googleAccessToken) {
+        toast({
+          title: "Error",
+          description: "Please sign in with Google to access your business data",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
           action: 'search_locations',
           query: searchTerm 
+        },
+        headers: {
+          'X-Google-Token': googleAccessToken
         }
       });
 
