@@ -483,42 +483,46 @@ const Sentiment = () => {
                 {/* Business Health Overview */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Business Health Overview</CardTitle>
-                    <CardDescription>Comprehensive analysis based on customer feedback</CardDescription>
+                    <CardTitle>Business Performance Analysis</CardTitle>
+                    <CardDescription>Comprehensive assessment based on customer feedback data</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {/* Performance Indicators */}
                     <div className="grid md:grid-cols-3 gap-4">
-                      <div className="text-center p-4 border rounded-lg">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-b from-primary/5 to-primary/10">
                         <div className="text-2xl font-bold text-primary mb-2">
                           {stats.avgRating.toFixed(1)}/5.0
                         </div>
                         <p className="text-sm text-muted-foreground">Average Rating</p>
-                        <p className="text-xs mt-1">
-                          {stats.avgRating >= 4.5 ? "Excellent" : 
-                           stats.avgRating >= 4.0 ? "Very Good" : 
-                           stats.avgRating >= 3.5 ? "Good" : 
-                           stats.avgRating >= 3.0 ? "Average" : "Needs Improvement"}
+                        <p className="text-xs mt-1 font-medium">
+                          {stats.avgRating >= 4.5 ? "Excellent Performance" : 
+                           stats.avgRating >= 4.0 ? "Very Good Performance" : 
+                           stats.avgRating >= 3.5 ? "Good Performance" : 
+                           stats.avgRating >= 3.0 ? "Average Performance" : "Requires Immediate Attention"}
                         </p>
                       </div>
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="text-2xl font-bold text-primary mb-2">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-b from-success/5 to-success/10">
+                        <div className="text-2xl font-bold text-success mb-2">
                           {stats.positivePercentage.toFixed(0)}%
                         </div>
                         <p className="text-sm text-muted-foreground">Positive Sentiment</p>
-                        <p className="text-xs mt-1">
-                          {stats.positivePercentage >= 80 ? "Outstanding" : 
-                           stats.positivePercentage >= 70 ? "Strong" : 
-                           stats.positivePercentage >= 60 ? "Good" : 
-                           stats.positivePercentage >= 50 ? "Fair" : "Critical"}
+                        <p className="text-xs mt-1 font-medium">
+                          {stats.positivePercentage >= 80 ? "Outstanding Customer Satisfaction" : 
+                           stats.positivePercentage >= 70 ? "Strong Customer Satisfaction" : 
+                           stats.positivePercentage >= 60 ? "Good Customer Satisfaction" : 
+                           stats.positivePercentage >= 50 ? "Fair Customer Satisfaction" : "Critical - Immediate Action Required"}
                         </p>
                       </div>
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="text-2xl font-bold text-primary mb-2">
+                      <div className="text-center p-4 border rounded-lg bg-gradient-to-b from-muted/20 to-muted/30">
+                        <div className="text-2xl font-bold text-foreground mb-2">
                           {stats.total}
                         </div>
-                        <p className="text-sm text-muted-foreground">Total Reviews</p>
-                        <p className="text-xs mt-1">Review Volume</p>
+                        <p className="text-sm text-muted-foreground">Total Reviews Analyzed</p>
+                        <p className="text-xs mt-1 font-medium">
+                          {stats.total >= 100 ? "Statistically Significant" : 
+                           stats.total >= 50 ? "Good Sample Size" : 
+                           stats.total >= 20 ? "Moderate Sample" : "Limited Data - Gather More Reviews"}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -526,30 +530,40 @@ const Sentiment = () => {
 
                 <div className="grid gap-6 md:grid-cols-2">
                   {/* Strengths */}
-                  <Card>
+                  <Card className="border-success/20">
                     <CardHeader>
-                      <CardTitle className="text-success">🌟 What You're Doing Right</CardTitle>
-                      <CardDescription>Your key strengths based on positive feedback</CardDescription>
+                      <CardTitle className="text-success">Competitive Advantages</CardTitle>
+                      <CardDescription>Key strengths driving positive customer feedback</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         <div>
-                          <h4 className="font-medium text-success mb-2">Top Praised Areas:</h4>
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {Array.from(new Set(sentimentData.flatMap(d => d.top_positive_tags || []))).slice(0, 6).map((tag, i) => (
-                              <Badge key={i} className="sentiment-positive">{tag}</Badge>
+                          <h4 className="font-medium text-success mb-3">Top Performing Areas:</h4>
+                          <div className="grid grid-cols-2 gap-2 mb-4">
+                            {Array.from(new Set(sentimentData.flatMap(d => d.top_positive_tags || []))).slice(0, 8).map((tag, i) => (
+                              <Badge key={i} className="sentiment-positive justify-center py-1">{tag}</Badge>
                             ))}
                           </div>
                         </div>
                         
                         {stats.positivePercentage >= 70 && (
-                          <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
-                            <p className="text-sm text-success font-medium">✅ Strong Performance</p>
-                            <p className="text-xs text-success/80 mt-1">
-                              With {stats.positivePercentage.toFixed(0)}% positive reviews, you're exceeding customer expectations!
+                          <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
+                            <h5 className="text-sm text-success font-semibold mb-2">Performance Validation</h5>
+                            <p className="text-xs text-success/80">
+                              Your {stats.positivePercentage.toFixed(0)}% positive sentiment score indicates strong customer satisfaction. 
+                              Maintain current service standards and consider scaling successful practices.
                             </p>
                           </div>
                         )}
+                        
+                        <div className="border-t pt-4">
+                          <h5 className="font-medium text-success mb-2">Strategic Recommendations:</h5>
+                          <ul className="text-xs space-y-1 text-success/80">
+                            <li>• Leverage positive feedback in marketing materials</li>
+                            <li>• Train staff on successful service practices</li>
+                            <li>• Document and standardize winning approaches</li>
+                          </ul>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

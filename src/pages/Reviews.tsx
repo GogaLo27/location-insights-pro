@@ -567,9 +567,12 @@ const Reviews = () => {
                             </Badge>
                           )}
           {review.reply_text ? (
-            <Badge variant="outline" className="text-success border-success">
-              Replied
-            </Badge>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-success rounded-full"></div>
+              <Badge variant="outline" className="text-success border-success bg-success/10 font-medium">
+                ✓ Replied
+              </Badge>
+            </div>
           ) : (
             <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
           )}
@@ -592,16 +595,19 @@ const Reviews = () => {
                       )}
 
                       {review.reply_text && (
-                        <div className="bg-muted/50 p-4 rounded-lg mt-4">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <Badge variant="outline">Business Reply</Badge>
+                        <div className="bg-gradient-to-r from-success/5 to-success/10 border-l-4 border-success p-4 rounded-lg mt-4">
+                          <div className="flex items-center space-x-2 mb-3">
+                            <div className="w-2 h-2 bg-success rounded-full"></div>
+                            <Badge variant="outline" className="text-success border-success bg-white font-medium">
+                              Business Response
+                            </Badge>
                             {review.reply_date && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground ml-auto">
                                 {format(new Date(review.reply_date), "MMM d, yyyy")}
                               </span>
                             )}
                           </div>
-                          <p className="text-sm">{review.reply_text}</p>
+                          <p className="text-sm leading-relaxed">{review.reply_text}</p>
                         </div>
                       )}
                     </CardContent>

@@ -75,9 +75,9 @@ serve(async (req) => {
     for (const review of reviews) {
       const prompt = `Analyze this customer review comprehensively and provide:
 1. Sentiment (positive, negative, or neutral)
-2. Up to 5 relevant tags/categories (e.g., "service", "food quality", "cleanliness", "staff", "wait time", "pricing", "atmosphere")
+2. Exactly 3-5 specific, meaningful tags from business categories like: "service quality", "food quality", "staff behavior", "cleanliness", "wait time", "pricing", "atmosphere", "location", "parking", "value for money", "customer service", "product quality", "delivery", "ordering process", "facilities", "accessibility", "communication", "professionalism", "responsiveness", "consistency"
 3. Key issues mentioned (if negative/neutral)
-4. Suggestions for improvement based on the review
+4. Detailed, actionable suggestions for improvement
 
 Review: "${review.text}"
 Rating: ${review.rating}/5 stars
@@ -85,9 +85,9 @@ Rating: ${review.rating}/5 stars
 Return ONLY a JSON object with this exact format:
 {
   "sentiment": "positive|negative|neutral",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "issues": ["issue1", "issue2"],
-  "suggestions": ["suggestion1", "suggestion2"]
+  "tags": ["specific_tag1", "specific_tag2", "specific_tag3"],
+  "issues": ["specific issue 1", "specific issue 2"],
+  "suggestions": ["actionable suggestion 1", "actionable suggestion 2"]
 }`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -159,9 +159,9 @@ async function analyzeAndUpdateReviews(supabase: any, reviews: any[]) {
     try {
       const prompt = `Analyze this customer review comprehensively and provide:
 1. Sentiment (positive, negative, or neutral)
-2. Up to 5 relevant tags/categories (e.g., "service", "food quality", "cleanliness", "staff", "wait time", "pricing", "atmosphere")
+2. Exactly 3-5 specific, meaningful tags from business categories like: "service quality", "food quality", "staff behavior", "cleanliness", "wait time", "pricing", "atmosphere", "location", "parking", "value for money", "customer service", "product quality", "delivery", "ordering process", "facilities", "accessibility", "communication", "professionalism", "responsiveness", "consistency"
 3. Key issues mentioned (if negative/neutral)
-4. Suggestions for improvement based on the review
+4. Detailed, actionable suggestions for improvement
 
 Review: "${review.text || 'No text provided'}"
 Rating: ${review.rating}/5 stars
@@ -169,9 +169,9 @@ Rating: ${review.rating}/5 stars
 Return ONLY a JSON object with this exact format:
 {
   "sentiment": "positive|negative|neutral",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "issues": ["issue1", "issue2"],
-  "suggestions": ["suggestion1", "suggestion2"]
+  "tags": ["specific_tag1", "specific_tag2", "specific_tag3"],
+  "issues": ["specific issue 1", "specific issue 2"],
+  "suggestions": ["actionable suggestion 1", "actionable suggestion 2"]
 }`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -193,9 +193,9 @@ Return ONLY a JSON object with this exact format:
 
       let analysis = {
         sentiment: review.rating >= 4 ? 'positive' : review.rating <= 2 ? 'negative' : 'neutral',
-        tags: ['general'],
+        tags: ['customer service', 'overall experience'],
         issues: [],
-        suggestions: []
+        suggestions: ['Monitor customer feedback regularly', 'Implement improvement processes']
       };
 
       if (response.ok) {
