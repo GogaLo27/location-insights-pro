@@ -297,6 +297,7 @@ async function fetchLocationAnalytics(
   endDate?: any
 ) {
   try {
+    // Determine date range defaults if none provided
     const today = new Date();
     const defaultEnd = {
       year: today.getFullYear(),
@@ -313,39 +314,56 @@ async function fetchLocationAnalytics(
     const start = startDate || defaultStart;
     const end = endDate || defaultEnd;
 
-    // Request all the metrics you need
+    // Use the same set of metrics as your working project, joined into a comma-separated string.
     const metrics = [
       "BUSINESS_IMPRESSIONS_MOBILE_SEARCH",
+      "BUSINESS_CONVERSATIONS",
       "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH",
       "BUSINESS_IMPRESSIONS_DESKTOP_MAPS",
       "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
       "BUSINESS_DIRECTION_REQUESTS",
       "CALL_CLICKS",
       "WEBSITE_CLICKS",
-      "BUSINESS_CONVERSATIONS",
       "BUSINESS_BOOKINGS",
       "BUSINESS_FOOD_ORDERS",
       "BUSINESS_FOOD_MENU_CLICKS",
     ];
 
-    // Build query parameters as repeated dailyMetrics and date fields
-    const params: [string, string][] = [];
-    metrics.forEach((m) => params.push(["dailyMetrics", m]));
-    params.push(["dailyRange.start_date.year", String(start.year)]);
-    params.push(["dailyRange.start_date.month", String(start.month)]);
-    params.push(["dailyRange.start_date.day", String(start.day)]);
-    params.push(["dailyRange.end_date.year", String(end.year)]);
-    params.push(["dailyRange.end_date.month", String(end.month)]);
-    params.push(["dailyRange.end_date.day", String(end.day)]);
+    // Construct params similar to your working Node project.
+    const params: Record<string, string> = {
+      dailyMetrics: metrics.join(','),
+      'dailyRange.start_date.year': String(start.year),
+      'dailyRange.start_date.month': String(start.month),
+      'dailyRange.start_date.day': String(start.day),
+      'dailyRange.end_date.year': String(end.year),
+      'dailyRange.end_date.month': String(end.month),
+      'dailyRange.end_date.day': String(end.day),
+    };
 
-    const url = `https://businessprofileperformance.googleapis.com/v1/locations/${locationId}:fetchMultiDailyMetricsTimeSeries`;
+    // Serialize metrics into repeated dailyMetrics query params and append date params.
+    const paramsSerializer = (p: Record<string, string>) => {
+      const metricsPart = p.dailyMetrics
+        .split(',')
+        .map((metric) => `dailyMetrics=${encodeURIComponent(metric.trim())}`)
+        .join('&');
+      const dateParams = Object.entries(p)
+        .filter(([key]) => key.startsWith('dailyRange'))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&');
+      return `${metricsPart}&${dateParams}`;
+    };
 
-    // Call the Google API via GET with repeated dailyMetrics parameters
-    const response = await googleApiRequest(url, accessToken, "GET", params);
+    const baseUrl = `https://businessprofileperformance.googleapis.com/v1/locations/${locationId}:fetchMultiDailyMetricsTimeSeries`;
+    const queryString = paramsSerializer(params);
+    const urlWithParams = `${baseUrl}?${queryString}`;
+
+    console.log(accessToken);
+    // Perform GET request instead of POST. No params or body needed since everything is encoded in the URL.
+    const response = await googleApiRequest(urlWithParams, accessToken, 'GET');
 
     return json({ analytics: response });
   } catch (error) {
-    console.error("Error fetching analytics:", error);
+    console.error('Error fetching analytics:', error);
     return json({ analytics: {} });
   }
 }

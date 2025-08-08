@@ -12,6 +12,8 @@ import Sentiment from './pages/Sentiment';
 import PlanSelection from './pages/PlanSelection';
 import PlanManagement from './pages/PlanManagement';
 import LocationSelection from './pages/LocationSelection';
+import BillingSuccess from './pages/BillingSuccess';
+import BillingCancel from './pages/BillingCancel';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -79,7 +81,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* Location-selection page: requires a plan but not a location */}
             <Route
               path="/location-selection"
               element={
@@ -88,6 +89,25 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+
+            {/* ✅ PayPal return routes */}
+            <Route
+              path="/billing/success"
+              element={
+                <ProtectedRoute requiresPlan={false} requiresLocation={false}>
+                  <BillingSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/billing/cancel"
+              element={
+                <ProtectedRoute requiresPlan={false} requiresLocation={false}>
+                  <BillingCancel />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<NotFound />} />
           </Routes>

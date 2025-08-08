@@ -26,44 +26,41 @@ const PlanSelection = () => {
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  const handlePlanSelect = async (planType: string) => {
-    if (!user) return;
+  // PlanSelection.tsx — only showing the key handler; keep the rest of your component
+const handlePlanSelect = async (planType: string) => {
+  if (!user) return;
+  setSelectedPlan(planType);
 
-    setSelectedPlan(planType);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseJwt = session?.access_token || "";
 
-    try {
-      // Save the selected plan
-      const { error: planError } = await supabase
-        .from("user_plans")
-        .upsert(
-          {
-            user_id: user.id,
-            plan_type: planType,
-          },
-          { onConflict: "user_id" }
-        );
+    const { data, error } = await supabase.functions.invoke('paypal-create-subscription', {
+      body: {
+        plan_type: planType,
+        return_url: `${window.location.origin}/billing/success`,
+        cancel_url: `${window.location.origin}/billing/cancel`,
+      },
+      headers: { Authorization: `Bearer ${supabaseJwt}` }
+    });
 
-      if (planError) throw planError;
-
-      toast({
-        title: "Plan Selected",
-        description: `You've successfully selected the ${planType} plan.`,
-      });
-
-      // Do NOT auto-select a location here. Redirect to dashboard.
-      // If no default location exists, ProtectedRoute will redirect
-      // to /location-selection.
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Error selecting plan:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save plan selection.",
-        variant: "destructive",
-      });
-      setSelectedPlan(null);
+    if (error || !data?.approval_url) {
+      throw new Error(error?.message || "Failed to start subscription");
     }
-  };
+
+    // save subscription id locally so success page can poll it (optional)
+    if (data.subscription_id) {
+      localStorage.setItem("pendingSubId", data.subscription_id);
+    }
+
+    // Redirect user to PayPal
+    window.location.href = data.approval_url;
+  } catch (e:any) {
+    console.error(e);
+    toast({ title: "Payment error", description: e.message || "Could not initiate subscription", variant: "destructive" });
+    setSelectedPlan(null);
+  }
+};
 
   const plans = [
     {
