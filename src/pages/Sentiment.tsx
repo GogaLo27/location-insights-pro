@@ -429,10 +429,9 @@ const Sentiment = () => {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Positive Reviews</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-green-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-600">{stats.totalPositive}</div>
+                    <div className="text-2xl font-bold text-success">{stats.totalPositive}</div>
                     <p className="text-xs text-muted-foreground">
                       {stats.positivePercentage.toFixed(1)}% of total
                     </p>
@@ -441,10 +440,9 @@ const Sentiment = () => {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Negative Reviews</CardTitle>
-                    <TrendingDown className="h-4 w-4 text-red-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-red-600">{stats.totalNegative}</div>
+                    <div className="text-2xl font-bold text-destructive">{stats.totalNegative}</div>
                     <p className="text-xs text-muted-foreground">
                       {stats.negativePercentage.toFixed(1)}% of total
                     </p>
@@ -453,21 +451,19 @@ const Sentiment = () => {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Neutral Reviews</CardTitle>
-                    <Minus className="h-4 w-4 text-gray-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-gray-600">{stats.totalNeutral}</div>
+                    <div className="text-2xl font-bold text-muted-foreground">{stats.totalNeutral}</div>
                     <p className="text-xs text-muted-foreground">
                       {stats.neutralPercentage.toFixed(1)}% of total
                     </p>
                   </CardContent>
                 </Card>
-                 <Card>
-                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                     <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
-                     <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                   </CardHeader>
-                   <CardContent>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <div className="text-2xl font-bold">{stats.avgRating.toFixed(1)}</div>
                     <p className="text-xs text-muted-foreground">
                       Sentiment: {stats.avgSentimentScore.toFixed(2)}
@@ -571,13 +567,13 @@ const Sentiment = () => {
                   {/* Areas for Improvement */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-amber-600">🎯 Focus Areas</CardTitle>
+                      <CardTitle className="text-primary">Focus Areas</CardTitle>
                       <CardDescription>Priority areas for business improvement</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         <div>
-                          <h4 className="font-medium text-amber-600 mb-2">Common Concerns:</h4>
+                          <h4 className="font-medium text-destructive mb-2">Common Concerns:</h4>
                           <div className="flex flex-wrap gap-2 mb-4">
                             {Array.from(new Set(sentimentData.flatMap(d => d.top_negative_tags || []))).slice(0, 6).map((tag, i) => (
                               <Badge key={i} className="sentiment-negative">{tag}</Badge>
@@ -587,8 +583,8 @@ const Sentiment = () => {
 
                         {/* Critical Issues */}
                         {Array.from(new Set(sentimentData.flatMap(d => d.top_issues || []))).slice(0, 3).map((issue, i) => (
-                          <div key={i} className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                            <p className="text-sm text-amber-800 dark:text-amber-200">⚠️ {issue}</p>
+                          <div key={i} className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                            <p className="text-sm text-destructive">{issue}</p>
                           </div>
                         ))}
                       </div>

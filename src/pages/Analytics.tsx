@@ -164,78 +164,75 @@ const Analytics = () => {
     }
   };
 
-  const processAnalyticsData = (rawData: any[]): AnalyticsData[] => {
-    if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return [];
-    
-    const processedData: AnalyticsData[] = [];
-    
-    // Process each metric series
-    rawData.forEach(series => {
-      if (series.dailyMetricTimeSeries) {
-        series.dailyMetricTimeSeries.forEach((timeSeries: any) => {
-          const metric = timeSeries.dailyMetric;
-          
-          timeSeries.timeSeries?.forEach((dataPoint: any, index: number) => {
-            if (!processedData[index]) {
-              processedData[index] = {
-                date: format(new Date(dataPoint.date.year, dataPoint.date.month - 1, dataPoint.date.day), 'MMM dd'),
-                businessImpressionsDesktopMaps: 0,
-                businessImpressionsMobileMaps: 0,
-                businessImpressionsDesktopSearch: 0,
-                businessImpressionsMobileSearch: 0,
-                websiteClicks: 0,
-                callClicks: 0,
-                businessDirectionRequests: 0,
-                businessConversations: 0,
-                businessBookings: 0,
-                businessFoodOrders: 0,
-                businessFoodMenuClicks: 0,
-              };
-            }
-            
-            const value = parseInt(dataPoint.value || 0);
-            
-            switch (metric) {
-              case 'BUSINESS_IMPRESSIONS_DESKTOP_MAPS':
-                processedData[index].businessImpressionsDesktopMaps = value;
-                break;
-              case 'BUSINESS_IMPRESSIONS_MOBILE_MAPS':
-                processedData[index].businessImpressionsMobileMaps = value;
-                break;
-              case 'BUSINESS_IMPRESSIONS_DESKTOP_SEARCH':
-                processedData[index].businessImpressionsDesktopSearch = value;
-                break;
-              case 'BUSINESS_IMPRESSIONS_MOBILE_SEARCH':
-                processedData[index].businessImpressionsMobileSearch = value;
-                break;
-              case 'WEBSITE_CLICKS':
-                processedData[index].websiteClicks = value;
-                break;
-              case 'CALL_CLICKS':
-                processedData[index].callClicks = value;
-                break;
-              case 'BUSINESS_DIRECTION_REQUESTS':
-                processedData[index].businessDirectionRequests = value;
-                break;
-              case 'BUSINESS_CONVERSATIONS':
-                processedData[index].businessConversations = value;
-                break;
-              case 'BUSINESS_BOOKINGS':
-                processedData[index].businessBookings = value;
-                break;
-              case 'BUSINESS_FOOD_ORDERS':
-                processedData[index].businessFoodOrders = value;
-                break;
-              case 'BUSINESS_FOOD_MENU_CLICKS':
-                processedData[index].businessFoodMenuClicks = value;
-                break;
-            }
-          });
-        });
-      }
+  const processAnalyticsData = (raw: any): AnalyticsData[] => {
+    if (!raw) return [];
+
+    const seriesList: any[] = Array.isArray(raw)
+      ? raw
+      : (raw.multiDailyMetricTimeSeries || raw.dailyMetricTimeSeries || []);
+
+    if (!Array.isArray(seriesList) || seriesList.length === 0) return [];
+
+    const byIndex: Record<number, AnalyticsData> = {};
+
+    seriesList.forEach((series: any) => {
+      const metric: string = series.dailyMetric || series.metric || '';
+      const points: any[] =
+        series.timeSeries?.datedValues || // Official GBP Performance API shape
+        series.timeSeries || // Fallback to array directly
+        [];
+
+      points.forEach((dp: any, index: number) => {
+        const d = dp.date || dp.timeDimension?.timeRange?.startDate;
+        if (!d) return;
+        const dateLabel = format(new Date(d.year, (d.month || 1) - 1, d.day || 1), 'MMM dd');
+
+        if (!byIndex[index]) {
+          byIndex[index] = {
+            date: dateLabel,
+            businessImpressionsDesktopMaps: 0,
+            businessImpressionsMobileMaps: 0,
+            businessImpressionsDesktopSearch: 0,
+            businessImpressionsMobileSearch: 0,
+            websiteClicks: 0,
+            callClicks: 0,
+            businessDirectionRequests: 0,
+            businessConversations: 0,
+            businessBookings: 0,
+            businessFoodOrders: 0,
+            businessFoodMenuClicks: 0,
+          };
+        }
+
+        const value = parseInt(dp.value ?? dp.metricValue ?? 0);
+        switch (metric) {
+          case 'BUSINESS_IMPRESSIONS_DESKTOP_MAPS':
+            byIndex[index].businessImpressionsDesktopMaps = value; break;
+          case 'BUSINESS_IMPRESSIONS_MOBILE_MAPS':
+            byIndex[index].businessImpressionsMobileMaps = value; break;
+          case 'BUSINESS_IMPRESSIONS_DESKTOP_SEARCH':
+            byIndex[index].businessImpressionsDesktopSearch = value; break;
+          case 'BUSINESS_IMPRESSIONS_MOBILE_SEARCH':
+            byIndex[index].businessImpressionsMobileSearch = value; break;
+          case 'WEBSITE_CLICKS':
+            byIndex[index].websiteClicks = value; break;
+          case 'CALL_CLICKS':
+            byIndex[index].callClicks = value; break;
+          case 'BUSINESS_DIRECTION_REQUESTS':
+            byIndex[index].businessDirectionRequests = value; break;
+          case 'BUSINESS_CONVERSATIONS':
+            byIndex[index].businessConversations = value; break;
+          case 'BUSINESS_BOOKINGS':
+            byIndex[index].businessBookings = value; break;
+          case 'BUSINESS_FOOD_ORDERS':
+            byIndex[index].businessFoodOrders = value; break;
+          case 'BUSINESS_FOOD_MENU_CLICKS':
+            byIndex[index].businessFoodMenuClicks = value; break;
+        }
+      });
     });
-    
-    return processedData.filter(Boolean);
+
+    return Object.values(byIndex);
   };
 
   const getTotalImpressions = () => {
