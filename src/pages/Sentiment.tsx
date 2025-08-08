@@ -164,11 +164,11 @@ const Sentiment = () => {
         }
       }
 
-      // Collect issues and suggestions
-      if (review.ai_issues) {
+      // Collect issues and suggestions - note these are arrays already from AI analysis
+      if (review.ai_issues && Array.isArray(review.ai_issues)) {
         groupedData[key].all_issues.push(...review.ai_issues);
       }
-      if (review.ai_suggestions) {
+      if (review.ai_suggestions && Array.isArray(review.ai_suggestions)) {
         groupedData[key].all_suggestions.push(...review.ai_suggestions);
       }
     });

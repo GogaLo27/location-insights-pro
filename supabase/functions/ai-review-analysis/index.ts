@@ -14,12 +14,14 @@ serve(async (req) => {
   }
 
   try {
-    const { reviews } = await req.json();
+    const body = await req.json();
+    console.log('Request body:', body);
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
+    const { reviews } = body;
     if (!reviews || !Array.isArray(reviews)) {
       throw new Error('Reviews array is required');
     }

@@ -147,7 +147,7 @@ const Analytics = () => {
   };
 
   const processAnalyticsData = (rawData: any[]): AnalyticsData[] => {
-    if (!rawData || rawData.length === 0) return [];
+    if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return [];
     
     const processedData: AnalyticsData[] = [];
     
