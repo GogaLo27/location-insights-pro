@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import { MapPin, MessageSquare, Star, Calendar as CalendarIcon, Filter, Reply, Search, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -181,44 +183,36 @@ const Reviews = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-primary-foreground" />
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex items-center space-x-2">
+              <h1 className="text-lg font-semibold">Reviews</h1>
             </div>
-            <span className="font-bold text-xl">Location Insights Pro</span>
-            <nav className="flex items-center space-x-6 ml-8">
-              <Button variant="ghost" onClick={() => window.location.href = '/dashboard'}>Dashboard</Button>
-              <Button variant="ghost" onClick={() => window.location.href = '/locations'}>Locations</Button>
-              <Button variant="outline">Reviews</Button>
-              <Button variant="ghost" onClick={() => window.location.href = '/sentiment'}>Sentiment</Button>
-            </nav>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Select value={selectedLocation} onValueChange={(value) => {
-              setSelectedLocation(value);
-              fetchReviews();
-            }}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                {locations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto py-8 px-4">
+            <div className="flex items-center space-x-4 ml-auto">
+              <Select value={selectedLocation} onValueChange={(value) => {
+                setSelectedLocation(value);
+                fetchReviews();
+              }}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </header>
+          
+          <div className="flex-1 space-y-4 p-8 pt-6">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Customer Reviews</h1>
@@ -395,8 +389,10 @@ const Reviews = () => {
             ))}
           </div>
         )}
+          </div>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

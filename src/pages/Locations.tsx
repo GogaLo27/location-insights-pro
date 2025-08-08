@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -183,34 +185,23 @@ const Locations = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-primary-foreground" />
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex items-center space-x-4 ml-auto">
+              <Badge variant="secondary" className="capitalize">
+                {profile?.subscription_plan || 'free'} Plan
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                {locations.length} of {profile?.locations_limit || 2} locations used
+              </span>
             </div>
-            <span className="font-bold text-xl">Location Insights Pro</span>
-            <nav className="flex items-center space-x-6 ml-8">
-              <Button variant="ghost" onClick={() => window.location.href = '/dashboard'}>Dashboard</Button>
-              <Button variant="outline">Locations</Button>
-              <Button variant="ghost" onClick={() => window.location.href = '/reviews'}>Reviews</Button>
-              <Button variant="ghost" onClick={() => window.location.href = '/sentiment'}>Sentiment</Button>
-            </nav>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="capitalize">
-              {profile?.subscription_plan || 'free'} Plan
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {locations.length} of {profile?.locations_limit || 2} locations used
-            </span>
-          </div>
-        </div>
-      </header>
+          </header>
 
-      <div className="container mx-auto py-8 px-4">
+          <div className="flex-1 space-y-4 p-8 pt-6">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Business Locations</h1>
@@ -324,8 +315,10 @@ const Locations = () => {
             ))}
           </div>
         )}
+          </div>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

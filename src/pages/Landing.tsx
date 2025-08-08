@@ -59,7 +59,7 @@ const Landing = () => {
   ];
 
   if (user) {
-    window.location.href = '/dashboard';
+    window.location.href = '/plan-selection';
     return null;
   }
 
