@@ -53,15 +53,18 @@ const Locations = () => {
 
   const fetchProfile = async () => {
     try {
-      // Temporary mock data until database migration is approved
-      setProfile({
-        id: user?.id || '',
-        email: user?.email || '',
-        full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
-        subscription_plan: 'free',
-        locations_limit: 2,
-        reviews_limit: 100,
-      });
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      setProfile(profile);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -70,8 +73,36 @@ const Locations = () => {
   const fetchLocations = async () => {
     try {
       setLoading(true);
-      // Temporary: No locations until database migration is approved and Google API is connected
-      setLocations([]);
+      
+      // First, try to get locations from database
+      const { data: dbLocations, error } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      // If database is empty, try to fetch from Google Business API
+      if (!dbLocations || dbLocations.length === 0) {
+        console.log('No locations in database, fetching from Google...');
+        await fetchFromGoogle();
+        
+        // After fetching from Google, try database again
+        const { data: newDbLocations, error: newError } = await supabase
+          .from('locations')
+          .select('*')
+          .eq('user_id', user?.id)
+          .order('created_at', { ascending: false });
+          
+        if (!newError) {
+          setLocations(newDbLocations || []);
+        }
+      } else {
+        setLocations(dbLocations);
+      }
     } catch (error) {
       console.error('Error fetching locations:', error);
       toast({
@@ -81,6 +112,30 @@ const Locations = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFromGoogle = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'fetch_user_locations'
+        }
+      });
+
+      if (error) {
+        console.log('Google API fetch failed:', error);
+        return;
+      }
+
+      if (data?.locations?.length > 0) {
+        toast({
+          title: "Success",
+          description: `Found ${data.locations.length} locations from Google Business`,
+        });
+      }
+    } catch (error) {
+      console.log('Error fetching from Google:', error);
     }
   };
 
@@ -94,11 +149,45 @@ const Locations = () => {
       return;
     }
 
-    toast({
-      title: "Database Migration Required",
-      description: "Please approve the database migration to enable location search functionality.",
-      variant: "destructive",
-    });
+    if (profile && locations.length >= profile.locations_limit) {
+      toast({
+        title: "Limit Reached",
+        description: `You've reached your limit of ${profile.locations_limit} locations. Upgrade your plan to add more.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'search_locations',
+          query: searchTerm 
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: `Found ${data?.locations?.length || 0} locations`,
+      });
+      
+      // Refresh locations after search
+      fetchLocations();
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search locations",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   if (!user && !authLoading) {

@@ -53,8 +53,13 @@ const Sentiment = () => {
 
   const fetchLocations = async () => {
     try {
-      // Temporary mock data until database migration is approved
-      setLocations([]);
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name, google_place_id')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setLocations(data || []);
     } catch (error) {
       console.error('Error fetching locations:', error);
       toast({
@@ -68,8 +73,32 @@ const Sentiment = () => {
   const fetchSentimentData = async () => {
     try {
       setLoading(true);
-      // Temporary: No sentiment data until database migration is approved
-      setSentimentData([]);
+      let query = supabase
+        .from('sentiment_analysis')
+        .select(`
+          *,
+          locations!inner(name)
+        `)
+        .eq('locations.user_id', user?.id)
+        .eq('period_type', selectedPeriod)
+        .gte('analysis_date', format(dateRange.from, 'yyyy-MM-dd'))
+        .lte('analysis_date', format(dateRange.to, 'yyyy-MM-dd'))
+        .order('analysis_date', { ascending: false });
+
+      if (selectedLocation !== "all") {
+        query = query.eq('location_id', selectedLocation);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      
+      const dataWithLocation = (data || []).map(item => ({
+        ...item,
+        location_name: item.locations?.name
+      }));
+      
+      setSentimentData(dataWithLocation);
     } catch (error) {
       console.error('Error fetching sentiment data:', error);
       toast({
@@ -83,11 +112,33 @@ const Sentiment = () => {
   };
 
   const handleGenerateSentiment = async () => {
-    toast({
-      title: "Database Migration Required",
-      description: "Please approve the database migration to enable sentiment analysis.",
-      variant: "destructive",
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
+        body: { 
+          action: 'generate_sentiment_analysis',
+          location_id: selectedLocation !== "all" ? selectedLocation : undefined,
+          period_type: selectedPeriod,
+          start_date: format(dateRange.from, 'yyyy-MM-dd'),
+          end_date: format(dateRange.to, 'yyyy-MM-dd')
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Sentiment analysis generated successfully",
+      });
+      
+      fetchSentimentData();
+    } catch (error) {
+      console.error('Error generating sentiment analysis:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate sentiment analysis",
+        variant: "destructive",
+      });
+    }
   };
 
   const getPeriodOptions = () => [

@@ -44,15 +44,18 @@ const Dashboard = () => {
 
   const fetchProfile = async () => {
     try {
-      // Temporary mock data until database migration is approved
-      setProfile({
-        id: user?.id || '',
-        email: user?.email || '',
-        full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
-        subscription_plan: 'free',
-        locations_limit: 2,
-        reviews_limit: 100,
-      });
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      setProfile(profile);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -62,16 +65,40 @@ const Dashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      // Temporary mock data until database migration is approved
+      // Fetch locations count
+      const { data: locations, error: locationsError } = await supabase
+        .from('locations')
+        .select('id, rating, total_reviews')
+        .eq('user_id', user?.id);
+
+      if (locationsError) throw locationsError;
+
+      // Fetch reviews with sentiment
+      const { data: reviews, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('rating, ai_sentiment, locations!inner(user_id)')
+        .eq('locations.user_id', user?.id);
+
+      if (reviewsError) throw reviewsError;
+
+      // Calculate stats
+      const totalLocations = locations?.length || 0;
+      const totalReviews = reviews?.length || 0;
+      const averageRating = reviews && reviews.length > 0 
+        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
+        : 0;
+
+      const sentimentBreakdown = {
+        positive: reviews?.filter(r => r.ai_sentiment === 'positive').length || 0,
+        negative: reviews?.filter(r => r.ai_sentiment === 'negative').length || 0,
+        neutral: reviews?.filter(r => r.ai_sentiment === 'neutral').length || 0,
+      };
+
       setStats({
-        totalLocations: 0,
-        totalReviews: 0,
-        averageRating: 0,
-        sentimentBreakdown: {
-          positive: 0,
-          negative: 0,
-          neutral: 0,
-        }
+        totalLocations,
+        totalReviews,
+        averageRating,
+        sentimentBreakdown
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
