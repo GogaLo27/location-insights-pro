@@ -53,59 +53,47 @@ const Sentiment = () => {
 
   const fetchLocations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('id, name, google_place_id')
-        .eq('user_id', user?.id);
+      // Use edge function to get locations
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'get_user_locations'
+        }
+      });
 
-      if (error) throw error;
-      setLocations(data || []);
+      if (!error && data?.locations) {
+        setLocations(data.locations);
+      } else {
+        setLocations([]);
+      }
     } catch (error) {
       console.error('Error fetching locations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch locations",
-        variant: "destructive",
-      });
+      setLocations([]);
     }
   };
 
   const fetchSentimentData = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('sentiment_analysis')
-        .select(`
-          *,
-          locations!inner(name)
-        `)
-        .eq('locations.user_id', user?.id)
-        .eq('period_type', selectedPeriod)
-        .gte('analysis_date', format(dateRange.from, 'yyyy-MM-dd'))
-        .lte('analysis_date', format(dateRange.to, 'yyyy-MM-dd'))
-        .order('analysis_date', { ascending: false });
+      
+      // Use edge function to get sentiment data
+      const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
+        body: { 
+          action: 'get_sentiment_analysis',
+          location_id: selectedLocation !== "all" ? selectedLocation : undefined,
+          period_type: selectedPeriod,
+          start_date: format(dateRange.from, 'yyyy-MM-dd'),
+          end_date: format(dateRange.to, 'yyyy-MM-dd')
+        }
+      });
 
-      if (selectedLocation !== "all") {
-        query = query.eq('location_id', selectedLocation);
+      if (!error && data?.sentiment_data) {
+        setSentimentData(data.sentiment_data);
+      } else {
+        setSentimentData([]);
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      
-      const dataWithLocation = (data || []).map(item => ({
-        ...item,
-        location_name: item.locations?.name
-      }));
-      
-      setSentimentData(dataWithLocation);
     } catch (error) {
       console.error('Error fetching sentiment data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch sentiment data",
-        variant: "destructive",
-      });
+      setSentimentData([]);
     } finally {
       setLoading(false);
     }

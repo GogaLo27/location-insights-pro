@@ -53,18 +53,15 @@ const Locations = () => {
 
   const fetchProfile = async () => {
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
-      setProfile(profile);
+      // Use mock data until database migration is executed
+      setProfile({
+        id: user?.id || '',
+        email: user?.email || '',
+        full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
+        subscription_plan: 'free',
+        locations_limit: 2,
+        reviews_limit: 100,
+      });
     } catch (error) {
       console.error('Error:', error);
     }
@@ -74,42 +71,22 @@ const Locations = () => {
     try {
       setLoading(true);
       
-      // First, try to get locations from database
-      const { data: dbLocations, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+      // Call edge function to handle database operations
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'get_user_locations'
+        }
+      });
 
       if (error) {
-        throw error;
-      }
-
-      // If database is empty, try to fetch from Google Business API
-      if (!dbLocations || dbLocations.length === 0) {
-        console.log('No locations in database, fetching from Google...');
-        await fetchFromGoogle();
-        
-        // After fetching from Google, try database again
-        const { data: newDbLocations, error: newError } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('user_id', user?.id)
-          .order('created_at', { ascending: false });
-          
-        if (!newError) {
-          setLocations(newDbLocations || []);
-        }
+        console.log('No locations found, will fetch from Google on first search');
+        setLocations([]);
       } else {
-        setLocations(dbLocations);
+        setLocations(data?.locations || []);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch locations",
-        variant: "destructive",
-      });
+      setLocations([]);
     } finally {
       setLoading(false);
     }

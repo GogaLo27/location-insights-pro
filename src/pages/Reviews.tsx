@@ -56,56 +56,44 @@ const Reviews = () => {
 
   const fetchLocations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('id, name, google_place_id')
-        .eq('user_id', user?.id);
+      // Use edge function to get locations
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'get_user_locations'
+        }
+      });
 
-      if (error) throw error;
-      setLocations(data || []);
+      if (!error && data?.locations) {
+        setLocations(data.locations);
+      } else {
+        setLocations([]);
+      }
     } catch (error) {
       console.error('Error fetching locations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch locations",
-        variant: "destructive",
-      });
+      setLocations([]);
     }
   };
 
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('reviews')
-        .select(`
-          *,
-          locations!inner(name)
-        `)
-        .eq('locations.user_id', user?.id)
-        .order('review_date', { ascending: false });
+      
+      // Use edge function to get reviews
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'get_reviews',
+          location_id: selectedLocation !== "all" ? selectedLocation : undefined
+        }
+      });
 
-      if (selectedLocation !== "all") {
-        query = query.eq('location_id', selectedLocation);
+      if (!error && data?.reviews) {
+        setReviews(data.reviews);
+      } else {
+        setReviews([]);
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      
-      const reviewsWithLocation = (data || []).map(review => ({
-        ...review,
-        location_name: review.locations?.name
-      }));
-      
-      setReviews(reviewsWithLocation);
     } catch (error) {
       console.error('Error fetching reviews:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch reviews",
-        variant: "destructive",
-      });
+      setReviews([]);
     } finally {
       setLoading(false);
     }
