@@ -1,49 +1,51 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Search, Star, Filter, RefreshCw, MessageSquare } from "lucide-react";
+import { MessageSquare, Star, Filter, Reply, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { useLocation } from "@/contexts/LocationContext";
-import ReplyDialog from "@/components/ReplyDialog";
 
 interface Review {
   id: string;
   google_review_id: string;
   author_name: string;
+  author_photo_url: string | null;
   rating: number;
   text: string | null;
-  review_date: string;
   reply_text: string | null;
+  review_date: string;
   reply_date: string | null;
-  ai_sentiment: "positive" | "negative" | "neutral" | null;
+  ai_sentiment: 'positive' | 'negative' | 'neutral' | null;
   ai_tags: string[] | null;
+  location_id: string;
+  location_name?: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  google_place_id: string;
 }
 
 const Reviews = () => {
   const { user, loading: authLoading } = useAuth();
-  const { selectedLocation } = useLocation();
   const { toast } = useToast();
+
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
-  const [tagFilter, setTagFilter] = useState<string>("all");
-
-  useEffect(() => {
-    if (user && selectedLocation) {
-      fetchReviews();
-    }
-  }, [user, selectedLocation]);
 
   const getSessionTokens = async () => {
     let { data: { session } } = await supabase.auth.getSession();
@@ -57,80 +59,173 @@ const Reviews = () => {
     };
   };
 
-  const fetchReviews = async () => {
-    if (!selectedLocation?.google_place_id) return;
-    
-    setLoading(true);
-    try {
-      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      await fetchLocations();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-      const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: {
-          action: "fetch_reviews",
-          locationId: selectedLocation.google_place_id.split('/').pop() || selectedLocation.google_place_id,
-        },
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      await fetchReviews();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocation]);
+
+  const fetchLocations = async () => {
+    try {
+      setLoading(true);
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign out and sign in with Google again to access your business data.",
+          variant: "destructive",
+        });
+        setLocations([]);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { action: 'fetch_user_locations' },
         headers: {
-          Authorization: `Bearer ${supabaseJwt}`,
-          "X-Google-Token": googleAccessToken,
+          'Authorization': `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
         },
       });
 
-      if (error) throw error;
-      
-      // Analyze reviews with AI
-      const reviewsData = data.reviews || [];
-      if (reviewsData.length > 0) {
-        try {
-          const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
-            body: { reviews: reviewsData },
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          if (!analysisError && analysisData?.reviews) {
-            setReviews(analysisData.reviews);
-          } else {
-            setReviews(reviewsData);
-          }
-        } catch (analysisError) {
-          console.error('Error analyzing reviews:', analysisError);
-          setReviews(reviewsData);
-        }
-      } else {
-        setReviews([]);
+      if (error) {
+        console.error('fetch_user_locations error:', error);
+        setLocations([]);
+        return;
+      }
+
+      const list: Location[] = data?.locations || [];
+      setLocations(list);
+
+      if (selectedLocation === "all" && list.length > 0) {
+        setSelectedLocation(list[0].id);
       }
     } catch (error) {
-      console.error("Error fetching reviews:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch reviews",
-        variant: "destructive",
-      });
+      console.error('Error fetching locations:', error);
+      setLocations([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getSentimentColor = (sentiment: string | null) => {
-    switch (sentiment) {
-      case "positive": return "text-success border-success";
-      case "negative": return "text-destructive border-destructive"; 
-      case "neutral": return "text-muted-foreground border-muted-foreground";
-      default: return "text-muted-foreground border-muted-foreground";
+  const fetchReviews = async () => {
+    try {
+      setLoading(true);
+
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) {
+        setReviews([]);
+        return;
+      }
+
+      if (selectedLocation === "all") {
+        setReviews([]);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { action: 'fetch_reviews', locationId: selectedLocation },
+        headers: {
+          'Authorization': `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
+        },
+      });
+
+      if (error) {
+        console.error('fetch_reviews error:', error);
+        setReviews([]);
+        return;
+      }
+
+      setReviews(data?.reviews || []);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      setReviews([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getSentimentBg = (sentiment: string | null) => {
-    switch (sentiment) {
-      case "positive": return "bg-success/10";
-      case "negative": return "bg-destructive/10"; 
-      case "neutral": return "bg-muted/50";
-      default: return "bg-muted/50";
+  const handleRefetchReviews = async (locationId?: string) => {
+    try {
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) {
+        throw new Error("Missing tokens");
+      }
+
+      const idToUse = locationId || (selectedLocation !== "all" ? selectedLocation : undefined);
+      if (!idToUse) {
+        toast({ title: "Select a location", description: "Choose a location to refresh reviews." });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('google-business-api', {
+        body: { action: 'fetch_reviews', locationId: idToUse },
+        headers: {
+          'Authorization': `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: "Reviews refreshed successfully" });
+      await fetchReviews();
+    } catch (error) {
+      console.error('Error refreshing reviews:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh reviews",
+        variant: "destructive",
+      });
     }
   };
 
-  // Get unique tags for filter
-  const allTags = Array.from(new Set(reviews.flatMap(review => review.ai_tags || [])));
+  const handleReplyToReview = async (googleReviewId: string, replyText: string) => {
+    try {
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+
+      if (selectedLocation === "all") {
+        toast({ title: "Select a location", description: "Pick a location first." });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('google-business-api', {
+        body: {
+          action: 'reply_to_review',
+          locationId: selectedLocation,
+          review_id: googleReviewId,
+          replyText,
+        },
+        headers: {
+          'Authorization': `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: "Reply sent successfully" });
+      await fetchReviews();
+    } catch (error) {
+      console.error('Error replying to review:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send reply",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredReviews = reviews.filter((review) => {
     const matchesSearch =
@@ -144,26 +239,8 @@ const Reviews = () => {
     const matchesRating =
       ratingFilter === "all" || String(review.rating) === ratingFilter;
 
-    const matchesTag =
-      tagFilter === "all" || (review.ai_tags && review.ai_tags.includes(tagFilter));
-
-    return matchesSearch && matchesSentiment && matchesRating && matchesTag;
+    return matchesSearch && matchesSentiment && matchesRating;
   });
-
-  const getAverageRating = () => {
-    if (reviews.length === 0) return 0;
-    return (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1);
-  };
-
-  const getSentimentCounts = () => {
-    const counts = { positive: 0, negative: 0, neutral: 0 };
-    reviews.forEach(review => {
-      if (review.ai_sentiment) {
-        counts[review.ai_sentiment]++;
-      }
-    });
-    return counts;
-  };
 
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -180,8 +257,6 @@ const Reviews = () => {
     );
   }
 
-  const sentimentCounts = getSentimentCounts();
-
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -189,232 +264,204 @@ const Reviews = () => {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-4 ml-4">
-              <h1 className="text-xl font-semibold">Reviews</h1>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-lg font-semibold">Reviews</h1>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              <Button onClick={fetchReviews} size="sm">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
+              <Select
+                value={selectedLocation}
+                onValueChange={(value) => setSelectedLocation(value)}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </header>
-          
-          <div className="flex-1 space-y-6 p-8 pt-6">
-            {selectedLocation && (
+
+          <div className="flex-1 space-y-4 p-8 pt-6">
+            <div className="flex justify-between items-center mb-8">
               <div>
-                <h1 className="text-3xl font-bold mb-2">{selectedLocation.location_name} Reviews</h1>
-                <p className="text-muted-foreground mb-6">
-                  Manage and respond to customer reviews for this location
+                <h1 className="text-3xl font-bold mb-2">Customer Reviews</h1>
+                <p className="text-muted-foreground">
+                  Manage and analyze your Google Business reviews with AI insights
                 </p>
               </div>
-            )}
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <Card className="border-accent/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Reviews</p>
-                      <p className="text-2xl font-bold text-accent">{reviews.length}</p>
-                    </div>
-                    <MessageSquare className="h-8 w-8 text-accent" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-accent/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Average Rating</p>
-                      <div className="flex items-center gap-1">
-                        <p className="text-2xl font-bold text-accent">{getAverageRating()}</p>
-                        <Star className="h-5 w-5 text-accent fill-accent" />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-green-500/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Positive</p>
-                      <p className="text-2xl font-bold text-green-600">{sentimentCounts.positive}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-red-500/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Negative</p>
-                      <p className="text-2xl font-bold text-red-600">{sentimentCounts.negative}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <Button onClick={() => handleRefetchReviews(selectedLocation !== "all" ? selectedLocation : undefined)}>
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Refresh Reviews
+              </Button>
             </div>
 
             {/* Filters */}
-            <Card className="border-accent/20">
+            <Card className="mb-6">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="w-5 h-5 text-accent" />
+                <CardTitle className="flex items-center">
+                  <Filter className="w-5 h-5 mr-2" />
                   Filters
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex-1 min-w-64">
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Search</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                       <Input
                         placeholder="Search reviews..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 border-accent/20 focus:border-accent"
+                        className="pl-10"
                       />
                     </div>
                   </div>
-                  
-                  <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Sentiments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Sentiments</SelectItem>
-                      <SelectItem value="positive">Positive</SelectItem>
-                      <SelectItem value="negative">Negative</SelectItem>
-                      <SelectItem value="neutral">Neutral</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={ratingFilter} onValueChange={setRatingFilter}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="All Ratings" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Ratings</SelectItem>
-                      <SelectItem value="1">1 Star</SelectItem>
-                      <SelectItem value="2">2 Stars</SelectItem>
-                      <SelectItem value="3">3 Stars</SelectItem>
-                      <SelectItem value="4">4 Stars</SelectItem>
-                      <SelectItem value="5">5 Stars</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={tagFilter} onValueChange={setTagFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Tags" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Tags</SelectItem>
-                      {allTags.map((tag) => (
-                        <SelectItem key={tag} value={tag}>
-                          {tag}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Sentiment</label>
+                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Sentiments</SelectItem>
+                        <SelectItem value="positive">Positive</SelectItem>
+                        <SelectItem value="negative">Negative</SelectItem>
+                        <SelectItem value="neutral">Neutral</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Rating</label>
+                    <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Ratings</SelectItem>
+                        <SelectItem value="5">5 Stars</SelectItem>
+                        <SelectItem value="4">4 Stars</SelectItem>
+                        <SelectItem value="3">3 Stars</SelectItem>
+                        <SelectItem value="2">2 Stars</SelectItem>
+                        <SelectItem value="1">1 Star</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Reviews List */}
-            <div className="space-y-4">
-              {filteredReviews.length === 0 ? (
-                <Card className="border-accent/20">
-                  <CardContent className="p-8 text-center">
-                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No reviews found</h3>
-                    <p className="text-muted-foreground">
-                      {reviews.length === 0 ? "No reviews available for this location." : "No reviews match your current filters."}
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                filteredReviews.map((review) => (
-                  <Card key={review.id} className={`border-accent/20 ${getSentimentBg(review.ai_sentiment)}`}>
+            {filteredReviews.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <MessageSquare className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No reviews found</h3>
+                  <p className="text-muted-foreground mb-6">
+                    {reviews.length === 0
+                      ? "Fetch reviews from your Google Business locations to get started."
+                      : "No reviews match your current filters."}
+                  </p>
+                  {reviews.length === 0 && (
+                    <Button onClick={() => handleRefetchReviews()}>
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Fetch Reviews
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredReviews.map((review) => (
+                  <Card key={review.id}>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-foreground">{review.author_name}</h3>
-                            {review.ai_sentiment && (
-                              <Badge variant="outline" className={getSentimentColor(review.ai_sentiment)}>
-                                {review.ai_sentiment}
-                              </Badge>
-                            )}
-                            <span className="text-sm text-muted-foreground">
-                              {format(new Date(review.review_date), 'MMM dd, yyyy')}
-                            </span>
+                        <div className="flex items-center space-x-3">
+                          {review.author_photo_url && (
+                            <img
+                              src={review.author_photo_url}
+                              alt={review.author_name}
+                              className="w-10 h-10 rounded-full"
+                            />
+                          )}
+                          <div>
+                            <h4 className="font-semibold">{review.author_name}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {review.location_name} • {format(new Date(review.review_date), "MMM d, yyyy")}
+                            </p>
                           </div>
-                          
-                          <div className="flex items-center gap-1 mb-2">
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`w-4 h-4 ${
-                                  i < (review.rating || 0)
-                                    ? "text-accent fill-accent"
-                                    : "text-muted-foreground"
-                                }`}
+                                className={`w-4 h-4 ${i < review.rating ? "text-yellow-400 fill-current" : "text-muted-foreground"}`}
                               />
                             ))}
                           </div>
-                          
-                          {review.text && (
-                            <p className="text-foreground mb-3 leading-relaxed">
-                              "{review.text}"
-                            </p>
+                          {review.ai_sentiment && (
+                            <Badge
+                              variant={
+                                review.ai_sentiment === "positive"
+                                  ? "default"
+                                  : review.ai_sentiment === "negative"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
+                              {review.ai_sentiment}
+                            </Badge>
                           )}
-                          
-                          {review.ai_tags && review.ai_tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-3">
-                              {review.ai_tags.map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          
-                          {review.reply_text && (
-                            <div className="mt-4 p-3 bg-accent/5 border-l-2 border-accent rounded-r">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center">
-                                  <span className="text-xs text-white font-medium">B</span>
-                                </div>
-                                <span className="text-sm font-medium text-accent">Business Reply</span>
-                                {review.reply_date && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {format(new Date(review.reply_date), 'MMM dd, yyyy')}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-foreground">{review.reply_text}</p>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="ml-4">
-                          <ReplyDialog 
-                            review={review} 
-                            onReplySubmitted={fetchReviews}
-                          />
                         </div>
                       </div>
+
+                      {review.text && <p className="text-muted-foreground mb-4">{review.text}</p>}
+
+                      {review.ai_tags && review.ai_tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {review.ai_tags.map((tag, index) => (
+                            <Badge key={index} variant="outline">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {review.reply_text && (
+                        <div className="bg-muted p-4 rounded-lg mb-4">
+                          <p className="text-sm font-medium mb-1">Business Reply:</p>
+                          <p className="text-sm">{review.reply_text}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {review.reply_date && format(new Date(review.reply_date), "MMM d, yyyy")}
+                          </p>
+                        </div>
+                      )}
+
+                      {!review.reply_text && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const reply = prompt("Enter your reply:");
+                            if (reply) handleReplyToReview(review.google_review_id, reply);
+                          }}
+                        >
+                          <Reply className="w-4 h-4 mr-2" />
+                          Reply
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </SidebarInset>
       </div>
