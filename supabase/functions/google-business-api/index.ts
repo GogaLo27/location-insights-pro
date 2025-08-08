@@ -20,6 +20,7 @@ serve(async (req) => {
 
   try {
     const { action, locationId, query, startDate, endDate } = await req.json();
+    console.log('Edge function called with action:', action);
     
     // Get Supabase user auth
     const authHeader = req.headers.get('Authorization');
@@ -31,13 +32,17 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth error:', authError);
       throw new Error('Unauthorized');
     }
 
     // Get Google access token from custom header
     const googleAccessToken = req.headers.get('X-Google-Token');
+    console.log('Google access token received:', !!googleAccessToken);
+    console.log('Google access token length:', googleAccessToken?.length || 0);
+    
     if (!googleAccessToken) {
-      throw new Error('Missing Google access token. Please sign in with Google to access your business data.');
+      throw new Error('Missing Google access token. Ensure client sends session.provider_token');
     }
 
     console.log('Processing action:', action, 'for user:', user.id);
@@ -60,23 +65,6 @@ serve(async (req) => {
         throw new Error('Invalid action');
     }
 
-    switch (action) {
-      case 'get_user_locations':
-      case 'fetch_user_locations':
-        return await fetchUserLocations(user.id, googleAccessToken);
-      
-      case 'search_locations':
-        return await searchLocations(user.id, query, googleAccessToken);
-      
-      case 'fetch_reviews':
-        return await fetchLocationReviews(locationId, googleAccessToken);
-      
-      case 'fetch_analytics':
-        return await fetchLocationAnalytics(locationId, googleAccessToken, startDate, endDate);
-      
-      default:
-        throw new Error('Invalid action');
-    }
 
   } catch (error) {
     console.error('Error in google-business-api function:', error);

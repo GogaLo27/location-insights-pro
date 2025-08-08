@@ -74,11 +74,29 @@ const Locations = () => {
       setLoading(true);
       
       // Get the current session with provider token
-      const { data: { session } } = await supabase.auth.getSession();
-      const googleAccessToken = session?.provider_token;
+      let { data: { session } } = await supabase.auth.getSession();
+      let googleAccessToken = session?.provider_token;
+      
+      // If provider_token is undefined, try refreshing the session
+      if (!googleAccessToken) {
+        console.log('No provider_token found, refreshing session...');
+        await supabase.auth.refreshSession();
+        const refreshedSession = await supabase.auth.getSession();
+        session = refreshedSession.data.session;
+        googleAccessToken = session?.provider_token;
+      }
+      
+      console.log('Session available:', !!session);
+      console.log('Google access token available:', !!googleAccessToken);
+      console.log('Provider token length:', googleAccessToken?.length || 0);
       
       if (!googleAccessToken) {
         console.log('No Google access token found, user needs to re-authenticate');
+        toast({
+          title: "Authentication Required",
+          description: "Please sign out and sign in with Google again to access your business data",
+          variant: "destructive",
+        });
         setLocations([]);
         return;
       }
@@ -97,6 +115,7 @@ const Locations = () => {
         console.log('Error fetching locations:', error);
         setLocations([]);
       } else {
+        console.log('Successfully fetched locations:', data?.locations?.length || 0);
         setLocations(data?.locations || []);
       }
     } catch (error) {
