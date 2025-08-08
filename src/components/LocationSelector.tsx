@@ -48,7 +48,7 @@ const LocationSelector = () => {
       }
 
       const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { action: 'get_user_locations' },
+        body: { action: 'fetch_user_locations' },
         headers: { 'X-Google-Token': googleAccessToken }
       });
 
