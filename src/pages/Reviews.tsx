@@ -84,7 +84,7 @@ const Reviews = () => {
       // Use edge function to get reviews
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
-          action: 'get_reviews',
+          action: 'fetch_reviews',
           location_id: selectedLocation !== "all" ? selectedLocation : undefined
         }
       });
