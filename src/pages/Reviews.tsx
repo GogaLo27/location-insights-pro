@@ -1,5 +1,3 @@
-// src/pages/Reviews.tsx (or wherever your route/component lives)
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
@@ -49,9 +47,13 @@ const Reviews = () => {
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
 
-  // ---- helper: get Supabase JWT + Google token
+  // --- helper to ensure we always have tokens
   const getSessionTokens = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session?.provider_token) {
+      await supabase.auth.refreshSession();
+      ({ data: { session } } = await supabase.auth.getSession());
+    }
     return {
       supabaseJwt: session?.access_token || "",
       googleAccessToken: session?.provider_token || "",
@@ -59,66 +61,81 @@ const Reviews = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      (async () => {
-        await fetchLocations();
-        await fetchReviews();
-      })();
-    }
+    if (!user) return;
+    (async () => {
+      await fetchLocations();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // ---- fetch locations (requires headers)
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      await fetchReviews();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocation]);
+
   const fetchLocations = async () => {
     try {
+      setLoading(true);
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) {
-        console.error("Missing tokens for fetchLocations");
+        toast({
+          title: "Authentication Required",
+          description: "Please sign out and sign in with Google again to access your business data.",
+          variant: "destructive",
+        });
         setLocations([]);
         return;
       }
 
       const { data, error } = await supabase.functions.invoke("google-business-api", {
-        body: { action: "fetch_user_locations" },
+        body: { action: "fetch_user_locations" }, // backend supports 'get_user_locations' too
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
           "X-Google-Token": googleAccessToken,
         },
       });
 
-      if (!error && data?.locations) {
-        setLocations(data.locations);
-      } else {
-        console.error("fetch_user_locations error:", error || data);
+      if (error) {
+        console.error("fetch_user_locations error:", error);
         setLocations([]);
+        return;
+      }
+
+      const list: Location[] = data?.locations || [];
+      setLocations(list);
+
+      // If "all" selected but we have locations, auto-select first so reviews can load
+      if (selectedLocation === "all" && list.length > 0) {
+        setSelectedLocation(list[0].id);
       }
     } catch (e) {
       console.error("Error fetching locations:", e);
       setLocations([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ---- fetch reviews (single location only; "all" is no-op unless you aggregate client-side)
   const fetchReviews = async () => {
     try {
       setLoading(true);
 
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) {
-        console.error("Missing tokens for fetchReviews");
         setReviews([]);
         return;
       }
 
-      // backend expects action='fetch_reviews' and param 'locationId'
+      // Require a specific location for now
       if (selectedLocation === "all") {
-        // If you want all locations, either:
-        // 1) loop over locations here and merge results, or
-        // 2) add a 'fetch_all_reviews' action on the server.
         setReviews([]);
         return;
       }
 
+      // Correct action + param name
       const { data, error } = await supabase.functions.invoke("google-business-api", {
         body: { action: "fetch_reviews", locationId: selectedLocation },
         headers: {
@@ -127,12 +144,13 @@ const Reviews = () => {
         },
       });
 
-      if (!error && data?.reviews) {
-        setReviews(data.reviews);
-      } else {
-        console.error("fetch_reviews error:", error || data);
+      if (error) {
+        console.error("fetch_reviews error:", error);
         setReviews([]);
+        return;
       }
+
+      setReviews(data?.reviews || []);
     } catch (e) {
       console.error("Error fetching reviews:", e);
       setReviews([]);
@@ -141,15 +159,18 @@ const Reviews = () => {
     }
   };
 
-  // ---- manual refresh; same headers + params
   const handleRefetchReviews = async (locationId?: string) => {
     try {
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
+      if (!supabaseJwt || !googleAccessToken) {
+        throw new Error("Missing tokens");
+      }
 
-      const idToUse =
-        locationId || (selectedLocation !== "all" ? selectedLocation : undefined);
-      if (!idToUse) throw new Error("Select a location first");
+      const idToUse = locationId || (selectedLocation !== "all" ? selectedLocation : undefined);
+      if (!idToUse) {
+        toast({ title: "Select a location", description: "Choose a location to refresh reviews." });
+        return;
+      }
 
       const { error } = await supabase.functions.invoke("google-business-api", {
         body: { action: "fetch_reviews", locationId: idToUse },
@@ -173,15 +194,15 @@ const Reviews = () => {
     }
   };
 
-  // ---- reply to review (NOTE: your backend currently does NOT implement 'reply_to_review')
   const handleReplyToReview = async (googleReviewId: string, replyText: string) => {
     try {
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
 
+      // NOTE: Your backend does NOT implement 'reply_to_review' yet.
       const { error } = await supabase.functions.invoke("google-business-api", {
         body: {
-          action: "reply_to_review", // you'll need to add this action server-side if you want it to work
+          action: "reply_to_review",
           review_id: googleReviewId,
           reply_text: replyText,
         },
@@ -205,7 +226,6 @@ const Reviews = () => {
     }
   };
 
-  // ---- filtering
   const filteredReviews = reviews.filter((review) => {
     const matchesSearch =
       !searchTerm ||
@@ -251,7 +271,6 @@ const Reviews = () => {
                 value={selectedLocation}
                 onValueChange={async (value) => {
                   setSelectedLocation(value);
-                  await fetchReviews();
                 }}
               >
                 <SelectTrigger className="w-48">
@@ -313,10 +332,7 @@ const Reviews = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-2 block">Sentiment</label>
-                    <Select
-                      value={sentimentFilter}
-                      onValueChange={setSentimentFilter}
-                    >
+                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -449,10 +465,7 @@ const Reviews = () => {
                           size="sm"
                           onClick={() => {
                             const replyText = prompt("Enter your reply:");
-                            if (replyText) {
-                              // NOTE: server action not implemented yet
-                              handleReplyToReview(review.google_review_id, replyText);
-                            }
+                            if (replyText) handleReplyToReview(review.google_review_id, replyText);
                           }}
                         >
                           <Reply className="w-4 h-4 mr-2" />
