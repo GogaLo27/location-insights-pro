@@ -9,6 +9,8 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID')!;
+const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
@@ -17,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, locationId, placeId, query } = await req.json();
+    const { action, locationId, query, startDate, endDate } = await req.json();
     
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -33,22 +35,25 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
+    // Get user's Google access token from user metadata
+    const googleAccessToken = user.user_metadata?.access_token;
+    if (!googleAccessToken) {
+      throw new Error('No Google access token found. Please sign in with Google.');
+    }
+
     switch (action) {
       case 'get_user_locations':
       case 'fetch_user_locations':
-        return await fetchUserLocations(user.id);
+        return await fetchUserLocations(user.id, googleAccessToken);
       
       case 'search_locations':
-        return await searchLocations(user.id, query);
-      
-      case 'add_location':
-        return await addLocation(user.id, placeId);
+        return await searchLocations(user.id, query, googleAccessToken);
       
       case 'fetch_reviews':
-        return await fetchLocationReviews(locationId);
+        return await fetchLocationReviews(locationId, googleAccessToken);
       
       case 'fetch_analytics':
-        return await fetchLocationAnalytics(locationId);
+        return await fetchLocationAnalytics(locationId, googleAccessToken, startDate, endDate);
       
       default:
         throw new Error('Invalid action');
@@ -66,126 +71,237 @@ serve(async (req) => {
   }
 });
 
-async function fetchUserLocations(userId: string) {
-  // For now, return mock data since we need Google Business API setup
-  const mockLocations = [
-    {
-      id: 'loc_1',
-      google_place_id: 'ChIJ123example',
-      name: 'Demo Restaurant',
-      address: '123 Main St, City, State',
-      phone: '+1-555-0123',
-      website: 'https://demo-restaurant.com',
-      rating: 4.5,
-      total_reviews: 125,
-      latitude: 40.7128,
-      longitude: -74.0060,
-      status: 'active',
-      last_fetched_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+async function googleApiRequest(url: string, accessToken: string, method = 'GET', params?: any) {
+  const urlWithParams = params ? `${url}?${new URLSearchParams(params).toString()}` : url;
+  
+  const response = await fetch(urlWithParams, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
-    {
-      id: 'loc_2',
-      google_place_id: 'ChIJ456example',
-      name: 'Sample Cafe',
-      address: '456 Oak Ave, City, State',
-      phone: '+1-555-0456',
-      website: 'https://sample-cafe.com',
-      rating: 4.2,
-      total_reviews: 89,
-      latitude: 40.7580,
-      longitude: -73.9855,
-      status: 'active',
-      last_fetched_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Google API Error: ${response.status} - ${errorText}`);
+    throw new Error(`Google API request failed: ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+async function getAllAccountIds(accessToken: string) {
+  const data = await googleApiRequest(
+    'https://mybusinessaccountmanagement.googleapis.com/v1/accounts',
+    accessToken
+  );
+
+  if (!data.accounts || data.accounts.length === 0) {
+    throw new Error('No Google Business accounts found');
+  }
+
+  return data.accounts.map((acc: any) => acc.name);
+}
+
+async function fetchUserLocations(userId: string, accessToken: string) {
+  try {
+    // Get all account IDs first
+    const accountIds = await getAllAccountIds(accessToken);
+    console.log('Found Google Business accounts:', accountIds);
+
+    const allLocations = [];
+
+    // Fetch locations for each account
+    for (const accountId of accountIds) {
+      let nextPageToken = null;
+
+      do {
+        const params: any = {
+          readMask: 'name,title,phoneNumbers,storefrontAddress,languageCode,storeCode,categories,websiteUri,regularHours,specialHours,serviceArea,labels,latlng,openInfo,metadata,profile,moreHours,serviceItems',
+          pageSize: 100,
+        };
+
+        if (nextPageToken) {
+          params.pageToken = nextPageToken;
+        }
+
+        const data = await googleApiRequest(
+          `https://mybusinessbusinessinformation.googleapis.com/v1/${accountId}/locations`,
+          accessToken,
+          'GET',
+          params
+        );
+
+        const locations = data.locations || [];
+        
+        // Format locations to match our interface
+        const formattedLocations = locations.map((loc: any) => ({
+          id: loc.name.split('/').pop(),
+          google_place_id: loc.name,
+          name: loc.title || 'Unknown Location',
+          address: loc.storefrontAddress ? 
+            `${loc.storefrontAddress.addressLines?.join(', ') || ''}, ${loc.storefrontAddress.locality || ''}, ${loc.storefrontAddress.administrativeArea || ''}`.trim() : 
+            null,
+          phone: loc.phoneNumbers?.primaryPhone || null,
+          website: loc.websiteUri || null,
+          rating: loc.metadata?.averageRating || null,
+          total_reviews: loc.metadata?.newReviewCount || 0,
+          latitude: loc.latlng?.latitude || null,
+          longitude: loc.latlng?.longitude || null,
+          status: 'active',
+          last_fetched_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+
+        allLocations.push(...formattedLocations);
+        nextPageToken = data.nextPageToken;
+        
+        console.log(`Fetched ${formattedLocations.length} locations from account ${accountId}`);
+      } while (nextPageToken);
     }
-  ];
+
+    console.log(`Total locations fetched: ${allLocations.length}`);
+
+    return new Response(
+      JSON.stringify({ locations: allLocations }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error fetching locations:', error);
+    throw error;
+  }
+}
+
+async function searchLocations(userId: string, query: string, accessToken: string) {
+  // For search, we'll fetch all locations and filter by query
+  const response = await fetchUserLocations(userId, accessToken);
+  const data = await response.json();
+  
+  const filteredLocations = data.locations.filter((location: any) => 
+    location.name.toLowerCase().includes(query.toLowerCase()) ||
+    (location.address && location.address.toLowerCase().includes(query.toLowerCase()))
+  );
 
   return new Response(
-    JSON.stringify({ locations: mockLocations }),
+    JSON.stringify({ locations: filteredLocations }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
 
-async function searchLocations(userId: string, query: string) {
-  // Mock search results based on query
-  const searchResults = [
-    {
-      id: `loc_${Date.now()}`,
-      google_place_id: `search_${Date.now()}`,
-      name: `${query} - Search Result`,
-      address: '789 Search St, Query City, State',
-      phone: '+1-555-0789',
-      website: null,
-      rating: 4.3,
-      total_reviews: 67,
-      latitude: 40.7614,
-      longitude: -73.9776,
-      status: 'active',
-      last_fetched_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+async function fetchLocationReviews(locationId: string, accessToken: string) {
+  try {
+    // First get account IDs to find the full location path
+    const accountIds = await getAllAccountIds(accessToken);
+    
+    let allReviews = [];
+    
+    for (const accountId of accountIds) {
+      try {
+        let nextPageToken = null;
+        
+        do {
+          const url = `https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations/${locationId}/reviews${
+            nextPageToken ? `?pageToken=${nextPageToken}` : ''
+          }`;
+
+          const data = await googleApiRequest(url, accessToken);
+          
+          const rawReviews = data.reviews || [];
+          const formattedReviews = rawReviews.map((r: any) => ({
+            id: r.reviewId,
+            author_name: r.reviewer?.displayName || 'Anonymous',
+            rating: r.starRating || 0,
+            text: r.comment || '',
+            review_date: r.createTime || new Date().toISOString(),
+            ai_sentiment: null, // To be analyzed later
+            ai_tags: []
+          }));
+
+          allReviews.push(...formattedReviews);
+          nextPageToken = data.nextPageToken;
+        } while (nextPageToken);
+        
+        break; // Found reviews for this location
+      } catch (error) {
+        console.log(`No reviews found for location ${locationId} in account ${accountId}`);
+        continue;
+      }
     }
-  ];
 
-  return new Response(
-    JSON.stringify({ locations: searchResults }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+    return new Response(
+      JSON.stringify({ reviews: allReviews }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+    // Return empty reviews if error
+    return new Response(
+      JSON.stringify({ reviews: [] }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 }
 
-async function addLocation(userId: string, placeId: string) {
-  // Mock implementation - in production this would use Google Places API
-  const mockLocation = {
-    id: `loc_${Date.now()}`,
-    google_place_id: placeId,
-    name: 'New Location',
-    address: 'To be fetched from Google',
-    rating: 0,
-    total_reviews: 0,
-    status: 'active'
-  };
+async function fetchLocationAnalytics(locationId: string, accessToken: string, startDate?: any, endDate?: any) {
+  try {
+    // Default to last 30 days if no dates provided
+    const today = new Date();
+    const defaultEndDate = {
+      year: today.getFullYear(),
+      month: today.getMonth() + 1,
+      day: today.getDate(),
+    };
+    
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const defaultStartDate = {
+      year: thirtyDaysAgo.getFullYear(),
+      month: thirtyDaysAgo.getMonth() + 1,
+      day: thirtyDaysAgo.getDate(),
+    };
 
-  return new Response(
-    JSON.stringify({ location: mockLocation }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
+    const start = startDate || defaultStartDate;
+    const end = endDate || defaultEndDate;
 
-async function fetchLocationReviews(locationId: string) {
-  // Mock reviews data
-  const mockReviews = [
-    {
-      id: 'rev_1',
-      author_name: 'John Doe',
-      rating: 5,
-      text: 'Great service and food!',
-      review_date: new Date().toISOString(),
-      ai_sentiment: 'positive',
-      ai_tags: ['service', 'food', 'quality']
-    }
-  ];
+    const params = {
+      'dailyMetrics': [
+        'BUSINESS_IMPRESSIONS_MOBILE_SEARCH',
+        'BUSINESS_CONVERSATIONS', 
+        'BUSINESS_IMPRESSIONS_DESKTOP_SEARCH',
+        'BUSINESS_IMPRESSIONS_DESKTOP_MAPS',
+        'BUSINESS_IMPRESSIONS_MOBILE_MAPS',
+        'BUSINESS_DIRECTION_REQUESTS',
+        'CALL_CLICKS',
+        'WEBSITE_CLICKS',
+        'BUSINESS_BOOKINGS',
+        'BUSINESS_FOOD_ORDERS',
+        'BUSINESS_FOOD_MENU_CLICKS',
+      ].join(','),
+      'dailyRange.start_date.year': start.year.toString(),
+      'dailyRange.start_date.month': start.month.toString(),
+      'dailyRange.start_date.day': start.day.toString(),
+      'dailyRange.end_date.year': end.year.toString(),
+      'dailyRange.end_date.month': end.month.toString(),
+      'dailyRange.end_date.day': end.day.toString(),
+    };
 
-  return new Response(
-    JSON.stringify({ reviews: mockReviews }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
+    const url = `https://businessprofileperformance.googleapis.com/v1/locations/${locationId}:fetchMultiDailyMetricsTimeSeries`;
+    const response = await googleApiRequest(url, accessToken, 'GET', params);
 
-async function fetchLocationAnalytics(locationId: string) {
-  // Mock analytics data
-  const mockAnalytics = {
-    views: 1234,
-    searches: 567,
-    website_clicks: 89,
-    direction_clicks: 234,
-    phone_calls: 45
-  };
+    return new Response(
+      JSON.stringify({ analytics: response }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
-  return new Response(
-    JSON.stringify({ analytics: mockAnalytics }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    // Return empty analytics if error
+    return new Response(
+      JSON.stringify({ analytics: {} }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 }
