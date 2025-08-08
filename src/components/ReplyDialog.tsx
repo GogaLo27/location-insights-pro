@@ -55,7 +55,10 @@ Please write a thoughtful, professional response that:
 Keep the response under 150 words.`;
 
       const { data, error } = await supabase.functions.invoke('generate-ai-reply', {
-        body: { prompt }
+        body: { prompt },
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (error) throw error;

@@ -251,7 +251,7 @@ const Reviews = () => {
             </div>
 
             {/* Filters */}
-            <Card className="mb-6 border-accent/20 shadow-lg backdrop-blur-sm">
+            <Card className="mb-6 border-accent/20 shadow-md backdrop-blur-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center text-foreground">
                   <Filter className="w-5 h-5 mr-2 text-accent" />
@@ -308,7 +308,7 @@ const Reviews = () => {
 
             {/* Reviews List */}
             {filteredReviews.length === 0 ? (
-              <Card className="border-accent/20 shadow-lg">
+              <Card className="border-accent/20 shadow-md">
                 <CardContent className="text-center py-12">
                   <div className="relative">
                     <MessageSquare className="w-16 h-16 text-accent mx-auto mb-4 opacity-80" />
@@ -334,7 +334,7 @@ const Reviews = () => {
             ) : (
               <div className="space-y-6">
                 {filteredReviews.map((review) => (
-                  <Card key={review.id} className="border-accent/10 shadow-lg hover:shadow-xl transition-all duration-200 backdrop-blur-sm bg-card/80">
+                  <Card key={review.id} className="border-accent/10 shadow-md hover:shadow-lg transition-all duration-200 backdrop-blur-sm bg-card/80">
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center space-x-4">
@@ -363,7 +363,7 @@ const Reviews = () => {
                               <Star
                                 key={i}
                                 className={`w-5 h-5 transition-colors ${
-                                  i < review.rating
+                                  i < (review.rating || 0)
                                     ? "text-accent fill-current"
                                     : "text-muted-foreground"
                                 }`}

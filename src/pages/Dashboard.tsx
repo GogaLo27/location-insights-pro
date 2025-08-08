@@ -8,9 +8,11 @@ import { SimpleBarChart, SimpleLineChart, SimplePieChart } from "@/components/ui
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import LocationSelector from "@/components/LocationSelector";
-import { MapPin, BarChart3, MessageSquare, Settings, LogOut, TrendingUp, Users, Star } from "lucide-react";
+import { MapPin, BarChart3, MessageSquare, Settings, LogOut, TrendingUp, Users, Star, Reply } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "@/contexts/LocationContext";
+import { format } from "date-fns";
 
 interface Profile {
   id: string;
@@ -31,8 +33,10 @@ interface DashboardStats {
 const Dashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
+  const { selectedLocation } = useLocation();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentReviews, setRecentReviews] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -42,8 +46,9 @@ const Dashboard = () => {
       setStatsLoading(true);
       fetchProfile();
       fetchDashboardStats();
+      fetchRecentReviews();
     }
-  }, [user]);
+  }, [user, selectedLocation]);
 
   const fetchProfile = async () => {
     try {
@@ -65,22 +70,125 @@ const Dashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      // Use mock data until database migration is executed
+      if (!selectedLocation) {
+        setStats({
+          totalLocations: 0,
+          totalReviews: 0,
+          averageRating: 0,
+          sentimentBreakdown: { positive: 0, negative: 0, neutral: 0 }
+        });
+        return;
+      }
+
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) {
+        setStats({
+          totalLocations: 0,
+          totalReviews: 0, 
+          averageRating: 0,
+          sentimentBreakdown: { positive: 0, negative: 0, neutral: 0 }
+        });
+        return;
+      }
+
+      const locationId = selectedLocation.google_place_id.split('/').pop();
+      const { data, error } = await supabase.functions.invoke("google-business-api", {
+        body: { action: "fetch_reviews", locationId },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          "X-Google-Token": googleAccessToken,
+        },
+      });
+
+      if (!error && data?.reviews) {
+        const reviews = data.reviews;
+        const totalReviews = reviews.length;
+        const averageRating = totalReviews > 0 
+          ? reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / totalReviews 
+          : 0;
+        
+        const sentimentCounts = reviews.reduce((acc: any, r: any) => {
+          const sentiment = r.ai_sentiment || 'neutral';
+          acc[sentiment] = (acc[sentiment] || 0) + 1;
+          return acc;
+        }, {});
+
+        setStats({
+          totalLocations: 1,
+          totalReviews,
+          averageRating,
+          sentimentBreakdown: {
+            positive: sentimentCounts.positive || 0,
+            negative: sentimentCounts.negative || 0,
+            neutral: sentimentCounts.neutral || 0,
+          }
+        });
+      } else {
+        setStats({
+          totalLocations: 1,
+          totalReviews: 0,
+          averageRating: 0,
+          sentimentBreakdown: { positive: 0, negative: 0, neutral: 0 }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
       setStats({
         totalLocations: 0,
         totalReviews: 0,
         averageRating: 0,
-        sentimentBreakdown: {
-          positive: 0,
-          negative: 0,
-          neutral: 0,
-        }
+        sentimentBreakdown: { positive: 0, negative: 0, neutral: 0 }
       });
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
     } finally {
       setStatsLoading(false);
     }
+  };
+
+  const fetchRecentReviews = async () => {
+    try {
+      if (!selectedLocation) {
+        setRecentReviews([]);
+        return;
+      }
+
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) {
+        setRecentReviews([]);
+        return;
+      }
+
+      const locationId = selectedLocation.google_place_id.split('/').pop();
+      const { data, error } = await supabase.functions.invoke("google-business-api", {
+        body: { action: "fetch_reviews", locationId },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          "X-Google-Token": googleAccessToken,
+        },
+      });
+
+      if (!error && data?.reviews) {
+        // Get the 5 most recent reviews
+        const recent = data.reviews
+          .sort((a: any, b: any) => new Date(b.review_date).getTime() - new Date(a.review_date).getTime())
+          .slice(0, 5);
+        setRecentReviews(recent);
+      }
+    } catch (error) {
+      console.error('Error fetching recent reviews:', error);
+      setRecentReviews([]);
+    }
+  };
+
+  const getSessionTokens = async () => {
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session?.provider_token) {
+      await supabase.auth.refreshSession();
+      ({ data: { session } } = await supabase.auth.getSession());
+    }
+    return {
+      supabaseJwt: session?.access_token || "",
+      googleAccessToken: session?.provider_token || "",
+    };
   };
 
   if (!user && !authLoading) {
@@ -282,7 +390,95 @@ const Dashboard = () => {
             </CardContent>
           </Card>
           </div>
-          )}
+        )}
+
+        {/* Recent Reviews Section */}
+        {recentReviews.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-accent" />
+                Recent Reviews
+              </CardTitle>
+              <CardDescription>
+                Latest customer feedback from {selectedLocation?.location_name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {recentReviews.map((review, index) => (
+                <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                      {review.author_photo_url ? (
+                        <img
+                          src={review.author_photo_url}
+                          alt={review.author_name}
+                          className="w-8 h-8 rounded-full"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-sm">
+                          {review.author_name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-sm">{review.author_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(review.review_date), "MMM d, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3 h-3 ${
+                              i < (review.rating || 0)
+                                ? "text-accent fill-current"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      {review.ai_sentiment && (
+                        <Badge 
+                          variant={
+                            review.ai_sentiment === "positive" ? "default" :
+                            review.ai_sentiment === "negative" ? "destructive" : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {review.ai_sentiment}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  {review.text && (
+                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                      "{review.text}"
+                    </p>
+                  )}
+                  {review.reply_text && (
+                    <div className="bg-muted/30 p-2 rounded text-xs">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Reply className="w-3 h-3 text-accent" />
+                        <span className="font-medium">Your Reply:</span>
+                      </div>
+                      <p className="text-muted-foreground">{review.reply_text}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <Button 
+                variant="outline" 
+                className="w-full mt-4"
+                onClick={() => window.location.href = '/reviews'}
+              >
+                View All Reviews
+              </Button>
+            </CardContent>
+          </Card>
+        )}
           </div>
         </SidebarInset>
       </div>
