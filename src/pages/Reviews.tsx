@@ -68,7 +68,7 @@ const Reviews = () => {
       const { data, error } = await supabase.functions.invoke("google-business-api", {
         body: {
           action: "fetch_reviews",
-          locationId: selectedLocation.google_place_id,
+          locationId: selectedLocation.google_place_id.split('/').pop() || selectedLocation.google_place_id,
         },
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
