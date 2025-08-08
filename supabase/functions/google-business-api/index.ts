@@ -1,5 +1,3 @@
-// /supabase/functions/google-business-api/index.ts
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -23,7 +21,7 @@ serve(async (req) => {
   try {
     const { action, locationId, query, startDate, endDate } = await req.json();
 
-    // ---- Supabase Auth
+    // Supabase Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonError("No authorization header", 401);
@@ -38,7 +36,7 @@ serve(async (req) => {
       return jsonError("Unauthorized", 401);
     }
 
-    // ---- Google token
+    // Google Token
     const googleAccessToken = req.headers.get("X-Google-Token");
     if (!googleAccessToken) {
       return jsonError(
@@ -47,9 +45,8 @@ serve(async (req) => {
       );
     }
 
-    // ---- Route actions
+    // Routing
     switch (action) {
-      case "get_user_locations":
       case "fetch_user_locations":
         return await fetchUserLocations(user.id, googleAccessToken);
 
@@ -78,8 +75,6 @@ serve(async (req) => {
     return jsonError(error?.message ?? "Internal error", 500);
   }
 });
-
-// ---------- Helpers
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -129,14 +124,11 @@ async function getAllAccountIds(accessToken: string) {
     throw new Error("No Google Business accounts found");
   }
 
-  // Keep full "accounts/123" path so URLs are correct
-  return data.accounts.map((acc: any) => acc.name);
+  return data.accounts.map((acc: any) => acc.name); // keep full "accounts/123"
 }
 
 async function fetchUserLocations(userId: string, accessToken: string) {
   const accountIds = await getAllAccountIds(accessToken);
-  console.log("Found Google Business accounts:", accountIds);
-
   const allLocations: any[] = [];
 
   for (const accountId of accountIds) {
@@ -158,8 +150,7 @@ async function fetchUserLocations(userId: string, accessToken: string) {
         params,
       );
 
-      const locations = data.locations || [];
-      const formatted = locations.map((loc: any) => ({
+      const formatted = (data.locations || []).map((loc: any) => ({
         id: loc.name?.split("/").pop(),
         google_place_id: loc.name,
         name: loc.title || "Unknown Location",
@@ -180,8 +171,6 @@ async function fetchUserLocations(userId: string, accessToken: string) {
 
       allLocations.push(...formatted);
       nextPageToken = data.nextPageToken ?? null;
-
-      console.log(`Fetched ${formatted.length} locations from ${accountId}`);
     } while (nextPageToken);
   }
 
@@ -191,21 +180,19 @@ async function fetchUserLocations(userId: string, accessToken: string) {
 async function searchLocations(userId: string, query: string, accessToken: string) {
   const response = await fetchUserLocations(userId, accessToken);
   const data = await response.json();
-
   const q = query.toLowerCase();
   const filtered = (data.locations as any[]).filter((location: any) =>
     location.name?.toLowerCase().includes(q) ||
     location.address?.toLowerCase().includes(q)
   );
-
   return json({ locations: filtered });
 }
 
 async function fetchLocationReviews(locationId: string, accessToken: string) {
-  const accountIds = await getAllAccountIds(accessToken); // ["accounts/123"]
+  const accountIds = await getAllAccountIds(accessToken);
   let allReviews: any[] = [];
 
-  for (const accountPath of accountIds) { // keep full path
+  for (const accountPath of accountIds) {
     try {
       let nextPageToken: string | null = null;
 
@@ -215,9 +202,7 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
           (nextPageToken ? `?pageToken=${nextPageToken}` : "");
 
         const data = await googleApiRequest(url, accessToken);
-        const raw = data.reviews || [];
-
-        const formatted = raw.map((r: any) => ({
+        const formatted = (data.reviews || []).map((r: any) => ({
           id: r.reviewId,
           author_name: r.reviewer?.displayName || "Anonymous",
           rating: r.starRating || 0,
@@ -231,9 +216,8 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
         nextPageToken = data.nextPageToken ?? null;
       } while (nextPageToken);
 
-      break; // found reviews for this account
+      break;
     } catch {
-      console.log(`No reviews for location ${locationId} in ${accountPath}`);
       continue;
     }
   }
