@@ -62,7 +62,7 @@ const Analytics = () => {
 
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
-          action: 'fetch_user_locations'
+          action: 'get_user_locations'
         },
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
@@ -107,7 +107,7 @@ const Analytics = () => {
       
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
-          action: 'fetch_location_analytics',
+          action: 'fetch_analytics',
           locationId: selectedLocation,
           startDate: {
             year: startDate.getFullYear(),
@@ -126,8 +126,8 @@ const Analytics = () => {
         },
       });
 
-      if (!error && data?.metrics) {
-        const processedData = processAnalyticsData(data.metrics);
+      if (!error && data?.analytics) {
+        const processedData = processAnalyticsData(data.analytics);
         setAnalyticsData(processedData);
       } else {
         console.error('Analytics fetch error:', error);

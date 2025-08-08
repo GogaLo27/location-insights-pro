@@ -3,214 +3,367 @@ import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { MapPin, Search, RefreshCw, Star, Phone, Globe } from "lucide-react";
+import LocationSelector from "@/components/LocationSelector";
+import ReplyDialog from "@/components/ReplyDialog";
+import { Star, Sparkles, Brain, TrendingUp, MessageSquare, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "@/contexts/LocationContext";
+import { format } from "date-fns";
 
-interface Location {
+interface Review {
   id: string;
-  google_place_id: string;
-  name: string;
-  address: string | null;
-  phone: string | null;
-  website: string | null;
-  rating: number | null;
-  total_reviews: number;
-  latitude: number | null;
-  longitude: number | null;
-  status: string;
-  last_fetched_at: string | null;
-  created_at: string;
-  updated_at: string;
+  google_review_id: string;
+  author_name: string;
+  author_photo_url: string | null;
+  rating: number;
+  text: string | null;
+  review_date: string;
+  reply_text: string | null;
+  reply_date: string | null;
+  ai_sentiment: "positive" | "negative" | "neutral" | null;
+  ai_tags: string[];
+  location_id: string;
 }
 
-interface Profile {
+interface ReviewAnalysis {
   id: string;
-  email: string;
-  full_name: string | null;
-  subscription_plan: string;
-  locations_limit: number;
-  reviews_limit: number;
+  review_id: string;
+  sentiment: "positive" | "negative" | "neutral";
+  tags: string[];
+  analyzed_at: string;
 }
 
-const Locations = () => {
+interface AnalysisProgress {
+  total: number;
+  analyzed: number;
+  isAnalyzing: boolean;
+}
+
+const Reviews = () => {
   const { user, loading: authLoading } = useAuth();
+  const { selectedLocation } = useLocation();
   const { toast } = useToast();
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress>({
+    total: 0,
+    analyzed: 0,
+    isAnalyzing: false
+  });
+  
+  const reviewsPerPage = 15;
+  const totalPages = Math.ceil(totalReviews / reviewsPerPage);
 
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-      fetchLocations();
+    if (user && selectedLocation) {
+      fetchReviews();
+      loadAnalysisProgress();
     }
-  }, [user]);
+  }, [user, selectedLocation, currentPage]);
 
-  const fetchProfile = async () => {
-    try {
-      setProfile({
-        id: user?.id || '',
-        email: user?.email || '',
-        full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
-        subscription_plan: 'free',
-        locations_limit: 2,
-        reviews_limit: 100,
-      });
-    } catch (error) {
-      console.error('Error:', error);
+  useEffect(() => {
+    // Check if analysis is still in progress on mount
+    const savedProgress = localStorage.getItem('reviewAnalysisProgress');
+    if (savedProgress) {
+      const progress = JSON.parse(savedProgress);
+      if (progress.isAnalyzing) {
+        setAnalysisProgress(progress);
+        // Continue monitoring progress
+        monitorAnalysisProgress();
+      }
     }
+  }, []);
+
+  const getSessionTokens = async () => {
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session?.provider_token) {
+      await supabase.auth.refreshSession();
+      ({ data: { session } } = await supabase.auth.getSession());
+    }
+    return {
+      supabaseJwt: session?.access_token || "",
+      googleAccessToken: session?.provider_token || "",
+    };
   };
 
-  const fetchLocations = async () => {
+  const fetchReviews = async () => {
+    if (!selectedLocation) return;
+    
     try {
       setLoading(true);
-      let { data: { session } } = await supabase.auth.getSession();
-      let googleAccessToken = session?.provider_token;
-
-      if (!googleAccessToken) {
-        console.log('No provider_token found, refreshing session...');
-        await supabase.auth.refreshSession();
-        const refreshedSession = await supabase.auth.getSession();
-        session = refreshedSession.data.session;
-        googleAccessToken = session?.provider_token;
-      }
-
-      console.log('Google access token available:', !!googleAccessToken);
-
-      if (!googleAccessToken) {
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      
+      if (!supabaseJwt || !googleAccessToken) {
         toast({
           title: "Authentication Required",
-          description: "Please sign out and sign in with Google again to access your business data",
+          description: "Please sign in with Google to access reviews",
           variant: "destructive",
         });
-        setLocations([]);
         return;
       }
 
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
-          action: 'get_user_locations',
-          googleAccessToken // ✅ send in body now
-        }
+          action: 'fetch_reviews',
+          locationId: selectedLocation.google_place_id
+        },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
+        },
       });
 
       if (error) {
-        console.log('Error fetching locations:', error);
-        setLocations([]);
-      } else {
-        console.log('Successfully fetched locations:', data?.locations?.length || 0);
-        setLocations(data?.locations || []);
+        console.error('Error fetching reviews:', error);
+        setReviews([]);
+        return;
+      }
+
+      if (data?.reviews) {
+        // Get existing analyses from database
+        const { data: analyses } = await supabase
+          .from('review_analyses')
+          .select('review_id, ai_sentiment, ai_tags')
+          .in('review_id', data.reviews.map((r: any) => r.google_review_id));
+
+        // Merge analyses with reviews
+        const reviewsWithAnalysis = data.reviews.map((review: any) => {
+          const analysis = analyses?.find(a => a.review_id === review.google_review_id);
+          return {
+            ...review,
+            ai_sentiment: analysis?.ai_sentiment || null,
+            ai_tags: analysis?.ai_tags || []
+          };
+        });
+
+        // Sort by date (newest first) and paginate
+        const sortedReviews = reviewsWithAnalysis.sort((a: any, b: any) => 
+          new Date(b.review_date).getTime() - new Date(a.review_date).getTime()
+        );
+        
+        setTotalReviews(sortedReviews.length);
+        const startIndex = (currentPage - 1) * reviewsPerPage;
+        const paginatedReviews = sortedReviews.slice(startIndex, startIndex + reviewsPerPage);
+        
+        setReviews(paginatedReviews);
+        
+        // Calculate average rating
+        const avgRating = sortedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / sortedReviews.length;
+        setAverageRating(avgRating || 0);
       }
     } catch (error) {
-      console.error('Error fetching locations:', error);
-      setLocations([]);
+      console.error('Error fetching reviews:', error);
+      setReviews([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchFromGoogle = async () => {
+  const loadAnalysisProgress = async () => {
+    if (!selectedLocation) return;
+    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const googleAccessToken = session?.provider_token;
-
-      if (!googleAccessToken) {
-        toast({
-          title: "Error",
-          description: "Please sign in with Google to access your business data",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
+      // Get total reviews count
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      const { data } = await supabase.functions.invoke('google-business-api', {
         body: { 
-          action: 'fetch_user_locations',
-          googleAccessToken
-        }
+          action: 'fetch_reviews',
+          locationId: selectedLocation.google_place_id
+        },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
+        },
       });
 
-      if (error) {
-        console.log('Google API fetch failed:', error);
-        return;
-      }
+      const totalReviews = data?.reviews?.length || 0;
 
-      if (data?.locations?.length > 0) {
-        toast({
-          title: "Success",
-          description: `Found ${data.locations.length} locations from Google Business`,
-        });
-      }
+      // Get analyzed reviews count
+      const { count } = await supabase
+        .from('review_analyses')
+        .select('*', { count: 'exact', head: true });
+
+      setAnalysisProgress(prev => ({
+        ...prev,
+        total: totalReviews,
+        analyzed: count || 0
+      }));
     } catch (error) {
-      console.log('Error fetching from Google:', error);
+      console.error('Error loading analysis progress:', error);
     }
   };
 
-  const handleSearchLocations = async () => {
-    if (!searchTerm.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a search term",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (profile && locations.length >= profile.locations_limit) {
-      toast({
-        title: "Limit Reached",
-        description: `You've reached your limit of ${profile.locations_limit} locations. Upgrade your plan to add more.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const startAnalysis = async () => {
+    if (!selectedLocation) return;
+    
     try {
-      setIsSearching(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const googleAccessToken = session?.provider_token;
+      setAnalysisProgress(prev => ({ ...prev, isAnalyzing: true }));
+      
+      // Save progress to localStorage
+      const progressData = { ...analysisProgress, isAnalyzing: true };
+      localStorage.setItem('reviewAnalysisProgress', JSON.stringify(progressData));
+      
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      
+      // Get all reviews
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { 
+          action: 'fetch_reviews',
+          locationId: selectedLocation.google_place_id
+        },
+        headers: {
+          Authorization: `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken,
+        },
+      });
 
-      if (!googleAccessToken) {
+      if (error || !data?.reviews) {
+        throw new Error('Failed to fetch reviews');
+      }
+
+      // Get already analyzed reviews
+      const { data: existingAnalyses } = await supabase
+        .from('review_analyses')
+        .select('review_id');
+
+      const analyzedIds = new Set(existingAnalyses?.map(a => a.review_id) || []);
+      const reviewsToAnalyze = data.reviews.filter((r: any) => !analyzedIds.has(r.google_review_id));
+
+      setAnalysisProgress(prev => ({
+        ...prev,
+        total: data.reviews.length,
+        analyzed: data.reviews.length - reviewsToAnalyze.length
+      }));
+
+      if (reviewsToAnalyze.length === 0) {
         toast({
-          title: "Error",
-          description: "Please sign in with Google to access your business data",
-          variant: "destructive",
+          title: "Analysis Complete",
+          description: "All reviews have already been analyzed!",
         });
+        setAnalysisProgress(prev => ({ ...prev, isAnalyzing: false }));
+        localStorage.removeItem('reviewAnalysisProgress');
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { 
-          action: 'search_locations',
-          query: searchTerm,
-          googleAccessToken
+      // Analyze reviews in batches
+      const batchSize = 5;
+      for (let i = 0; i < reviewsToAnalyze.length; i += batchSize) {
+        const batch = reviewsToAnalyze.slice(i, i + batchSize);
+        
+        try {
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+            body: { reviews: batch }
+          });
+
+          if (!analysisError && analysisData?.reviews) {
+            // Store analyses in database
+            const analysesToInsert = analysisData.reviews.map((review: any) => ({
+              review_id: review.google_review_id,
+              ai_sentiment: review.ai_sentiment,
+              ai_tags: review.ai_tags,
+              user_id: user?.id
+            }));
+
+            await supabase.from('review_analyses').insert(analysesToInsert);
+            
+            // Update progress
+            setAnalysisProgress(prev => {
+              const newProgress = {
+                ...prev,
+                analyzed: prev.analyzed + batch.length
+              };
+              localStorage.setItem('reviewAnalysisProgress', JSON.stringify(newProgress));
+              return newProgress;
+            });
+          }
+        } catch (batchError) {
+          console.error('Error analyzing batch:', batchError);
         }
-      });
 
-      if (error) throw error;
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
+      // Analysis complete
+      setAnalysisProgress(prev => ({ ...prev, isAnalyzing: false }));
+      localStorage.removeItem('reviewAnalysisProgress');
+      
       toast({
-        title: "Success",
-        description: `Found ${data?.locations?.length || 0} locations`,
+        title: "Analysis Complete!",
+        description: `Successfully analyzed ${reviewsToAnalyze.length} reviews`,
       });
+      
+      // Refresh reviews to show analysis results
+      await fetchReviews();
 
-      fetchLocations();
     } catch (error) {
-      console.error('Error searching locations:', error);
+      console.error('Error during analysis:', error);
+      setAnalysisProgress(prev => ({ ...prev, isAnalyzing: false }));
+      localStorage.removeItem('reviewAnalysisProgress');
       toast({
-        title: "Error",
-        description: "Failed to search locations",
+        title: "Analysis Failed",
+        description: "Failed to analyze reviews. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsSearching(false);
+    }
+  };
+
+  const monitorAnalysisProgress = () => {
+    const interval = setInterval(() => {
+      loadAnalysisProgress();
+      
+      // Check if analysis is complete
+      const savedProgress = localStorage.getItem('reviewAnalysisProgress');
+      if (!savedProgress) {
+        clearInterval(interval);
+        setAnalysisProgress(prev => ({ ...prev, isAnalyzing: false }));
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  };
+
+  const renderStars = (rating: number) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[...Array(5)].map((_, i) => (
+          <Star
+            key={i}
+            className={`w-4 h-4 ${
+              i < rating
+                ? "text-accent fill-current"
+                : "text-muted-foreground/30"
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const getSentimentColor = (sentiment: string | null) => {
+    switch (sentiment) {
+      case "positive": return "text-emerald-600 bg-emerald-50 border-emerald-200";
+      case "negative": return "text-red-600 bg-red-50 border-red-200";
+      case "neutral": return "text-amber-600 bg-amber-50 border-amber-200";
+      default: return "text-muted-foreground bg-muted/50 border-border";
+    }
+  };
+
+  const getSentimentIcon = (sentiment: string | null) => {
+    switch (sentiment) {
+      case "positive": return "😊";
+      case "negative": return "😞";
+      case "neutral": return "😐";
+      default: return "🤔";
     }
   };
 
@@ -218,12 +371,12 @@ const Locations = () => {
     return <Navigate to="/" replace />;
   }
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading locations...</p>
+          <p className="text-lg text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -231,26 +384,300 @@ const Locations = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/20">
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background/80 backdrop-blur-sm">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-4 ml-auto">
-              <Badge variant="secondary" className="capitalize">
-                {profile?.subscription_plan || 'free'} Plan
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {locations.length} of {profile?.locations_limit || 2} locations used
-              </span>
+            <div className="flex items-center space-x-4 ml-4">
+              <LocationSelector />
             </div>
           </header>
 
-          {/* rest of your JSX remains exactly the same */}
+          <div className="flex-1 space-y-6 p-8">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
+                  Customer Reviews
+                </h1>
+                <p className="text-muted-foreground text-lg">
+                  Manage and respond to your Google Business reviews with AI insights
+                </p>
+              </div>
+              
+              {selectedLocation && (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={startAnalysis}
+                    disabled={analysisProgress.isAnalyzing}
+                    className="bg-gradient-to-r from-accent to-accent/80 hover:from-accent/90 hover:to-accent/70"
+                  >
+                    {analysisProgress.isAnalyzing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-4 h-4 mr-2" />
+                        Analyze Reviews
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {!selectedLocation ? (
+              <Card className="border-2 border-dashed border-muted-foreground/25">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <MessageSquare className="w-16 h-16 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Select a Location</h3>
+                  <p className="text-muted-foreground text-center max-w-md">
+                    Choose a location from the dropdown above to view and manage your reviews
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Analysis Progress */}
+                {(analysisProgress.isAnalyzing || analysisProgress.analyzed > 0) && (
+                  <Card className="bg-gradient-to-r from-accent/5 to-primary/5 border-accent/20">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-5 h-5 text-accent" />
+                          <CardTitle className="text-lg">AI Analysis Progress</CardTitle>
+                        </div>
+                        <Badge variant="outline" className="text-accent border-accent">
+                          {analysisProgress.analyzed} / {analysisProgress.total}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Progress 
+                        value={analysisProgress.total > 0 ? (analysisProgress.analyzed / analysisProgress.total) * 100 : 0} 
+                        className="h-3 bg-muted"
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {analysisProgress.isAnalyzing 
+                          ? "Analyzing reviews with AI sentiment and tagging..."
+                          : `Analysis complete! ${analysisProgress.analyzed} reviews analyzed.`
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Stats Cards */}
+                <div className="grid gap-6 md:grid-cols-3">
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-primary/10 to-primary/5">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
+                      <MessageSquare className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-primary">{totalReviews}</div>
+                      <p className="text-xs text-muted-foreground">
+                        Across all time
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-accent/10 to-accent/5">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+                      <Star className="h-4 w-4 text-accent" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <div className="text-3xl font-bold text-accent">{averageRating.toFixed(1)}</div>
+                        {renderStars(Math.round(averageRating))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Customer satisfaction
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500/10 to-emerald-500/5">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">AI Analyzed</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-emerald-600">{analysisProgress.analyzed}</div>
+                      <p className="text-xs text-muted-foreground">
+                        Reviews with AI insights
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Reviews List */}
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading reviews...</p>
+                    </div>
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <Card className="border-2 border-dashed border-muted-foreground/25">
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <MessageSquare className="w-16 h-16 text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No Reviews Found</h3>
+                      <p className="text-muted-foreground text-center max-w-md">
+                        This location doesn't have any reviews yet, or they might not be accessible.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      {reviews.map((review, index) => (
+                        <Card key={review.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-background to-muted/10">
+                          <CardContent className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center space-x-4">
+                                {review.author_photo_url ? (
+                                  <img
+                                    src={review.author_photo_url}
+                                    alt={review.author_name}
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-accent/20"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold">
+                                    {review.author_name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-semibold text-foreground">{review.author_name}</h4>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {renderStars(review.rating)}
+                                    <span className="text-sm text-muted-foreground">
+                                      {format(new Date(review.review_date), 'MMM dd, yyyy')}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                {review.ai_sentiment && (
+                                  <Badge className={`${getSentimentColor(review.ai_sentiment)} border`}>
+                                    {getSentimentIcon(review.ai_sentiment)} {review.ai_sentiment}
+                                  </Badge>
+                                )}
+                                <ReplyDialog 
+                                  review={review} 
+                                  onReplySubmitted={fetchReviews}
+                                />
+                              </div>
+                            </div>
+                            
+                            {review.text && (
+                              <p className="text-foreground mb-4 leading-relaxed">{review.text}</p>
+                            )}
+                            
+                            {review.ai_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {review.ai_tags.map((tag, tagIndex) => (
+                                  <Badge key={tagIndex} variant="outline" className="text-xs bg-muted/50">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {review.reply_text && (
+                              <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-accent/20">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                    <span className="text-xs text-white font-semibold">B</span>
+                                  </div>
+                                  <span className="font-medium text-sm">Business Response</span>
+                                  {review.reply_date && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(review.reply_date), 'MMM dd, yyyy')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">{review.reply_text}</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-8">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {((currentPage - 1) * reviewsPerPage) + 1} to {Math.min(currentPage * reviewsPerPage, totalReviews)} of {totalReviews} reviews
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                          >
+                            <ChevronLeft className="w-4 h-4 mr-1" />
+                            Previous
+                          </Button>
+                          
+                          <div className="flex items-center gap-1">
+                            {[...Array(totalPages)].map((_, index) => {
+                              const pageNum = index + 1;
+                              if (
+                                pageNum === 1 ||
+                                pageNum === totalPages ||
+                                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                              ) {
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    className="w-8 h-8 p-0"
+                                    onClick={() => setCurrentPage(pageNum)}
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              } else if (
+                                pageNum === currentPage - 2 ||
+                                pageNum === currentPage + 2
+                              ) {
+                                return <span key={pageNum} className="text-muted-foreground">...</span>;
+                              }
+                              return null;
+                            })}
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                          >
+                            Next
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </SidebarInset>
       </div>
     </SidebarProvider>
   );
 };
 
-export default Locations;
+export default Reviews;

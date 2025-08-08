@@ -20,6 +20,7 @@ interface Review {
   rating: number;
   text: string | null;
   ai_sentiment: "positive" | "negative" | "neutral" | null;
+  location_id: string;
 }
 
 interface ReplyDialogProps {
@@ -107,12 +108,14 @@ Keep the response under 150 words.`;
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) throw new Error("Missing tokens");
 
+      // Extract location ID from review (assuming it's stored in location_id field)
+      // For reply, we need both location ID and review ID
       const { error } = await supabase.functions.invoke("google-business-api", {
         body: {
           action: "reply_to_review",
-          locationId: review.google_review_id.split('/').pop(),
-          review_id: review.google_review_id.split('/').pop(),
-          reply_text: replyText,
+          locationId: review.location_id || review.google_review_id.split('/')[0], // Use location_id if available
+          review_id: review.google_review_id,
+          replyText: replyText,
         },
         headers: {
           Authorization: `Bearer ${supabaseJwt}`,
