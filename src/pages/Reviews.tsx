@@ -111,6 +111,8 @@ const Reviews = () => {
         return;
       }
 
+      console.log('Fetching reviews for location:', selectedLocation.google_place_id);
+      
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
           action: 'fetch_reviews',
@@ -122,18 +124,38 @@ const Reviews = () => {
         },
       });
 
+      console.log('Google API response:', { data, error });
+
       if (error) {
         console.error('Error fetching reviews:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch reviews. Please try again.",
+          variant: "destructive",
+        });
         setReviews([]);
         return;
       }
 
-      if (data?.reviews) {
-        // Get existing analyses from database
-        const { data: analyses } = await supabase
-          .from('review_analyses')
-          .select('review_id, ai_sentiment, ai_tags')
-          .in('review_id', data.reviews.map((r: any) => r.google_review_id));
+      if (data?.reviews && Array.isArray(data.reviews)) {
+        console.log(`Found ${data.reviews.length} reviews from Google API`);
+        
+        // Try to get existing analyses from database using google_review_id as text
+        let analyses = [];
+        try {
+          const { data: analysisData, error: analysisError } = await supabase
+            .from('review_analyses')
+            .select('review_id, ai_sentiment, ai_tags')
+            .eq('user_id', user?.id);
+          
+          console.log('Analysis query result:', { analysisData, analysisError });
+          
+          if (!analysisError && analysisData) {
+            analyses = analysisData;
+          }
+        } catch (analysisError) {
+          console.error('Error fetching analyses:', analysisError);
+        }
 
         // Merge analyses with reviews
         const reviewsWithAnalysis = data.reviews.map((review: any) => {
@@ -159,10 +181,24 @@ const Reviews = () => {
         // Calculate average rating
         const avgRating = sortedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / sortedReviews.length;
         setAverageRating(avgRating || 0);
+        
+        console.log(`Displaying ${paginatedReviews.length} reviews on page ${currentPage}`);
+      } else {
+        console.log('No reviews found in API response');
+        setReviews([]);
+        setTotalReviews(0);
+        setAverageRating(0);
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error in fetchReviews:', error);
       setReviews([]);
+      setTotalReviews(0);
+      setAverageRating(0);
+      toast({
+        title: "Error",
+        description: "Failed to load reviews. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
