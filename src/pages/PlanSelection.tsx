@@ -1,10 +1,20 @@
 import { useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import {
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarInset,
+} from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CheckCircle, MapPin, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -22,65 +32,30 @@ const PlanSelection = () => {
     setSelectedPlan(planType);
 
     try {
-      // Save the plan
+      // Save the selected plan
       const { error: planError } = await supabase
-        .from('user_plans')
-        .upsert({
-          user_id: user.id,
-          plan_type: planType,
-        }, {
-          onConflict: 'user_id'
-        });
+        .from("user_plans")
+        .upsert(
+          {
+            user_id: user.id,
+            plan_type: planType,
+          },
+          { onConflict: "user_id" }
+        );
 
       if (planError) throw planError;
-
-      // Fetch user's locations
-      const getSessionTokens = async () => {
-        let { data: { session } } = await supabase.auth.getSession();
-        if (!session?.provider_token) {
-          await supabase.auth.refreshSession();
-          ({ data: { session } } = await supabase.auth.getSession());
-        }
-        return {
-          supabaseJwt: session?.access_token || "",
-          googleAccessToken: session?.provider_token || "",
-        };
-      };
-
-      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
-      
-      if (supabaseJwt && googleAccessToken) {
-        const { data } = await supabase.functions.invoke('google-business-api', {
-          body: { action: 'fetch_user_locations' },
-          headers: {
-            Authorization: `Bearer ${supabaseJwt}`,
-            'X-Google-Token': googleAccessToken,
-          },
-        });
-
-        // Auto-select first location if available
-        if (data?.locations && data.locations.length > 0) {
-          const firstLocation = data.locations[0];
-          await supabase
-            .from('user_selected_locations')
-            .upsert({
-              user_id: user.id,
-              google_place_id: firstLocation.google_place_id,
-              location_name: firstLocation.name,
-            }, {
-              onConflict: 'user_id'
-            });
-        }
-      }
 
       toast({
         title: "Plan Selected",
         description: `You've successfully selected the ${planType} plan.`,
       });
 
-      navigate('/dashboard');
+      // Do NOT auto-select a location here. Redirect to dashboard.
+      // If no default location exists, ProtectedRoute will redirect
+      // to /location-selection.
+      navigate("/dashboard");
     } catch (error) {
-      console.error('Error selecting plan:', error);
+      console.error("Error selecting plan:", error);
       toast({
         title: "Error",
         description: "Failed to save plan selection.",
@@ -96,7 +71,12 @@ const PlanSelection = () => {
       name: "Starter",
       price: "$29",
       description: "Perfect for small businesses",
-      features: ["Up to 3 locations", "Basic analytics", "Review monitoring", "Email support"],
+      features: [
+        "Up to 3 locations",
+        "Basic analytics",
+        "Review monitoring",
+        "Email support",
+      ],
       locations: 3,
       reviews: 100,
     },
@@ -105,32 +85,47 @@ const PlanSelection = () => {
       name: "Professional",
       price: "$79",
       description: "For growing businesses",
-      features: ["Up to 10 locations", "Advanced analytics", "AI review analysis", "Priority support", "Custom reports"],
+      features: [
+        "Up to 10 locations",
+        "Advanced analytics",
+        "AI review analysis",
+        "Priority support",
+        "Custom reports",
+      ],
       locations: 10,
       reviews: 500,
-      popular: true
+      popular: true,
     },
     {
       id: "enterprise",
       name: "Enterprise",
       price: "$199",
       description: "For enterprises",
-      features: ["Unlimited locations", "Full analytics suite", "AI-powered insights", "24/7 support", "Custom integrations", "Dedicated account manager"],
+      features: [
+        "Unlimited locations",
+        "Full analytics suite",
+        "AI-powered insights",
+        "24/7 support",
+        "Custom integrations",
+        "Dedicated account manager",
+      ],
       locations: -1, // -1 means unlimited
       reviews: -1,
-    }
+    },
   ];
 
+  // If not authenticated and not loading, send to landing page
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
   }
 
+  // Show a spinner while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading...</p>
+          <p className="text-lg text-muted-foreground">Loading…</p>
         </div>
       </div>
     );
@@ -147,24 +142,27 @@ const PlanSelection = () => {
               <h1 className="text-lg font-semibold">Choose Your Plan</h1>
             </div>
           </header>
-          
+
           <div className="flex-1 space-y-4 p-8 pt-6">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold mb-4">
                 Welcome to Location Insights Pro!
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Choose the perfect plan for your business needs. You can upgrade or downgrade at any time.
+                Choose the perfect plan for your business needs. You can upgrade
+                or downgrade at any time.
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {plans.map((plan) => (
-                <Card 
-                  key={plan.id} 
+                <Card
+                  key={plan.id}
                   className={`relative cursor-pointer transition-all hover:shadow-lg ${
-                    plan.popular ? 'border-primary shadow-lg scale-105' : ''
-                  } ${selectedPlan === plan.id ? 'ring-2 ring-primary' : ''}`}
+                    plan.popular ? "border-primary shadow-lg scale-105" : ""
+                  } ${
+                    selectedPlan === plan.id ? "ring-2 ring-primary" : ""
+                  }`}
                 >
                   {plan.popular && (
                     <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
@@ -175,7 +173,9 @@ const PlanSelection = () => {
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
                     <div className="text-3xl font-bold">
                       {plan.price}
-                      <span className="text-base font-normal text-muted-foreground">/month</span>
+                      <span className="text-base font-normal text-muted-foreground">
+                        /month
+                      </span>
                     </div>
                     <CardDescription>{plan.description}</CardDescription>
                   </CardHeader>
@@ -184,31 +184,35 @@ const PlanSelection = () => {
                       <div className="flex items-center space-x-2">
                         <MapPin className="w-4 h-4 text-primary" />
                         <span className="font-medium">
-                          {plan.locations === -1 ? 'Unlimited locations' : `Up to ${plan.locations} locations`}
+                          {plan.locations === -1
+                            ? "Unlimited locations"
+                            : `Up to ${plan.locations} locations`}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-primary" />
                         <span className="font-medium">
-                          {plan.reviews === -1 ? 'Unlimited reviews' : `Up to ${plan.reviews} reviews`}
+                          {plan.reviews === -1
+                            ? "Unlimited reviews"
+                            : `Up to ${plan.reviews} reviews`}
                         </span>
                       </div>
                     </div>
                     <div className="space-y-2">
-                      {plan.features.map((feature, i) => (
-                        <div key={i} className="flex items-center space-x-2">
+                      {plan.features.map((feature, idx) => (
+                        <div key={idx} className="flex items-center space-x-2">
                           <CheckCircle className="w-4 h-4 text-primary" />
                           <span className="text-sm">{feature}</span>
                         </div>
                       ))}
                     </div>
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       variant={plan.popular ? "default" : "outline"}
                       disabled={selectedPlan === plan.id}
                       onClick={() => handlePlanSelect(plan.id)}
                     >
-                      {selectedPlan === plan.id ? 'Selecting...' : 'Select Plan'}
+                      {selectedPlan === plan.id ? "Selecting…" : "Select Plan"}
                     </Button>
                   </CardContent>
                 </Card>

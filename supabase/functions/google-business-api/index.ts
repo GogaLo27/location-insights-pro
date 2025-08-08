@@ -290,42 +290,58 @@ async function replyToReview(locationId: string, reviewId: string, replyText: st
   return jsonError("Failed to send reply. Ensure the account owns the location and has permissions.", 400);
 }
 
-async function fetchLocationAnalytics(locationId: string, accessToken: string, startDate?: any, endDate?: any) {
+async function fetchLocationAnalytics(
+  locationId: string,
+  accessToken: string,
+  startDate?: any,
+  endDate?: any
+) {
   try {
     const today = new Date();
-    const defaultEnd = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate() };
+    const defaultEnd = {
+      year: today.getFullYear(),
+      month: today.getMonth() + 1,
+      day: today.getDate(),
+    };
     const ago = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const defaultStart = { year: ago.getFullYear(), month: ago.getMonth() + 1, day: ago.getDate() };
+    const defaultStart = {
+      year: ago.getFullYear(),
+      month: ago.getMonth() + 1,
+      day: ago.getDate(),
+    };
 
     const start = startDate || defaultStart;
     const end = endDate || defaultEnd;
 
-    const requestBody = {
-      dailyMetrics: [
-        "BUSINESS_IMPRESSIONS_MOBILE_SEARCH",
-        "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH",
-        "BUSINESS_IMPRESSIONS_DESKTOP_MAPS",
-        "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
-        "BUSINESS_DIRECTION_REQUESTS",
-        "CALL_CLICKS",
-        "WEBSITE_CLICKS"
-      ],
-      dailyRange: {
-        startDate: {
-          year: start.year,
-          month: start.month,
-          day: start.day
-        },
-        endDate: {
-          year: end.year,
-          month: end.month,
-          day: end.day
-        }
-      }
-    };
+    // Request all the metrics you need
+    const metrics = [
+      "BUSINESS_IMPRESSIONS_MOBILE_SEARCH",
+      "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH",
+      "BUSINESS_IMPRESSIONS_DESKTOP_MAPS",
+      "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
+      "BUSINESS_DIRECTION_REQUESTS",
+      "CALL_CLICKS",
+      "WEBSITE_CLICKS",
+      "BUSINESS_CONVERSATIONS",
+      "BUSINESS_BOOKINGS",
+      "BUSINESS_FOOD_ORDERS",
+      "BUSINESS_FOOD_MENU_CLICKS",
+    ];
+
+    // Build query parameters as repeated dailyMetrics and date fields
+    const params: [string, string][] = [];
+    metrics.forEach((m) => params.push(["dailyMetrics", m]));
+    params.push(["dailyRange.start_date.year", String(start.year)]);
+    params.push(["dailyRange.start_date.month", String(start.month)]);
+    params.push(["dailyRange.start_date.day", String(start.day)]);
+    params.push(["dailyRange.end_date.year", String(end.year)]);
+    params.push(["dailyRange.end_date.month", String(end.month)]);
+    params.push(["dailyRange.end_date.day", String(end.day)]);
 
     const url = `https://businessprofileperformance.googleapis.com/v1/locations/${locationId}:fetchMultiDailyMetricsTimeSeries`;
-    const response = await googleApiRequest(url, accessToken, "POST", undefined, requestBody);
+
+    // Call the Google API via GET with repeated dailyMetrics parameters
+    const response = await googleApiRequest(url, accessToken, "GET", params);
 
     return json({ analytics: response });
   } catch (error) {
