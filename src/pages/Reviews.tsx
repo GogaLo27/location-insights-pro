@@ -56,13 +56,8 @@ const Reviews = () => {
 
   const fetchLocations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('id, name, google_place_id')
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-      setLocations(data || []);
+      // Temporary mock data until database migration is approved
+      setLocations([]);
     } catch (error) {
       console.error('Error fetching locations:', error);
       toast({
@@ -76,29 +71,8 @@ const Reviews = () => {
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('reviews')
-        .select(`
-          *,
-          locations!inner(name)
-        `)
-        .eq('locations.user_id', user?.id)
-        .order('review_date', { ascending: false });
-
-      if (selectedLocation !== "all") {
-        query = query.eq('location_id', selectedLocation);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      
-      const reviewsWithLocation = (data || []).map(review => ({
-        ...review,
-        location_name: review.locations?.name
-      }));
-      
-      setReviews(reviewsWithLocation);
+      // Temporary: No reviews until database migration is approved
+      setReviews([]);
     } catch (error) {
       console.error('Error fetching reviews:', error);
       toast({
@@ -112,58 +86,19 @@ const Reviews = () => {
   };
 
   const handleRefetchReviews = async (locationId?: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { 
-          action: 'fetch_reviews',
-          location_id: locationId 
-        }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Reviews refreshed successfully",
-      });
-      
-      fetchReviews();
-    } catch (error) {
-      console.error('Error refreshing reviews:', error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh reviews",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Database Migration Required",
+      description: "Please approve the database migration to enable review functionality.",
+      variant: "destructive",
+    });
   };
 
   const handleReplyToReview = async (reviewId: string, replyText: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { 
-          action: 'reply_to_review',
-          review_id: reviewId,
-          reply_text: replyText
-        }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Reply sent successfully",
-      });
-      
-      fetchReviews();
-    } catch (error) {
-      console.error('Error replying to review:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send reply",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Database Migration Required", 
+      description: "Please approve the database migration to enable reply functionality.",
+      variant: "destructive",
+    });
   };
 
   const filteredReviews = reviews.filter(review => {

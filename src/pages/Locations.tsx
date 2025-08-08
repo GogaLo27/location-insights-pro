@@ -53,18 +53,15 @@ const Locations = () => {
 
   const fetchProfile = async () => {
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
-      setProfile(profile);
+      // Temporary mock data until database migration is approved
+      setProfile({
+        id: user?.id || '',
+        email: user?.email || '',
+        full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
+        subscription_plan: 'free',
+        locations_limit: 2,
+        reviews_limit: 100,
+      });
     } catch (error) {
       console.error('Error:', error);
     }
@@ -73,17 +70,8 @@ const Locations = () => {
   const fetchLocations = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      setLocations(data || []);
+      // Temporary: No locations until database migration is approved and Google API is connected
+      setLocations([]);
     } catch (error) {
       console.error('Error fetching locations:', error);
       toast({
@@ -106,44 +94,11 @@ const Locations = () => {
       return;
     }
 
-    if (profile && locations.length >= profile.locations_limit) {
-      toast({
-        title: "Limit Reached",
-        description: `You've reached your limit of ${profile.locations_limit} locations. Upgrade your plan to add more.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { 
-          action: 'search_locations',
-          query: searchTerm 
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: `Found ${data?.locations?.length || 0} locations`,
-      });
-      
-      fetchLocations();
-    } catch (error) {
-      console.error('Error searching locations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to search locations",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSearching(false);
-    }
+    toast({
+      title: "Database Migration Required",
+      description: "Please approve the database migration to enable location search functionality.",
+      variant: "destructive",
+    });
   };
 
   if (!user && !authLoading) {
