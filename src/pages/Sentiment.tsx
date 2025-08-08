@@ -343,259 +343,266 @@ const Sentiment = () => {
           </header>
           
           <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Sentiment Analysis</h1>
-            <p className="text-muted-foreground">
-              AI-powered sentiment insights from your customer reviews
-            </p>
-          </div>
-          <Button onClick={handleGenerateSentiment}>
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Generate Analysis
-          </Button>
-        </div>
-
-        {/* Controls */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Analysis Parameters</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex justify-between items-center mb-8">
               <div>
-                <label className="text-sm font-medium mb-2 block">Time Period</label>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getPeriodOptions().map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <h1 className="text-3xl font-bold mb-2">Sentiment Analysis</h1>
+                <p className="text-muted-foreground">
+                  AI-powered sentiment insights from your customer reviews
+                </p>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Date Range Presets</label>
-                <Select onValueChange={(value) => {
-                  const preset = getDatePresets()[parseInt(value)];
-                  setDateRange(preset);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select preset" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getDatePresets().map((preset, index) => (
-                      <SelectItem key={index} value={index.toString()}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Custom Date Range</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange.from && dateRange.to 
-                        ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-                        : "Pick a date range"
-                      }
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={dateRange}
-                      onSelect={(range) => range && range.from && range.to && setDateRange({ from: range.from, to: range.to })}
-                      numberOfMonths={2}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Overall Stats */}
-        {stats && (
-          <div className="grid md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Positive Reviews</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.totalPositive}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.positivePercentage.toFixed(1)}% of total
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Negative Reviews</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{stats.totalNegative}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.negativePercentage.toFixed(1)}% of total
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Neutral Reviews</CardTitle>
-                <Minus className="h-4 w-4 text-gray-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-600">{stats.totalNeutral}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.neutralPercentage.toFixed(1)}% of total
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.avgRating.toFixed(1)}</div>
-                <p className="text-xs text-muted-foreground">
-                  Sentiment: {stats.avgSentimentScore.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Sentiment Data */}
-        {sentimentData.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No sentiment data found</h3>
-              <p className="text-muted-foreground mb-6">
-                Generate sentiment analysis from your reviews to get started.
-              </p>
               <Button onClick={handleGenerateSentiment}>
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Generate Analysis
               </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {sentimentData.map((data) => (
-              <Card key={data.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle className="text-lg">
-                        {format(new Date(data.analysis_date), 'MMM d, yyyy')}
-                      </CardTitle>
-                      <CardDescription>
-                        {data.location_name} • {data.period_type} analysis
-                      </CardDescription>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">{data.average_rating.toFixed(1)}</div>
-                      <p className="text-sm text-muted-foreground">Avg Rating</p>
-                    </div>
+            </div>
+
+            {/* Controls */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Analysis Parameters</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Time Period</label>
+                    <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getPeriodOptions().map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-6 mb-6">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{data.positive_count}</div>
-                      <p className="text-sm text-muted-foreground">Positive</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-600">{data.neutral_count}</div>
-                      <p className="text-sm text-muted-foreground">Neutral</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{data.negative_count}</div>
-                      <p className="text-sm text-muted-foreground">Negative</p>
-                    </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Date Range Presets</label>
+                    <Select onValueChange={(value) => {
+                      const preset = getDatePresets()[parseInt(value)];
+                      setDateRange(preset);
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select preset" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getDatePresets().map((preset, index) => (
+                          <SelectItem key={index} value={index.toString()}>
+                            {preset.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {data.top_positive_tags && data.top_positive_tags.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold text-green-600 mb-2">Top Positive Tags</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {data.top_positive_tags.map((tag, index) => (
-                            <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
-                              {tag}
-                            </span>
-                          ))}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Custom Date Range</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRange.from && dateRange.to 
+                            ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+                            : "Pick a date range"
+                          }
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={(range) => range && range.from && range.to && setDateRange({ from: range.from, to: range.to })}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Overall Stats */}
+            {stats && (
+              <div className="grid md:grid-cols-4 gap-6 mb-8">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Positive Reviews</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">{stats.totalPositive}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.positivePercentage.toFixed(1)}% of total
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Negative Reviews</CardTitle>
+                    <TrendingDown className="h-4 w-4 text-red-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">{stats.totalNegative}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.negativePercentage.toFixed(1)}% of total
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Neutral Reviews</CardTitle>
+                    <Minus className="h-4 w-4 text-gray-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-gray-600">{stats.totalNeutral}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.neutralPercentage.toFixed(1)}% of total
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.avgRating.toFixed(1)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Sentiment: {stats.avgSentimentScore.toFixed(2)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Sentiment Data */}
+            {sentimentData.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No sentiment data found</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Generate sentiment analysis from your reviews to get started.
+                  </p>
+                  <Button onClick={handleGenerateSentiment}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Generate Analysis
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {sentimentData.map((data) => (
+                  <Card key={data.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle className="text-lg">
+                            {format(new Date(data.analysis_date), 'MMM d, yyyy')}
+                          </CardTitle>
+                          <CardDescription>
+                            {data.location_name} • {data.period_type} analysis
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold">{data.average_rating.toFixed(1)}</div>
+                          <p className="text-sm text-muted-foreground">Avg Rating</p>
                         </div>
                       </div>
-                    )}
-                    
-                    {data.top_negative_tags && data.top_negative_tags.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold text-red-600 mb-2">Top Negative Tags</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {data.top_negative_tags.map((tag, index) => (
-                            <span key={index} className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm">
-                              {tag}
-                            </span>
-                          ))}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-6 mb-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">{data.positive_count}</div>
+                          <p className="text-sm text-muted-foreground">Positive</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-600">{data.neutral_count}</div>
+                          <p className="text-sm text-muted-foreground">Neutral</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-red-600">{data.negative_count}</div>
+                          <p className="text-sm text-muted-foreground">Negative</p>
                         </div>
                       </div>
-                    )}
-                    
-                    {/* Issues and Suggestions */}
-                    {((data.top_issues && data.top_issues.length > 0) || (data.top_suggestions && data.top_suggestions.length > 0)) && (
-                      <div className="mt-6 space-y-4">
-                        {data.top_issues && data.top_issues.length > 0 && (
+                      
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {data.top_positive_tags && data.top_positive_tags.length > 0 && (
                           <div>
-                            <h4 className="font-semibold text-destructive mb-2 flex items-center">
-                              <span className="w-2 h-2 bg-destructive rounded-full mr-2"></span>
-                              Key Issues to Address
-                            </h4>
-                            <div className="space-y-1">
-                              {data.top_issues.map((issue, index) => (
-                                <div key={index} className="text-sm text-muted-foreground bg-destructive/5 p-2 rounded">
-                                  • {issue}
-                                </div>
+                            <h4 className="font-semibold text-green-600 mb-2">Top Positive Tags</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {data.top_positive_tags.map((tag, index) => (
+                                <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
+                                  {tag}
+                                </span>
                               ))}
                             </div>
                           </div>
                         )}
                         
-                        {data.top_suggestions && data.top_suggestions.length > 0 && (
+                        {data.top_negative_tags && data.top_negative_tags.length > 0 && (
                           <div>
-                            <h4 className="font-semibold text-primary mb-2 flex items-center">
-                              <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
-                              Recommended Actions
-                            </h4>
-                            <div className="space-y-1">
-                              {data.top_suggestions.map((suggestion, index) => (
-                                <div key={index} className="text-sm text-muted-foreground bg-primary/5 p-2 rounded">
-                                  💡 {suggestion}
-                                </div>
+                            <h4 className="font-semibold text-red-600 mb-2">Top Negative Tags</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {data.top_negative_tags.map((tag, index) => (
+                                <span key={index} className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm">
+                                  {tag}
+                                </span>
                               ))}
                             </div>
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                      
+                      {/* Issues and Suggestions Section */}
+                      {((data.top_issues && data.top_issues.length > 0) || (data.top_suggestions && data.top_suggestions.length > 0)) && (
+                        <div className="grid md:grid-cols-2 gap-6 mt-6">
+                          {data.top_issues && data.top_issues.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-destructive mb-3 flex items-center">
+                                <span className="w-2 h-2 bg-destructive rounded-full mr-2"></span>
+                                Key Issues to Address
+                              </h4>
+                              <div className="space-y-2">
+                                {data.top_issues.map((issue, index) => (
+                                  <div key={index} className="text-sm bg-destructive/5 p-3 rounded-lg border-l-2 border-destructive/20">
+                                    ⚠️ {issue}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {data.top_suggestions && data.top_suggestions.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold text-primary mb-3 flex items-center">
+                                <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
+                                Recommended Actions
+                              </h4>
+                              <div className="space-y-2">
+                                {data.top_suggestions.map((suggestion, index) => (
+                                  <div key={index} className="text-sm bg-primary/5 p-3 rounded-lg border-l-2 border-primary/20">
+                                    💡 {suggestion}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Show message if no actionable insights */}
+                      {(!data.top_issues || data.top_issues.length === 0) && (!data.top_suggestions || data.top_suggestions.length === 0) && (
+                        <div className="mt-6 p-4 bg-muted/50 rounded-lg text-center">
+                          <p className="text-muted-foreground">No specific issues or suggestions identified for this period. Consider running AI analysis on more reviews.</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </SidebarInset>
       </div>

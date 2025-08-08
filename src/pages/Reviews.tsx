@@ -146,8 +146,8 @@ const Reviews = () => {
 
     for (const review of googleReviews) {
       try {
-        // Upsert review (insert or update if exists)
-        await supabase
+        // Use upsert with conflict resolution - update existing or insert new
+        const { error: upsertError } = await supabase
           .from('saved_reviews')
           .upsert({
             user_id: user.id,
@@ -161,8 +161,17 @@ const Reviews = () => {
             reply_date: review.reply_date,
             ai_sentiment: review.ai_sentiment,
             ai_tags: review.ai_tags,
+            ai_issues: review.ai_issues,
+            ai_suggestions: review.ai_suggestions,
             ai_analyzed_at: review.ai_sentiment ? new Date().toISOString() : null,
+          }, {
+            onConflict: 'user_id,google_review_id',
+            ignoreDuplicates: false
           });
+        
+        if (upsertError) {
+          console.error('Upsert error for review:', review.google_review_id, upsertError);
+        }
       } catch (error) {
         console.error('Error saving review:', error);
       }
@@ -205,6 +214,8 @@ const Reviews = () => {
             .update({
               ai_sentiment: analyzedReview.ai_sentiment,
               ai_tags: analyzedReview.ai_tags,
+              ai_issues: analyzedReview.ai_issues,
+              ai_suggestions: analyzedReview.ai_suggestions,
               ai_analyzed_at: new Date().toISOString(),
             })
             .eq('google_review_id', analyzedReview.google_review_id);

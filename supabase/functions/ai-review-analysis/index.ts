@@ -53,13 +53,13 @@ Return ONLY a JSON object with this exact format:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4.1-2025-04-14',
           messages: [
             { role: 'system', content: 'You are an AI that analyzes customer reviews. Return only valid JSON.' },
             { role: 'user', content: prompt }
           ],
           temperature: 0.3,
-          max_tokens: 150,
+          max_tokens: 300,
         }),
       });
 
