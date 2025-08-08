@@ -112,7 +112,9 @@ export type Database = {
       saved_reviews: {
         Row: {
           ai_analyzed_at: string | null
+          ai_issues: string[] | null
           ai_sentiment: string | null
+          ai_suggestions: string[] | null
           ai_tags: string[] | null
           author_name: string
           created_at: string | null
@@ -129,7 +131,9 @@ export type Database = {
         }
         Insert: {
           ai_analyzed_at?: string | null
+          ai_issues?: string[] | null
           ai_sentiment?: string | null
+          ai_suggestions?: string[] | null
           ai_tags?: string[] | null
           author_name: string
           created_at?: string | null
@@ -146,7 +150,9 @@ export type Database = {
         }
         Update: {
           ai_analyzed_at?: string | null
+          ai_issues?: string[] | null
           ai_sentiment?: string | null
+          ai_suggestions?: string[] | null
           ai_tags?: string[] | null
           author_name?: string
           created_at?: string | null

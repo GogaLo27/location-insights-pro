@@ -24,6 +24,8 @@ interface SentimentData {
   average_rating: number;
   top_positive_tags: string[] | null;
   top_negative_tags: string[] | null;
+  top_issues: string[] | null;
+  top_suggestions: string[] | null;
   sentiment_score: number;
   location_name?: string;
 }
@@ -140,7 +142,10 @@ const Sentiment = () => {
           negative_count: 0,
           neutral_count: 0,
           ratings: [],
-          tags: []
+          positive_tags: [],
+          negative_tags: [],
+          all_issues: [],
+          all_suggestions: []
         };
       }
 
@@ -149,10 +154,22 @@ const Sentiment = () => {
       else if (review.ai_sentiment === 'negative') groupedData[key].negative_count++;
       else groupedData[key].neutral_count++;
 
-      // Collect ratings and tags
+      // Collect ratings and tags by sentiment
       groupedData[key].ratings.push(review.rating);
       if (review.ai_tags) {
-        groupedData[key].tags.push(...review.ai_tags);
+        if (review.ai_sentiment === 'positive') {
+          groupedData[key].positive_tags.push(...review.ai_tags);
+        } else if (review.ai_sentiment === 'negative') {
+          groupedData[key].negative_tags.push(...review.ai_tags);
+        }
+      }
+
+      // Collect issues and suggestions
+      if (review.ai_issues) {
+        groupedData[key].all_issues.push(...review.ai_issues);
+      }
+      if (review.ai_suggestions) {
+        groupedData[key].all_suggestions.push(...review.ai_suggestions);
       }
     });
 
@@ -161,25 +178,35 @@ const Sentiment = () => {
       ...data,
       average_rating: data.ratings.length > 0 ? data.ratings.reduce((a: number, b: number) => a + b, 0) / data.ratings.length : 0,
       sentiment_score: data.positive_count > 0 ? (data.positive_count / (data.positive_count + data.negative_count + data.neutral_count)) * 100 : 0,
-      top_positive_tags: getTopTags(data.tags, reviews.filter((r: any) => r.ai_sentiment === 'positive')),
-      top_negative_tags: getTopTags(data.tags, reviews.filter((r: any) => r.ai_sentiment === 'negative'))
+      top_positive_tags: getTopTags(data.positive_tags),
+      top_negative_tags: getTopTags(data.negative_tags),
+      top_issues: getTopItems(data.all_issues),
+      top_suggestions: getTopItems(data.all_suggestions)
     }));
   };
 
-  const getTopTags = (allTags: string[], sentimentReviews: any[]): string[] => {
+  const getTopTags = (tags: string[]): string[] => {
     const tagCounts: { [key: string]: number } = {};
-    sentimentReviews.forEach(review => {
-      if (review.ai_tags) {
-        review.ai_tags.forEach((tag: string) => {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        });
-      }
+    tags.forEach(tag => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     });
 
     return Object.entries(tagCounts)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 5)
       .map(([tag]) => tag);
+  };
+
+  const getTopItems = (items: string[]): string[] => {
+    const itemCounts: { [key: string]: number } = {};
+    items.forEach(item => {
+      itemCounts[item] = (itemCounts[item] || 0) + 1;
+    });
+
+    return Object.entries(itemCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .map(([item]) => item);
   };
 
   const handleGenerateSentiment = async () => {
@@ -524,6 +551,43 @@ const Sentiment = () => {
                             </span>
                           ))}
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Issues and Suggestions */}
+                    {((data.top_issues && data.top_issues.length > 0) || (data.top_suggestions && data.top_suggestions.length > 0)) && (
+                      <div className="mt-6 space-y-4">
+                        {data.top_issues && data.top_issues.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold text-destructive mb-2 flex items-center">
+                              <span className="w-2 h-2 bg-destructive rounded-full mr-2"></span>
+                              Key Issues to Address
+                            </h4>
+                            <div className="space-y-1">
+                              {data.top_issues.map((issue, index) => (
+                                <div key={index} className="text-sm text-muted-foreground bg-destructive/5 p-2 rounded">
+                                  • {issue}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {data.top_suggestions && data.top_suggestions.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold text-primary mb-2 flex items-center">
+                              <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
+                              Recommended Actions
+                            </h4>
+                            <div className="space-y-1">
+                              {data.top_suggestions.map((suggestion, index) => (
+                                <div key={index} className="text-sm text-muted-foreground bg-primary/5 p-2 rounded">
+                                  💡 {suggestion}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
