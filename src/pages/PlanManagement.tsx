@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -39,19 +40,13 @@ const currencyFmt = (amountCents: number, currency: string) =>
     (amountCents || 0) / 100
   );
 
-declare global {
-  interface Window {
-    paypal?: any;
-  }
-}
-
 const PlanManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<BillingPlanRow[]>([]);
-  const paypalRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -99,44 +94,45 @@ const PlanManagement = () => {
     }
   };
 
-  // ✅ Load PayPal SDK once
-  useEffect(() => {
-    if (!window.paypal) {
-      const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=YOUR_SANDBOX_CLIENT_ID&vault=true&intent=subscription`;
-      script.async = true;
-      script.onload = () => renderButtons();
-      document.body.appendChild(script);
-    } else {
-      renderButtons();
-    }
-  }, [plans]);
+  const handleSubscribe = async (planType: BillingPlanRow["plan_type"]) => {
+    if (!user) return;
+    try {
+      setSubmittingPlan(planType);
+      const { data: authData } = await supabase.auth.getSession();
+      const jwt = authData.session?.access_token || "";
 
-  // ✅ Render PayPal buttons for each plan
-  const renderButtons = () => {
-    if (!window.paypal) return;
-    plans.forEach((plan) => {
-      const container = paypalRefs.current[plan.plan_type];
-      if (container) {
-        container.innerHTML = ""; // clear before render
-        window.paypal.Buttons({
-          style: {
-            shape: "rect",
-            color: "gold",
-            layout: "vertical",
-            label: "subscribe"
-          },
-          createSubscription: function (data: any, actions: any) {
-            return actions.subscription.create({
-              plan_id: plan.provider_plan_id
-            });
-          },
-          onApprove: function (data: any) {
-            alert(`Subscription successful! ID: ${data.subscriptionID}`);
-          }
-        }).render(container);
+      const res = await supabase.functions.invoke("paypal-create-subscription", {
+        body: {
+          plan_type: planType,
+          return_url: `${window.location.origin}/billing/success`,
+          cancel_url: `${window.location.origin}/billing/cancel`,
+        },
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+
+      if (res.error) throw new Error(res.error.message || "Edge function error");
+
+      let payload: any = res.data;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch {}
       }
-    });
+
+      if (!payload?.approval_url) throw new Error("No approval_url returned");
+
+      if (payload.subscription_id) {
+        localStorage.setItem("pendingSubId", payload.subscription_id);
+      }
+
+      window.location.href = payload.approval_url;
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "Payment error",
+        description: e.message || "Failed to start subscription",
+        variant: "destructive",
+      });
+      setSubmittingPlan(null);
+    }
   };
 
   const featureMap: Record<
@@ -185,6 +181,13 @@ const PlanManagement = () => {
           </header>
 
           <div className="flex-1 space-y-4 p-8 pt-6">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold mb-2">Manage Your Plan</h1>
+              <p className="text-muted-foreground">
+                Upgrade or downgrade your plan to fit your business needs
+              </p>
+            </div>
+
             {currentPlan && (
               <Card className="mb-6 border-accent">
                 <CardHeader>
@@ -227,6 +230,13 @@ const PlanManagement = () => {
                         {price}
                         <span className="text-sm text-muted-foreground">/{p.interval}</span>
                       </div>
+                      <CardDescription>
+                        {p.plan_type === "starter"
+                          ? "Perfect for small businesses"
+                          : p.plan_type === "professional"
+                          ? "Ideal for growing businesses"
+                          : "For large organizations"}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2 mb-6">
@@ -237,7 +247,19 @@ const PlanManagement = () => {
                           </li>
                         ))}
                       </ul>
-                      <div ref={(el) => (paypalRefs.current[p.plan_type] = el)} />
+
+                      <div className="space-y-2">
+                        {/* PayPal/Card button per plan */}
+                        <Button
+                          className="w-full"
+                          variant={isCurrent ? "outline" : "default"}
+                          disabled={submittingPlan === p.plan_type}
+                          onClick={() => handleSubscribe(p.plan_type)}
+                        >
+                          {submittingPlan === p.plan_type ? "Redirecting…" : "Pay with PayPal / Card"}
+                        </Button>
+
+                      </div>
                     </CardContent>
                   </Card>
                 );
