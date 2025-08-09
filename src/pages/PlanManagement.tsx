@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -40,52 +39,19 @@ const currencyFmt = (amountCents: number, currency: string) =>
     (amountCents || 0) / 100
   );
 
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+
 const PlanManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<BillingPlanRow[]>([]);
-
-  // Load PayPal SDK once
-  useEffect(() => {
-    if (!document.getElementById("paypal-sdk")) {
-      const script = document.createElement("script");
-      script.id = "paypal-sdk";
-      script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID}&vault=true&intent=subscription`;
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
-
-  // Render PayPal buttons once SDK is ready
-  useEffect(() => {
-    if ((window as any).paypal && plans.length) {
-      plans.forEach((p) => {
-        const containerId = `paypal-button-container-${p.provider_plan_id}`;
-        const container = document.getElementById(containerId);
-        if (container && container.childNodes.length === 0) {
-          (window as any).paypal.Buttons({
-            style: {
-              shape: "rect",
-              color: "gold",
-              layout: "vertical",
-              label: "subscribe"
-            },
-            createSubscription: function (data: any, actions: any) {
-              return actions.subscription.create({
-                plan_id: p.provider_plan_id
-              });
-            },
-            onApprove: function (data: any) {
-              alert("Subscription ID: " + data.subscriptionID);
-              // TODO: send subscriptionID to backend to save
-            }
-          }).render(`#${containerId}`);
-        }
-      });
-    }
-  }, [plans]);
+  const paypalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (user) {
@@ -131,6 +97,46 @@ const PlanManagement = () => {
     } catch (error) {
       console.error("Error fetching plan:", error);
     }
+  };
+
+  // ✅ Load PayPal SDK once
+  useEffect(() => {
+    if (!window.paypal) {
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=YOUR_SANDBOX_CLIENT_ID&vault=true&intent=subscription`;
+      script.async = true;
+      script.onload = () => renderButtons();
+      document.body.appendChild(script);
+    } else {
+      renderButtons();
+    }
+  }, [plans]);
+
+  // ✅ Render PayPal buttons for each plan
+  const renderButtons = () => {
+    if (!window.paypal) return;
+    plans.forEach((plan) => {
+      const container = paypalRefs.current[plan.plan_type];
+      if (container) {
+        container.innerHTML = ""; // clear before render
+        window.paypal.Buttons({
+          style: {
+            shape: "rect",
+            color: "gold",
+            layout: "vertical",
+            label: "subscribe"
+          },
+          createSubscription: function (data: any, actions: any) {
+            return actions.subscription.create({
+              plan_id: plan.provider_plan_id
+            });
+          },
+          onApprove: function (data: any) {
+            alert(`Subscription successful! ID: ${data.subscriptionID}`);
+          }
+        }).render(container);
+      }
+    });
   };
 
   const featureMap: Record<
@@ -221,13 +227,6 @@ const PlanManagement = () => {
                         {price}
                         <span className="text-sm text-muted-foreground">/{p.interval}</span>
                       </div>
-                      <CardDescription>
-                        {p.plan_type === "starter"
-                          ? "Perfect for small businesses"
-                          : p.plan_type === "professional"
-                          ? "Ideal for growing businesses"
-                          : "For large organizations"}
-                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2 mb-6">
@@ -238,7 +237,7 @@ const PlanManagement = () => {
                           </li>
                         ))}
                       </ul>
-                      <div id={`paypal-button-container-${p.provider_plan_id}`} />
+                      <div ref={(el) => (paypalRefs.current[p.plan_type] = el)} />
                     </CardContent>
                   </Card>
                 );
