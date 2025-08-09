@@ -1,130 +1,112 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// deno-lint-ignore-file no-explicit-any
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-type Json = Record<string, any>;
-
-const ENV = {
-  PAYPAL_ENV: Deno.env.get("PAYPAL_ENV") || "live",
-  PAYPAL_CLIENT_ID: Deno.env.get("PAYPAL_CLIENT_ID")!,
-  PAYPAL_CLIENT_SECRET: Deno.env.get("PAYPAL_CLIENT_SECRET")!,
-  PAYPAL_PLAN_STARTER: Deno.env.get("PAYPAL_PLAN_STARTER")!,
-  PAYPAL_PLAN_PROFESSIONAL: Deno.env.get("PAYPAL_PLAN_PROFESSIONAL")!,
-  PAYPAL_PLAN_ENTERPRISE: Deno.env.get("PAYPAL_PLAN_ENTERPRISE")!,
-  BRAND_NAME: Deno.env.get("BRAND_NAME") || "Location Insights Pro",
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-authorization",
+  "Access-Control-Max-Age": "86400",
 };
 
-const API_BASE =
-  ENV.PAYPAL_ENV === "sandbox"
-    ? "https://api-m.sandbox.paypal.com"
-    : "https://api-m.paypal.com";
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
 
-function planIdFor(planType: string): string {
-  switch (planType) {
-    case "starter":
-      return ENV.PAYPAL_PLAN_STARTER;
-    case "professional":
-      return ENV.PAYPAL_PLAN_PROFESSIONAL;
-    case "enterprise":
-      return ENV.PAYPAL_PLAN_ENTERPRISE;
-    default:
-      throw new Error(`Unknown plan_type: ${planType}`);
-  }
+const PAYPAL_CLIENT_ID = Deno.env.get("PAYPAL_CLIENT_ID")!;
+const PAYPAL_SECRET    = Deno.env.get("PAYPAL_SECRET")!;
+const PAYPAL_BASE      = Deno.env.get("PAYPAL_BASE_URL") || "https://api-m.sandbox.paypal.com";
+
+console.log("[env] has CLIENT_ID?", !!PAYPAL_CLIENT_ID, "has SECRET?", !!PAYPAL_SECRET, "BASE:", PAYPAL_BASE);
+
+if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
+  throw new Error("Missing PAYPAL_CLIENT_ID or PAYPAL_SECRET env vars");
+}
+if (!PAYPAL_BASE.startsWith("http")) {
+  throw new Error(`Invalid PAYPAL_BASE_URL: ${PAYPAL_BASE}`);
 }
 
-async function getAccessToken(): Promise<string> {
-  const auth = btoa(`${ENV.PAYPAL_CLIENT_ID}:${ENV.PAYPAL_CLIENT_SECRET}`);
-  const res = await fetch(`${API_BASE}/v1/oauth2/token`, {
+async function paypalToken() {
+  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${auth}`,
+      Authorization: "Basic " + btoa(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OAuth failed: ${res.status} ${text}`);
+    const txt = await res.text();
+    throw new Error(`PayPal token failed ${res.status}: ${txt}`);
   }
-  const data = await res.json();
-  return data.access_token;
-}
-
-async function createRedirectSubscription(
-  accessToken: string,
-  planId: string,
-  returnUrl: string,
-  cancelUrl: string
-) {
-  const res = await fetch(`${API_BASE}/v1/billing/subscriptions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      "PayPal-Request-Id": crypto.randomUUID(),
-    },
-    body: JSON.stringify({
-      plan_id: planId,
-      payment_method: {
-        payer_selected: "PAYPAL",
-        payee_preferred: "IMMEDIATE_PAYMENT_REQUIRED"
-      },
-      application_context: {
-        brand_name: ENV.BRAND_NAME,
-        user_action: "SUBSCRIBE_NOW",
-        return_url: returnUrl,
-        cancel_url: cancelUrl,
-        payment_method: {
-          payer_selected: "PAYPAL",
-          payee_preferred: "IMMEDIATE_PAYMENT_REQUIRED"
-        },
-        shipping_preference: "NO_SHIPPING"
-      }
-    }),
-  });
-
   const json = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      `Create subscription failed: ${res.status} ${JSON.stringify(json)}`
-    );
-  }
-
-  const approval = (json.links || []).find((l: any) => l.rel === "approve")
-    ?.href;
-  return { subscription: json, approval_url: approval };
+  return json.access_token as string;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
   try {
+    const auth = req.headers.get("Authorization")?.replace("Bearer ", "");
+    const { data: { user } } = await supabase.auth.getUser(auth || "");
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: cors });
+
     const { plan_type, return_url, cancel_url } = await req.json();
 
-    if (!plan_type || !return_url || !cancel_url) {
-      return new Response(
-        JSON.stringify({ error: "Missing plan_type/return_url/cancel_url" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+    // 1) Look up the PayPal plan id for this plan_type
+    const { data: planRow, error: planErr } = await supabase
+      .from("billing_plans")
+      .select("*")
+      .eq("plan_type", plan_type)
+      .single();
+    if (planErr || !planRow) throw new Error("Unknown plan_type");
+
+    // 2) Create local subscription (pending)
+    const { data: sub, error: subErr } = await supabase
+      .from("subscriptions")
+      .insert({ user_id: user.id, plan_type, status: "pending" })
+      .select("*")
+      .single();
+    if (subErr) throw subErr;
+
+    // 3) Create PayPal subscription
+    const token = await paypalToken();
+    const resp = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "PayPal-Request-Id": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        plan_id: planRow.provider_plan_id,
+        application_context: {
+          user_action: "SUBSCRIBE_NOW",
+          brand_name: "Location Insights Pro",
+          return_url,
+          cancel_url,
+        },
+        custom_id: sub.id, // link the webhook back to our row
+      }),
+    });
+
+    const json = await resp.json();
+    if (!resp.ok) {
+      console.error("PayPal create sub failed", json);
+      return new Response(JSON.stringify({ error: "PayPal create failed", details: json }), { status: 400, headers: cors });
     }
 
-    const token = await getAccessToken();
-    const planId = planIdFor(plan_type);
-    const { subscription, approval_url } = await createRedirectSubscription(
-      token,
-      planId,
-      return_url,
-      cancel_url
-    );
+    await supabase
+      .from("subscriptions")
+      .update({ provider_subscription_id: json.id, raw: json })
+      .eq("id", sub.id);
 
-    return new Response(
-      JSON.stringify({
-        subscription_id: subscription.id,
-        status: subscription.status,
-        approval_url,
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    const approval = (json.links || []).find((l: any) => l.rel === "approve")?.href;
+    return new Response(JSON.stringify({ approval_url: approval, subscription_id: sub.id }), { headers: cors });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message || String(e) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error(e);
+    return new Response(JSON.stringify({ error: e.message || "Server error" }), { status: 500, headers: cors });
   }
 });
