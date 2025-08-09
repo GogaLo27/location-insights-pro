@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
@@ -16,122 +16,233 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { CheckCircle, MapPin, Star } from "lucide-react";
+import { CheckCircle, MapPin, Star, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+
+type PayPalConfig = {
+  clientId: string;
+  environment: "sandbox" | "live";
+};
+
+const loadPayPalSdk = async (clientId: string) => {
+  if (window.paypal) return;
+  const script = document.createElement("script");
+  script.src =
+    `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
+    `&components=card-fields&vault=true`;
+  script.async = true;
+  document.body.appendChild(script);
+  await new Promise<void>((resolve, reject) => {
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load PayPal SDK"));
+  });
+};
 
 const PlanSelection = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [ppCfg, setPpCfg] = useState<PayPalConfig | null>(null);
 
-  // PlanSelection.tsx — only showing the key handler; keep the rest of your component
-const handlePlanSelect = async (planType: string) => {
-  if (!user) return;
-  setSelectedPlan(planType);
+  // Refs for card fields
+  const cardInstanceRef = useRef<any>(null);
 
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const supabaseJwt = session?.access_token || "";
-
-    const res = await supabase.functions.invoke('paypal-create-subscription', {
-      body: {
-        plan_type: planType, // 'starter' | 'professional' | 'enterprise'
-        return_url: `${window.location.origin}/billing/success`,
-        cancel_url: `${window.location.origin}/billing/cancel`,
+  // Plans UI (unchanged except we’ll trigger card flow instead of redirect)
+  const plans = useMemo(
+    () => [
+      {
+        id: "starter",
+        name: "Starter",
+        price: "$29",
+        description: "Perfect for small businesses",
+        features: ["Up to 3 locations", "Basic analytics", "Review monitoring", "Email support"],
+        locations: 3,
+        reviews: 100,
       },
-      headers: { Authorization: `Bearer ${supabaseJwt}` },
+      {
+        id: "professional",
+        name: "Professional",
+        price: "$79",
+        description: "For growing businesses",
+        features: [
+          "Up to 10 locations",
+          "Advanced analytics",
+          "AI review analysis",
+          "Priority support",
+          "Custom reports",
+        ],
+        locations: 10,
+        reviews: 500,
+        popular: true,
+      },
+      {
+        id: "enterprise",
+        name: "Enterprise",
+        price: "$199",
+        description: "For enterprises",
+        features: [
+          "Unlimited locations",
+          "Full analytics suite",
+          "AI-powered insights",
+          "24/7 support",
+          "Custom integrations",
+          "Dedicated account manager",
+        ],
+        locations: -1,
+        reviews: -1,
+      },
+    ],
+    []
+  );
+
+  // Fetch PayPal client id from the server (so you don’t need .env on the client)
+  const ensurePayPalReady = async () => {
+    if (ppCfg) return ppCfg;
+    const { data, error } = await supabase.functions.invoke("paypal-create-subscription", {
+      body: { action: "get_config" },
+    });
+    if (error) throw error;
+    const cfg: PayPalConfig = typeof data === "string" ? JSON.parse(data) : data;
+    await loadPayPalSdk(cfg.clientId);
+    setPpCfg(cfg);
+    return cfg;
+  };
+
+  // Build and render card fields into the modal
+  const renderCardFields = async (planType: string) => {
+    const paypal = window.paypal;
+    if (!paypal) throw new Error("PayPal SDK not available");
+
+    // Create setup token via server on demand
+    const createVaultSetupToken = async () => {
+      const { data, error } = await supabase.functions.invoke("paypal-create-subscription", {
+        body: { action: "create_setup_token" },
+      });
+      if (error) throw error;
+      const payload = typeof data === "string" ? JSON.parse(data) : data;
+      if (!payload?.id) throw new Error("Failed to create setup token");
+      return payload.id as string;
+    };
+
+    // Destroy previous instance if any
+    try {
+      cardInstanceRef.current?.teardown?.();
+    } catch {}
+    cardInstanceRef.current = null;
+
+    const card = paypal.CardFields({
+      // PayPal docs: createVaultSetupToken must return a string token from server
+      // The SDK will update that token with card details under the hood.
+      createVaultSetupToken,
+      onApprove: async ({ vaultSetupToken }: { vaultSetupToken: string }) => {
+        try {
+          setLoading(true);
+          // Exchange setup token -> payment token and create the subscription (server)
+          const { data, error } = await supabase.functions.invoke("paypal-create-subscription", {
+            body: {
+              action: "create_subscription_with_vault",
+              plan_type: planType,
+              vault_setup_token: vaultSetupToken,
+            },
+          });
+          if (error) throw error;
+          const res = typeof data === "string" ? JSON.parse(data) : data;
+
+          if (res?.status === "active") {
+            // No redirect needed; go straight to success
+            localStorage.setItem("pendingSubId", res.local_subscription_id || res.subscription_id || "");
+            navigate("/billing/success?subscription_id=" + (res.subscription_id || ""));
+          } else if (res?.status) {
+            // Pending or other state – still go to success page which polls and syncs
+            localStorage.setItem("pendingSubId", res.local_subscription_id || "");
+            navigate("/billing/success?subscription_id=" + (res.subscription_id || ""));
+          } else {
+            throw new Error("Unexpected response from server");
+          }
+        } catch (e: any) {
+          console.error(e);
+          toast({
+            title: "Payment error",
+            description: e?.message || "Failed to create subscription",
+            variant: "destructive",
+          });
+        } finally {
+          setLoading(false);
+          setShowCardModal(false);
+          try { cardInstanceRef.current?.teardown?.(); } catch {}
+        }
+      },
+      onError: (err: any) => {
+        console.error("PayPal CardFields error:", err);
+        toast({
+          title: "Payment error",
+          description: "Card form error. Please check details and try again.",
+          variant: "destructive",
+        });
+      },
     });
 
-    // supabase-js returns { data, error }; data can be a string
-    if (res.error) {
-      console.error("invoke error:", res.error);
-      throw new Error(res.error.message || "Edge function error");
+    // Render fields
+    if (card.isEligible()) {
+      card.NameField().render("#pp-card-name");
+      card.NumberField().render("#pp-card-number");
+      card.ExpiryField().render("#pp-card-expiry");
+      card.CVVField().render("#pp-card-cvv");
+    } else {
+      throw new Error("Card fields not eligible for this buyer/account.");
     }
 
-    let payload: any = res.data;
-    if (typeof payload === "string") {
-      try { payload = JSON.parse(payload); } catch { /* leave as-is */ }
+    cardInstanceRef.current = card;
+  };
+
+  const handlePlanSelect = async (planType: string) => {
+    if (!user) return;
+    setSelectedPlan(planType);
+    try {
+      setLoading(true);
+      await ensurePayPalReady();
+      setShowCardModal(true);
+      // Slight delay so modal DOM exists before rendering fields
+      setTimeout(() => {
+        renderCardFields(planType).catch((e) => {
+          console.error(e);
+          toast({
+            title: "Payment error",
+            description: e?.message || "Unable to render card fields.",
+            variant: "destructive",
+          });
+          setShowCardModal(false);
+          setSelectedPlan(null);
+        });
+      }, 50);
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "Payment error",
+        description: e?.message || "Unable to initialize card payment.",
+        variant: "destructive",
+      });
+      setSelectedPlan(null);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (!payload?.approval_url) {
-      console.error("Unexpected payload shape:", payload);
-      throw new Error("No approval_url returned");
-    }
-
-    if (payload.subscription_id) {
-      localStorage.setItem("pendingSubId", payload.subscription_id);
-    }
-
-    // ✅ redirect to PayPal
-    window.location.href = payload.approval_url;
-  } catch (e: any) {
-    console.error(e);
-    toast({
-      title: "Payment error",
-      description: e.message || "Failed to start subscription",
-      variant: "destructive",
-    });
-    setSelectedPlan(null);
-  }
-};
-
-  const plans = [
-    {
-      id: "starter",
-      name: "Starter",
-      price: "$29",
-      description: "Perfect for small businesses",
-      features: [
-        "Up to 3 locations",
-        "Basic analytics",
-        "Review monitoring",
-        "Email support",
-      ],
-      locations: 3,
-      reviews: 100,
-    },
-    {
-      id: "professional",
-      name: "Professional",
-      price: "$79",
-      description: "For growing businesses",
-      features: [
-        "Up to 10 locations",
-        "Advanced analytics",
-        "AI review analysis",
-        "Priority support",
-        "Custom reports",
-      ],
-      locations: 10,
-      reviews: 500,
-      popular: true,
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "$199",
-      description: "For enterprises",
-      features: [
-        "Unlimited locations",
-        "Full analytics suite",
-        "AI-powered insights",
-        "24/7 support",
-        "Custom integrations",
-        "Dedicated account manager",
-      ],
-      locations: -1, // -1 means unlimited
-      reviews: -1,
-    },
-  ];
-
-  // If not authenticated and not loading, send to landing page
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
   }
 
-  // Show a spinner while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -157,12 +268,9 @@ const handlePlanSelect = async (planType: string) => {
 
           <div className="flex-1 space-y-4 p-8 pt-6">
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold mb-4">
-                Welcome to Location Insights Pro!
-              </h2>
+              <h2 className="text-3xl font-bold mb-4">Welcome to Location Insights Pro!</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Choose the perfect plan for your business needs. You can upgrade
-                or downgrade at any time.
+                Choose the perfect plan for your business needs. You can upgrade or downgrade at any time.
               </p>
             </div>
 
@@ -170,11 +278,9 @@ const handlePlanSelect = async (planType: string) => {
               {plans.map((plan) => (
                 <Card
                   key={plan.id}
-                  className={`relative cursor-pointer transition-all hover:shadow-lg ${
+                  className={`relative transition-all hover:shadow-lg ${
                     plan.popular ? "border-primary shadow-lg scale-105" : ""
-                  } ${
-                    selectedPlan === plan.id ? "ring-2 ring-primary" : ""
-                  }`}
+                  } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
                 >
                   {plan.popular && (
                     <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
@@ -185,9 +291,7 @@ const handlePlanSelect = async (planType: string) => {
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
                     <div className="text-3xl font-bold">
                       {plan.price}
-                      <span className="text-base font-normal text-muted-foreground">
-                        /month
-                      </span>
+                      <span className="text-base font-normal text-muted-foreground">/month</span>
                     </div>
                     <CardDescription>{plan.description}</CardDescription>
                   </CardHeader>
@@ -196,17 +300,13 @@ const handlePlanSelect = async (planType: string) => {
                       <div className="flex items-center space-x-2">
                         <MapPin className="w-4 h-4 text-primary" />
                         <span className="font-medium">
-                          {plan.locations === -1
-                            ? "Unlimited locations"
-                            : `Up to ${plan.locations} locations`}
+                          {plan.locations === -1 ? "Unlimited locations" : `Up to ${plan.locations} locations`}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Star className="w-4 h-4 text-primary" />
                         <span className="font-medium">
-                          {plan.reviews === -1
-                            ? "Unlimited reviews"
-                            : `Up to ${plan.reviews} reviews`}
+                          {plan.reviews === -1 ? "Unlimited reviews" : `Up to ${plan.reviews} reviews`}
                         </span>
                       </div>
                     </div>
@@ -221,10 +321,10 @@ const handlePlanSelect = async (planType: string) => {
                     <Button
                       className="w-full"
                       variant={plan.popular ? "default" : "outline"}
-                      disabled={selectedPlan === plan.id}
+                      disabled={loading && selectedPlan === plan.id}
                       onClick={() => handlePlanSelect(plan.id)}
                     >
-                      {selectedPlan === plan.id ? "Selecting…" : "Select Plan"}
+                      {loading && selectedPlan === plan.id ? "Processing…" : "Pay by Card"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -233,6 +333,55 @@ const handlePlanSelect = async (planType: string) => {
           </div>
         </SidebarInset>
       </div>
+
+      {/* Card modal */}
+      {showCardModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-xl p-6 shadow-xl relative">
+            <button
+              className="absolute right-3 top-3 p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              onClick={() => {
+                setShowCardModal(false);
+                try { cardInstanceRef.current?.teardown?.(); } catch {}
+                setSelectedPlan(null);
+              }}
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-semibold mb-4">Enter card details</h3>
+
+            <div className="space-y-4">
+              <div id="pp-card-name" className="border rounded-md p-3" />
+              <div id="pp-card-number" className="border rounded-md p-3" />
+              <div className="grid grid-cols-2 gap-3">
+                <div id="pp-card-expiry" className="border rounded-md p-3" />
+                <div id="pp-card-cvv" className="border rounded-md p-3" />
+              </div>
+            </div>
+
+            <Button
+              className="mt-6 w-full"
+              disabled={loading}
+              onClick={() => {
+                try {
+                  cardInstanceRef.current?.submit();
+                } catch (e) {
+                  console.error(e);
+                  toast({
+                    title: "Payment error",
+                    description: "Could not submit card form.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              {loading ? "Processing…" : "Subscribe"}
+            </Button>
+          </div>
+        </div>
+      )}
     </SidebarProvider>
   );
 };
