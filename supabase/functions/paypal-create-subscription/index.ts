@@ -19,6 +19,8 @@ const PAYPAL_CLIENT_ID = Deno.env.get("PAYPAL_CLIENT_ID")!;
 const PAYPAL_SECRET    = Deno.env.get("PAYPAL_SECRET")!;
 const PAYPAL_BASE      = Deno.env.get("PAYPAL_BASE_URL") || "https://api-m.sandbox.paypal.com";
 
+console.log("[env] has CLIENT_ID?", !!PAYPAL_CLIENT_ID, "has SECRET?", !!PAYPAL_SECRET, "BASE:", PAYPAL_BASE);
+
 if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
   throw new Error("Missing PAYPAL_CLIENT_ID or PAYPAL_SECRET env vars");
 }

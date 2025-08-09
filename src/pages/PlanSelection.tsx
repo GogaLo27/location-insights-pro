@@ -35,29 +35,44 @@ const handlePlanSelect = async (planType: string) => {
     const { data: { session } } = await supabase.auth.getSession();
     const supabaseJwt = session?.access_token || "";
 
-    const { data, error } = await supabase.functions.invoke('paypal-create-subscription', {
+    const res = await supabase.functions.invoke('paypal-create-subscription', {
       body: {
-        plan_type: planType,
+        plan_type: planType, // 'starter' | 'professional' | 'enterprise'
         return_url: `${window.location.origin}/billing/success`,
         cancel_url: `${window.location.origin}/billing/cancel`,
       },
-      headers: { Authorization: `Bearer ${supabaseJwt}` }
+      headers: { Authorization: `Bearer ${supabaseJwt}` },
     });
 
-    if (error || !data?.approval_url) {
-      throw new Error(error?.message || "Failed to start subscription");
+    // supabase-js returns { data, error }; data can be a string
+    if (res.error) {
+      console.error("invoke error:", res.error);
+      throw new Error(res.error.message || "Edge function error");
     }
 
-    // save subscription id locally so success page can poll it (optional)
-    if (data.subscription_id) {
-      localStorage.setItem("pendingSubId", data.subscription_id);
+    let payload: any = res.data;
+    if (typeof payload === "string") {
+      try { payload = JSON.parse(payload); } catch { /* leave as-is */ }
     }
 
-    // Redirect user to PayPal
-    window.location.href = data.approval_url;
-  } catch (e:any) {
+    if (!payload?.approval_url) {
+      console.error("Unexpected payload shape:", payload);
+      throw new Error("No approval_url returned");
+    }
+
+    if (payload.subscription_id) {
+      localStorage.setItem("pendingSubId", payload.subscription_id);
+    }
+
+    // ✅ redirect to PayPal
+    window.location.href = payload.approval_url;
+  } catch (e: any) {
     console.error(e);
-    toast({ title: "Payment error", description: e.message || "Could not initiate subscription", variant: "destructive" });
+    toast({
+      title: "Payment error",
+      description: e.message || "Failed to start subscription",
+      variant: "destructive",
+    });
     setSelectedPlan(null);
   }
 };
