@@ -3,25 +3,27 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Max-Age": "86400",
-};
-
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-const PAYPAL_CLIENT_ID = Deno.env.get("PAYPAL_CLIENT_ID")!;
-const PAYPAL_SECRET    = Deno.env.get("PAYPAL_SECRET")!;
-const PAYPAL_BASE      = Deno.env.get("PAYPAL_BASE_URL") || "https://api-m.sandbox.paypal.com";
+const PAYPAL_CLIENT_ID  = Deno.env.get("PAYPAL_CLIENT_ID")!;
+const PAYPAL_SECRET     = Deno.env.get("PAYPAL_SECRET")!;
+const PAYPAL_BASE       = Deno.env.get("PAYPAL_BASE_URL") || "https://api-m.sandbox.paypal.com";
 const PAYPAL_WEBHOOK_ID = Deno.env.get("PAYPAL_WEBHOOK_ID")!;
 
-async function paypalToken() {
-  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+function requireEnv() {
+  const missing: string[] = [];
+  if (!PAYPAL_CLIENT_ID)  missing.push("PAYPAL_CLIENT_ID");
+  if (!PAYPAL_SECRET)     missing.push("PAYPAL_SECRET");
+  if (!PAYPAL_WEBHOOK_ID) missing.push("PAYPAL_WEBHOOK_ID");
+  if (!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (missing.length) throw new Error("Missing env: " + missing.join(", "));
+}
+
+async function getPaypalToken(): Promise<string> {
+  const r = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: "Basic " + btoa(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`),
@@ -29,36 +31,33 @@ async function paypalToken() {
     },
     body: "grant_type=client_credentials",
   });
-  const txt = await res.text();
-  if (!res.ok) throw new Error(`token ${res.status}: ${txt}`);
-  return JSON.parse(txt).access_token as string;
+  const t = await r.text();
+  if (!r.ok) throw new Error(`token ${r.status} ${t}`);
+  return JSON.parse(t).access_token as string;
 }
 
-async function verifySignature(headers: Headers, body: any) {
-  const token = await paypalToken();
-  const payload = {
-    auth_algo:         headers.get("paypal-auth-algo"),
-    cert_url:          headers.get("paypal-cert-url"),
-    transmission_id:   headers.get("paypal-transmission-id"),
-    transmission_sig:  headers.get("paypal-transmission-sig"),
-    transmission_time: headers.get("paypal-transmission-time"),
-    webhook_id:        PAYPAL_WEBHOOK_ID,
-    webhook_event:     body,
-  };
-
-  const res = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
+async function verifySignature(headers: Headers, payload: any): Promise<boolean> {
+  const token = await getPaypalToken();
+  const vr = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      auth_algo:         headers.get("paypal-auth-algo"),
+      cert_url:          headers.get("paypal-cert-url"),
+      transmission_id:   headers.get("paypal-transmission-id"),
+      transmission_sig:  headers.get("paypal-transmission-sig"),
+      transmission_time: headers.get("paypal-transmission-time"),
+      webhook_id:        PAYPAL_WEBHOOK_ID,
+      webhook_event:     payload,
+    }),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`verify ${res.status}: ${JSON.stringify(json)}`);
+  const json = await vr.json();
+  if (!vr.ok) throw new Error(`verify ${vr.status} ${JSON.stringify(json)}`);
   return json.verification_status === "SUCCESS";
 }
 
-function mapPayPalStatus(eventType: string, resourceStatus?: string) {
-  // Normalize to our subscription.status values
-  switch (eventType) {
+function mapStatus(event: string, resourceStatus?: string) {
+  switch (event) {
     case "BILLING.SUBSCRIPTION.ACTIVATED":
       return "active";
     case "BILLING.SUBSCRIPTION.SUSPENDED":
@@ -68,68 +67,91 @@ function mapPayPalStatus(eventType: string, resourceStatus?: string) {
     case "BILLING.SUBSCRIPTION.EXPIRED":
       return "expired";
     case "BILLING.SUBSCRIPTION.CREATED":
-      // PayPal may send CREATED first; keep as pending until ACTIVATED
       return resourceStatus?.toLowerCase() || "pending";
+    case "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
+    case "PAYMENT.SALE.DENIED":
+      return "past_due";
     default:
-      return resourceStatus?.toLowerCase() || undefined;
+      return resourceStatus?.toLowerCase();
   }
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method !== "POST") return new Response("ok", { status: 200 });
 
   try {
-    const text = await req.text();
-    const body = text ? JSON.parse(text) : {};
-    console.log("[webhook] event:", body?.event_type, "id:", body?.resource?.id);
+    requireEnv();
 
-    // Verify signature
-    const ok = await verifySignature(req.headers, body);
-    if (!ok) {
-      console.error("[webhook] signature verification FAILED");
-      return new Response("bad signature", { status: 400, headers: cors });
+    const body = await req.json().catch(() => ({}));
+    const eventType = body?.event_type as string;
+    const resource  = body?.resource || {};
+    const providerId = resource?.id as string | undefined;
+
+    console.log("[paypal-webhook] event:", eventType, "provider:", providerId);
+
+    // 1) Verify signature. If it fails, tell PayPal to retry (400) and log why.
+    try {
+      const ok = await verifySignature(req.headers, body);
+      if (!ok) {
+        console.error("[verify] status != SUCCESS");
+        return new Response("signature failed", { status: 400 });
+      }
+    } catch (e) {
+      console.error("[verify] error", e);
+      return new Response("signature error", { status: 400 });
     }
 
-    const eventType = body.event_type as string;
-    const resource  = body.resource || {};
-    const providerId = resource.id as string; // PayPal subscription id
-
+    // 2) We only proceed with a subscription id
     if (!providerId) {
-      console.warn("[webhook] missing resource.id");
-      return new Response("ok", { status: 200, headers: cors });
+      console.error("[webhook] missing resource.id");
+      return new Response("bad payload", { status: 400 });
     }
 
-    // Find our local subscription row by provider_subscription_id
-    const { data: sub } = await supabase
+    // 3) Find our row
+    const { data: sub, error: findErr } = await supabase
       .from("subscriptions")
       .select("*")
       .eq("provider_subscription_id", providerId)
       .maybeSingle();
 
+    if (findErr) {
+      console.error("[db] select error", findErr);
+      return new Response("db error", { status: 500 });
+    }
     if (!sub) {
-      console.warn("[webhook] local subscription not found for", providerId);
-      return new Response("ok", { status: 200, headers: cors });
+      console.error("[db] no local subscription for", providerId);
+      return new Response("not found", { status: 404 });
     }
 
-    const newStatus = mapPayPalStatus(eventType, resource.status);
+    // 4) Update status
+    const newStatus = mapStatus(eventType, resource?.status);
     if (newStatus) {
-      await supabase.from("subscriptions")
+      const { error: updErr } = await supabase
+        .from("subscriptions")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", sub.id);
+      if (updErr) {
+        console.error("[db] update error", updErr);
+        return new Response("db update error", { status: 500 });
+      }
 
-      // When ACTIVE, ensure user_plans is in sync
       if (newStatus === "active") {
-        await supabase.from("user_plans").upsert({
+        const { error: planErr } = await supabase.from("user_plans").upsert({
           user_id: sub.user_id,
           plan_type: sub.plan_type,
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
+        if (planErr) {
+          console.error("[db] user_plans upsert error", planErr);
+          // but still return 200; plan sync can be retried on next event
+        }
       }
     }
 
-    return new Response("ok", { status: 200, headers: cors });
+    // 5) Success → PayPal will mark “Sent”
+    return new Response("ok", { status: 200 });
   } catch (e) {
-    console.error("[webhook error]", e);
-    return new Response("error", { status: 500, headers: cors });
+    console.error("[webhook] fatal", e);
+    return new Response("error", { status: 500 });
   }
 });
