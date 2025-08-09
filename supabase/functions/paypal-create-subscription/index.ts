@@ -1,13 +1,9 @@
-// supabase/functions/paypal-create-subscription/index.ts
-// Deno (Supabase Edge Functions). This creates a PayPal Subscription and returns approval_url.
-// No card fields, no SDK — just the hosted PayPal page redirect.
-
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 type Json = Record<string, any>;
 
 const ENV = {
-  PAYPAL_ENV: Deno.env.get("PAYPAL_ENV") || "live", // "sandbox" | "live"
+  PAYPAL_ENV: Deno.env.get("PAYPAL_ENV") || "live",
   PAYPAL_CLIENT_ID: Deno.env.get("PAYPAL_CLIENT_ID")!,
   PAYPAL_CLIENT_SECRET: Deno.env.get("PAYPAL_CLIENT_SECRET")!,
   PAYPAL_PLAN_STARTER: Deno.env.get("PAYPAL_PLAN_STARTER")!,
@@ -67,12 +63,21 @@ async function createRedirectSubscription(
     },
     body: JSON.stringify({
       plan_id: planId,
+      payment_method: {
+        payer_selected: "PAYPAL",
+        payee_preferred: "IMMEDIATE_PAYMENT_REQUIRED"
+      },
       application_context: {
         brand_name: ENV.BRAND_NAME,
         user_action: "SUBSCRIBE_NOW",
         return_url: returnUrl,
         cancel_url: cancelUrl,
-      },
+        payment_method: {
+          payer_selected: "PAYPAL",
+          payee_preferred: "IMMEDIATE_PAYMENT_REQUIRED"
+        },
+        shipping_preference: "NO_SHIPPING"
+      }
     }),
   });
 
@@ -112,7 +117,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         subscription_id: subscription.id,
         status: subscription.status,
-        approval_url, // <-- FE should redirect here
+        approval_url,
       }),
       { headers: { "Content-Type": "application/json" } }
     );
