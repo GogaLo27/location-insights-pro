@@ -80,16 +80,32 @@ serve(async (req) => {
         "Content-Type": "application/json",
         "PayPal-Request-Id": crypto.randomUUID(),
       },
-      body: JSON.stringify({
-        plan_id: planRow.provider_plan_id,
-        application_context: {
-          user_action: "SUBSCRIBE_NOW",
-          brand_name: "Location Insights Pro",
-          return_url,
-          cancel_url,
-        },
-        custom_id: sub.id, // link the webhook back to our row
-      }),
+        body: JSON.stringify({
+          plan_id: planRow.provider_plan_id,
+          application_context: {
+            user_action: "SUBSCRIBE_NOW",
+            brand_name: "Location Insights Pro",
+            return_url,
+            cancel_url,
+            shipping_preference: "NO_SHIPPING",
+          },
+          payment_source: {
+            paypal: {
+              experience_context: {
+                payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED",
+                payment_method_selected: "CARD",
+                brand_name: "Location Insights Pro",
+                locale: "en-US",
+                user_action: "SUBSCRIBE_NOW",
+                return_url,
+                cancel_url,
+                shipping_preference: "NO_SHIPPING",
+                landing_page: "GUEST_CHECKOUT",
+              },
+            },
+          },
+          custom_id: sub.id, // link the webhook back to our row
+        }),
     });
 
     const json = await resp.json();

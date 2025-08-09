@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+const sb: any = supabase;
 
 function getQueryParam(name: string) {
   const url = new URL(window.location.href);
@@ -21,14 +22,14 @@ export default function BillingSuccess() {
       // Prefer local id (our DB id). If not, try to find by provider id.
       let subRow: any = null;
       if (localId) {
-        const { data } = await supabase
+        const { data } = await sb
           .from("subscriptions")
           .select("id,status,provider_subscription_id")
           .eq("id", localId)
           .single();
         subRow = data;
       } else if (providerId) {
-        const { data } = await supabase
+        const { data } = await sb
           .from("subscriptions")
           .select("id,status,provider_subscription_id")
           .eq("provider_subscription_id", providerId)

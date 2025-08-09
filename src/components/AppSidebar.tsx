@@ -21,7 +21,8 @@ import {
   MessageSquare, 
   TrendingUp,
   Settings,
-  LogOut
+  LogOut,
+  ReceiptText
 } from "lucide-react";
 
 const navigationItems = [
@@ -30,6 +31,7 @@ const navigationItems = [
   { title: "Reviews", url: "/reviews", icon: MessageSquare },
   { title: "Analytics", url: "/analytics", icon: TrendingUp },
   { title: "Sentiment", url: "/sentiment", icon: TrendingUp },
+  { title: "Orders", url: "/orders", icon: ReceiptText },
 ];
 
 export function AppSidebar() {

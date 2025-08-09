@@ -14,6 +14,7 @@ import PlanManagement from './pages/PlanManagement';
 import LocationSelection from './pages/LocationSelection';
 import BillingSuccess from './pages/BillingSuccess';
 import BillingCancel from './pages/BillingCancel';
+import OrderHistory from './pages/OrderHistory';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -78,6 +79,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <PlanManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <OrderHistory />
                 </ProtectedRoute>
               }
             />
