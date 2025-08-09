@@ -1,251 +1,149 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
-import { Navigate, useNavigate } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Navigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  SidebarProvider,
-  SidebarTrigger,
-  SidebarInset,
-} from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { CheckCircle, MapPin, Star } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Check, Crown, Zap, Building } from "lucide-react";
 
-declare global {
-  interface Window {
-    paypal?: any;
-  }
+interface UserPlan {
+  id: string;
+  plan_type: string;
+  created_at: string;
 }
 
-type BillingPlanRow = {
+interface BillingPlan {
   id: string;
-  plan_type: "starter" | "professional" | "enterprise" | string;
-  provider: string; // "paypal"
-  provider_plan_id: string; // PayPal Plan ID (P-... )
+  plan_type: string;
+  provider_plan_id: string;
   price_cents: number;
-  currency: string; // e.g. "USD"
-  interval: string; // e.g. "month"
-};
+  currency: string;
+}
 
-type PayPalConfig = {
-  clientId: string;
-};
-
-const PLANS_UI = [
-  {
-    id: "starter",
-    name: "Starter",
-    price: "$29",
-    description: "Perfect for small businesses",
-    features: [
-      "Up to 3 locations",
-      "Basic analytics",
-      "Review monitoring",
-      "Email support",
-    ],
-    locations: 3,
-    reviews: 100,
-    popular: false,
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    price: "$79",
-    description: "For growing businesses",
-    features: [
-      "Up to 10 locations",
-      "Advanced analytics",
-      "AI review analysis",
-      "Priority support",
-      "Custom reports",
-    ],
-    locations: 10,
-    reviews: 500,
-    popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "$199",
-    description: "For enterprises",
-    features: [
-      "Unlimited locations",
-      "Full analytics suite",
-      "AI-powered insights",
-      "24/7 support",
-      "Custom integrations",
-      "Dedicated account manager",
-    ],
-    locations: -1,
-    reviews: -1,
-    popular: false,
-  },
-] as const;
-
-export default function PlanSelection() {
+const PlanManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
+  const paypalRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
 
-  const [plansMap, setPlansMap] = useState<Record<string, BillingPlanRow>>({});
-  const [paypalCfg, setPaypalCfg] = useState<PayPalConfig | null>(null);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
-
-  // Prevent rendering a button twice
-  const rendered = useRef<Record<string, boolean>>({});
-
-  // Load PayPal clientId from your Supabase Edge Function
-  const fetchPayPalConfig = async (): Promise<PayPalConfig> => {
-    const res = await supabase.functions.invoke("paypal-create-subscription", {
-      body: { action: "get_config" }, // <-- your function should return { clientId }
-    });
-    if (res.error) throw new Error(res.error.message || "Failed to get PayPal config");
-    const data = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
-    if (!data?.clientId) throw new Error("Missing clientId from get_config");
-    return { clientId: data.clientId as string };
-  };
-
-  // Load PayPal SDK
-  const ensurePayPalSdk = async (clientId: string) => {
-    if (window.paypal) return;
-    const src =
-      "https://www.paypal.com/sdk/js" +
-      `?client-id=${encodeURIComponent(clientId)}` +
-      `&components=buttons` +
-      `&vault=true` +
-      `&intent=subscription`;
-    await new Promise<void>((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("Failed to load PayPal SDK"));
-      document.head.appendChild(s);
-    });
-  };
-
-  // Pull plan IDs from your DB: billing_plans
-  const loadPlansFromDb = async () => {
-    const { data, error } = await supabase
-      .from("billing_plans")
-      .select("id,plan_type,provider,provider_plan_id,price_cents,currency,interval")
-      .in("plan_type", ["starter", "professional", "enterprise"])
-      .eq("provider", "paypal");
-
-    if (error) throw error;
-
-    const map: Record<string, BillingPlanRow> = {};
-    for (const row of (data || [])) {
-      if (row.provider_plan_id) map[row.plan_type] = row as BillingPlanRow;
+  useEffect(() => {
+    if (user) {
+      fetchCurrentPlan();
     }
-    setPlansMap(map);
+    fetchBillingPlans();
+    fetchPaypalConfig();
+  }, [user]);
+
+  const fetchCurrentPlan = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("user_plans")
+        .select("*")
+        .eq("user_id", user?.id)
+        .single();
+
+      if (error && error.code !== "PGRST116") {
+        throw error;
+      }
+
+      setCurrentPlan(data);
+    } catch (error) {
+      console.error("Error fetching plan:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBillingPlans = async () => {
+    const { data, error } = await supabase.from("billing_plans").select("*").eq("provider", "paypal");
+    if (!error && data) {
+      setBillingPlans(data);
+    }
+  };
+
+  const fetchPaypalConfig = async () => {
+    // Get PayPal client ID from Supabase function or config table
+    const { data, error } = await supabase.from("config").select("value").eq("key", "PAYPAL_CLIENT_ID").single();
+    if (!error && data) {
+      setPaypalClientId(data.value);
+    }
   };
 
   useEffect(() => {
-    let cancelled = false;
+    if (paypalClientId && billingPlans.length > 0) {
+      // Load PayPal SDK once
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=${paypalClientId}&vault=true&intent=subscription`;
+      script.async = true;
+      script.onload = renderAllButtons;
+      document.body.appendChild(script);
+    }
+  }, [paypalClientId, billingPlans]);
 
-    (async () => {
-      if (authLoading) return;
-      if (!user) return; // keep your existing auth gate
-
-      try {
-        await loadPlansFromDb();
-        const cfg = await fetchPayPalConfig();
-        if (cancelled) return;
-        setPaypalCfg(cfg);
-        await ensurePayPalSdk(cfg.clientId);
-        if (cancelled) return;
-        setSdkLoaded(true);
-      } catch (e: any) {
-        console.error(e);
-        toast({
-          title: "Setup error",
-          description: e?.message || "Could not initialize PayPal",
-          variant: "destructive",
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user]);
-
-  // Render one PayPal button per plan (opens hosted PayPal checkout)
-  useEffect(() => {
-    if (!sdkLoaded || !paypalCfg) return;
-    if (!user) return;
-
-    PLANS_UI.forEach((p) => {
-      const containerId = `paypal-button-${p.id}`;
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      if (rendered.current[p.id]) return;
-
-      const dbPlan = plansMap[p.id];
-      if (!dbPlan?.provider_plan_id) {
-        el.innerHTML = `<div style="color:#b00020;font-size:12px;">Missing PayPal plan for ${p.id}</div>`;
-        return;
-      }
-
-      window.paypal
-        .Buttons({
-          style: { label: "subscribe", layout: "horizontal", height: 45 },
-          createSubscription: (_data: any, actions: any) => {
+  const renderAllButtons = () => {
+    billingPlans.forEach((plan) => {
+      if (paypalRefs.current[plan.plan_type]) {
+        // @ts-ignore
+        window.paypal.Buttons({
+          style: {
+            shape: "rect",
+            color: "gold",
+            layout: "vertical",
+            label: "subscribe",
+          },
+          createSubscription: function (data: any, actions: any) {
             return actions.subscription.create({
-              plan_id: dbPlan.provider_plan_id, // <-- from billing_plans
+              plan_id: plan.provider_plan_id,
             });
           },
-          onApprove: (data: any) => {
-            const subId = data?.subscriptionID || data?.subscriptionId;
-            if (subId) {
-              navigate(`/billing/success?subscription_id=${encodeURIComponent(subId)}`);
-            } else {
-              navigate(`/billing/success`);
-            }
-          },
-          onCancel: () => {
-            navigate(`/billing/cancel`);
-          },
-          onError: (err: any) => {
-            console.error("PayPal button error:", err);
-            // keep UI simple: toast + let user click again
+          onApprove: function (data: any, actions: any) {
             toast({
-              title: "Payment error",
-              description: err?.message || "PayPal error",
+              title: "Payment Approved",
+              description: `Subscription ID: ${data.subscriptionID}`,
+            });
+            localStorage.setItem("pendingSubId", data.subscriptionID);
+            window.location.href = "/billing-success?subscription_id=" + data.subscriptionID;
+          },
+          onError: function (err: any) {
+            console.error("PayPal error:", err);
+            toast({
+              title: "Error",
+              description: "PayPal payment failed.",
               variant: "destructive",
             });
           },
-        })
-        .render(`#${containerId}`);
-
-      rendered.current[p.id] = true;
+        }).render(paypalRefs.current[plan.plan_type]);
+      }
     });
-  }, [sdkLoaded, paypalCfg, plansMap, user, navigate, toast]);
+  };
 
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
   }
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading…</p>
+          <p className="text-lg text-muted-foreground">Loading plans...</p>
         </div>
       </div>
     );
   }
+
+  const iconMap: Record<string, any> = {
+    starter: Zap,
+    professional: Crown,
+    enterprise: Building,
+  };
 
   return (
     <SidebarProvider>
@@ -254,73 +152,67 @@ export default function PlanSelection() {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-semibold">Choose Your Plan</h1>
+            <div className="flex items-center space-x-4 ml-4">
+              <h1 className="text-xl font-semibold">Plan Management</h1>
             </div>
           </header>
 
           <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold mb-4">Welcome to Location Insights Pro!</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Choose the perfect plan for your business needs. You can upgrade or downgrade at any time.
-              </p>
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold mb-2">Manage Your Plan</h1>
+              <p className="text-muted-foreground">Upgrade or downgrade your plan to fit your business needs</p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {PLANS_UI.map((plan) => (
-                <Card
-                  key={plan.id}
-                  className={`relative transition-all hover:shadow-lg ${
-                    plan.popular ? "border-primary shadow-lg scale-105" : ""
-                  }`}
-                >
-                  {plan.popular && (
-                    <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
-                      Most Popular
+            {currentPlan && (
+              <Card className="mb-6 border-accent">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Badge variant="default" className="bg-accent text-white">
+                      Current Plan
                     </Badge>
-                  )}
-                  <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                    <div className="text-3xl font-bold">
-                      {plan.price}
-                      <span className="text-base font-normal text-muted-foreground">/month</span>
-                    </div>
-                    <CardDescription>{plan.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="w-4 h-4 text-primary" />
-                        <span className="font-medium">
-                          {plan.locations === -1 ? "Unlimited locations" : `Up to ${plan.locations} locations`}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Star className="w-4 h-4 text-primary" />
-                        <span className="font-medium">
-                          {plan.reviews === -1 ? "Unlimited reviews" : `Up to ${plan.reviews} reviews`}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {plan.features.map((feature, idx) => (
-                        <div key={idx} className="flex items-center space-x-2">
-                          <CheckCircle className="w-4 h-4 text-primary" />
-                          <span className="text-sm">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {currentPlan.plan_type.charAt(0).toUpperCase() + currentPlan.plan_type.slice(1)}
+                  </CardTitle>
+                  <CardDescription>Active since {new Date(currentPlan.created_at).toLocaleDateString()}</CardDescription>
+                </CardHeader>
+              </Card>
+            )}
 
-                    {/* OFFICIAL PayPal Button mounts here (opens hosted checkout) */}
-                    <div id={`paypal-button-${plan.id}`} />
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {billingPlans.map((plan) => {
+                const IconComponent = iconMap[plan.plan_type];
+                return (
+                  <Card key={plan.plan_type} className={`relative ${plan.plan_type === "professional" ? "border-accent shadow-lg" : ""} ${currentPlan?.plan_type === plan.plan_type ? "bg-accent/5" : ""}`}>
+                    {plan.plan_type === "professional" && (
+                      <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-accent text-white">
+                        Most Popular
+                      </Badge>
+                    )}
+                    <CardHeader className="text-center">
+                      <div className="mx-auto mb-4 p-3 bg-accent/10 rounded-full w-fit">
+                        <IconComponent className="h-6 w-6 text-accent" />
+                      </div>
+                      <CardTitle className="flex items-center justify-center gap-2">
+                        {plan.plan_type.charAt(0).toUpperCase() + plan.plan_type.slice(1)}
+                        {currentPlan?.plan_type === plan.plan_type && <Badge variant="outline">Current</Badge>}
+                      </CardTitle>
+                      <div className="text-3xl font-bold text-accent">
+                        ${(plan.price_cents / 100).toFixed(0)}
+                        <span className="text-sm text-muted-foreground">/month</span>
+                      </div>
+                      <CardDescription>{plan.plan_type === "starter" ? "Perfect for small businesses" : plan.plan_type === "professional" ? "Ideal for growing businesses" : "For large organizations"}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div ref={(el) => (paypalRefs.current[plan.plan_type] = el)} />
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </SidebarInset>
       </div>
     </SidebarProvider>
   );
-}
+};
+
+export default PlanManagement;
