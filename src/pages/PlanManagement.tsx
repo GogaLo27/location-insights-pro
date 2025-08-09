@@ -46,7 +46,46 @@ const PlanManagement = () => {
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<BillingPlanRow[]>([]);
-  const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
+
+  // Load PayPal SDK once
+  useEffect(() => {
+    if (!document.getElementById("paypal-sdk")) {
+      const script = document.createElement("script");
+      script.id = "paypal-sdk";
+      script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID}&vault=true&intent=subscription`;
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  // Render PayPal buttons once SDK is ready
+  useEffect(() => {
+    if ((window as any).paypal && plans.length) {
+      plans.forEach((p) => {
+        const containerId = `paypal-button-container-${p.provider_plan_id}`;
+        const container = document.getElementById(containerId);
+        if (container && container.childNodes.length === 0) {
+          (window as any).paypal.Buttons({
+            style: {
+              shape: "rect",
+              color: "gold",
+              layout: "vertical",
+              label: "subscribe"
+            },
+            createSubscription: function (data: any, actions: any) {
+              return actions.subscription.create({
+                plan_id: p.provider_plan_id
+              });
+            },
+            onApprove: function (data: any) {
+              alert("Subscription ID: " + data.subscriptionID);
+              // TODO: send subscriptionID to backend to save
+            }
+          }).render(`#${containerId}`);
+        }
+      });
+    }
+  }, [plans]);
 
   useEffect(() => {
     if (user) {
@@ -91,47 +130,6 @@ const PlanManagement = () => {
       setCurrentPlan(data as any);
     } catch (error) {
       console.error("Error fetching plan:", error);
-    }
-  };
-
-  const handleSubscribe = async (planType: BillingPlanRow["plan_type"]) => {
-    if (!user) return;
-    try {
-      setSubmittingPlan(planType);
-      const { data: authData } = await supabase.auth.getSession();
-      const jwt = authData.session?.access_token || "";
-
-      const res = await supabase.functions.invoke("paypal-create-subscription", {
-        body: {
-          plan_type: planType,
-          return_url: `${window.location.origin}/billing/success`,
-          cancel_url: `${window.location.origin}/billing/cancel`,
-        },
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-      if (res.error) throw new Error(res.error.message || "Edge function error");
-
-      let payload: any = res.data;
-      if (typeof payload === "string") {
-        try { payload = JSON.parse(payload); } catch {}
-      }
-
-      if (!payload?.approval_url) throw new Error("No approval_url returned");
-
-      if (payload.subscription_id) {
-        localStorage.setItem("pendingSubId", payload.subscription_id);
-      }
-
-      window.location.href = payload.approval_url;
-    } catch (e: any) {
-      console.error(e);
-      toast({
-        title: "Payment error",
-        description: e.message || "Failed to start subscription",
-        variant: "destructive",
-      });
-      setSubmittingPlan(null);
     }
   };
 
@@ -181,13 +179,6 @@ const PlanManagement = () => {
           </header>
 
           <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Manage Your Plan</h1>
-              <p className="text-muted-foreground">
-                Upgrade or downgrade your plan to fit your business needs
-              </p>
-            </div>
-
             {currentPlan && (
               <Card className="mb-6 border-accent">
                 <CardHeader>
@@ -247,39 +238,7 @@ const PlanManagement = () => {
                           </li>
                         ))}
                       </ul>
-
-                      <div className="space-y-2">
-                        {/* PayPal/Card button per plan */}
-                        <Button
-                          className="w-full"
-                          variant={isCurrent ? "outline" : "default"}
-                          disabled={submittingPlan === p.plan_type}
-                          onClick={() => handleSubscribe(p.plan_type)}
-                        >
-                          {submittingPlan === p.plan_type ? "Redirecting…" : "Pay with PayPal / Card"}
-                        </Button>
-                        <div id="paypal-button-container-P-297729854X929900CNCLXZ2I"></div>
-<script src="https://www.paypal.com/sdk/js?client-id=AeH6W11a3ex2t64XXmQnAFs4-OawYaWNe22tTm5y3GVjRKMxPfaKtLf-oMdA3UfSA0E5nzBMXjYVlAMj&vault=true&intent=subscription" data-sdk-integration-source="button-factory"></script>
-<script>
-  paypal.Buttons({
-      style: {
-          shape: 'rect',
-          color: 'gold',
-          layout: 'vertical',
-          label: 'subscribe'
-      },
-      createSubscription: function(data, actions) {
-        return actions.subscription.create({
-          /* Creates the subscription */
-          plan_id: 'P-297729854X929900CNCLXZ2I'
-        });
-      },
-      onApprove: function(data, actions) {
-        alert(data.subscriptionID); // You can add optional success message for the subscriber here
-      }
-  }).render('#paypal-button-container-P-297729854X929900CNCLXZ2I'); // Renders the PayPal button
-</script>
-                      </div>
+                      <div id={`paypal-button-container-${p.provider_plan_id}`} />
                     </CardContent>
                   </Card>
                 );
