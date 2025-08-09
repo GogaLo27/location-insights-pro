@@ -12,13 +12,13 @@ import { Check, Crown, Zap, Building } from "lucide-react";
 
 interface UserPlan {
   id: string;
-  plan_type: "starter" | "professional" | "enterprise";
+  plan_type: "Starter" | "professional" | "enterprise";
   created_at: string;
 }
 
 type BillingPlanRow = {
   id: string;
-  plan_type: "starter" | "professional" | "enterprise";
+  plan_type: "Starter" | "professional" | "enterprise";
   provider: "paypal";
   provider_plan_id: string;
   price_cents: number;
