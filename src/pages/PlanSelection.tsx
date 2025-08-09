@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
@@ -16,7 +16,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { CheckCircle, MapPin, Star, X } from "lucide-react";
+import { CheckCircle, MapPin, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -33,81 +33,82 @@ type PayPalConfig = {
 
 const loadPayPalSdk = async (clientId: string) => {
   if (window.paypal) return;
-  const script = document.createElement("script");
-  script.src =
+  const s = document.createElement("script");
+  // Official PayPal SDK with the official Card Fields component
+  s.src =
     `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
-    `&components=card-fields&vault=true`;
-  script.async = true;
-  document.body.appendChild(script);
+    `&components=card-fields&vault=true&intent=subscription`;
+  s.async = true;
+  document.body.appendChild(s);
   await new Promise<void>((resolve, reject) => {
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load PayPal SDK"));
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("PayPal SDK failed to load"));
   });
 };
 
-const PlanSelection = () => {
+export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [showCardModal, setShowCardModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [ppCfg, setPpCfg] = useState<PayPalConfig | null>(null);
+  const [showCardBlock, setShowCardBlock] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Refs for card fields
-  const cardInstanceRef = useRef<any>(null);
+  // PayPal card instance (official component)
+  const cardRef = useRef<any>(null);
 
-  // Plans UI (unchanged except we’ll trigger card flow instead of redirect)
-  const plans = useMemo(
-    () => [
-      {
-        id: "starter",
-        name: "Starter",
-        price: "$29",
-        description: "Perfect for small businesses",
-        features: ["Up to 3 locations", "Basic analytics", "Review monitoring", "Email support"],
-        locations: 3,
-        reviews: 100,
-      },
-      {
-        id: "professional",
-        name: "Professional",
-        price: "$79",
-        description: "For growing businesses",
-        features: [
-          "Up to 10 locations",
-          "Advanced analytics",
-          "AI review analysis",
-          "Priority support",
-          "Custom reports",
-        ],
-        locations: 10,
-        reviews: 500,
-        popular: true,
-      },
-      {
-        id: "enterprise",
-        name: "Enterprise",
-        price: "$199",
-        description: "For enterprises",
-        features: [
-          "Unlimited locations",
-          "Full analytics suite",
-          "AI-powered insights",
-          "24/7 support",
-          "Custom integrations",
-          "Dedicated account manager",
-        ],
-        locations: -1,
-        reviews: -1,
-      },
-    ],
-    []
-  );
+  const plans = [
+    {
+      id: "starter",
+      name: "Starter",
+      price: "$29",
+      description: "Perfect for small businesses",
+      features: [
+        "Up to 3 locations",
+        "Basic analytics",
+        "Review monitoring",
+        "Email support",
+      ],
+      locations: 3,
+      reviews: 100,
+    },
+    {
+      id: "professional",
+      name: "Professional",
+      price: "$79",
+      description: "For growing businesses",
+      features: [
+        "Up to 10 locations",
+        "Advanced analytics",
+        "AI review analysis",
+        "Priority support",
+        "Custom reports",
+      ],
+      locations: 10,
+      reviews: 500,
+      popular: true,
+    },
+    {
+      id: "enterprise",
+      name: "Enterprise",
+      price: "$199",
+      description: "For enterprises",
+      features: [
+        "Unlimited locations",
+        "Full analytics suite",
+        "AI-powered insights",
+        "24/7 support",
+        "Custom integrations",
+        "Dedicated account manager",
+      ],
+      locations: -1,
+      reviews: -1,
+    },
+  ];
 
-  // Fetch PayPal client id from the server (so you don’t need .env on the client)
-  const ensurePayPalReady = async () => {
+  const ensurePayPal = async () => {
     if (ppCfg) return ppCfg;
     const { data, error } = await supabase.functions.invoke("paypal-create-subscription", {
       body: { action: "get_config" },
@@ -119,12 +120,16 @@ const PlanSelection = () => {
     return cfg;
   };
 
-  // Build and render card fields into the modal
-  const renderCardFields = async (planType: string) => {
+  // Render PayPal's official Card Fields block into the placeholders
+  const renderPayPalCardFields = async () => {
     const paypal = window.paypal;
     if (!paypal) throw new Error("PayPal SDK not available");
 
-    // Create setup token via server on demand
+    // Always tear down any existing instance
+    try { cardRef.current?.teardown?.(); } catch {}
+    cardRef.current = null;
+
+    // createVaultSetupToken MUST come from server (we do NOT collect card data)
     const createVaultSetupToken = async () => {
       const { data, error } = await supabase.functions.invoke("paypal-create-subscription", {
         body: { action: "create_setup_token" },
@@ -135,41 +140,27 @@ const PlanSelection = () => {
       return payload.id as string;
     };
 
-    // Destroy previous instance if any
-    try {
-      cardInstanceRef.current?.teardown?.();
-    } catch {}
-    cardInstanceRef.current = null;
-
     const card = paypal.CardFields({
-      // PayPal docs: createVaultSetupToken must return a string token from server
-      // The SDK will update that token with card details under the hood.
       createVaultSetupToken,
       onApprove: async ({ vaultSetupToken }: { vaultSetupToken: string }) => {
+        // Server exchanges setup token -> payment token and creates the subscription
         try {
-          setLoading(true);
-          // Exchange setup token -> payment token and create the subscription (server)
+          setSubmitting(true);
           const { data, error } = await supabase.functions.invoke("paypal-create-subscription", {
             body: {
               action: "create_subscription_with_vault",
-              plan_type: planType,
+              plan_type: selectedPlan,
               vault_setup_token: vaultSetupToken,
             },
           });
           if (error) throw error;
           const res = typeof data === "string" ? JSON.parse(data) : data;
-
-          if (res?.status === "active") {
-            // No redirect needed; go straight to success
-            localStorage.setItem("pendingSubId", res.local_subscription_id || res.subscription_id || "");
-            navigate("/billing/success?subscription_id=" + (res.subscription_id || ""));
-          } else if (res?.status) {
-            // Pending or other state – still go to success page which polls and syncs
+          if (res?.subscription_id) {
             localStorage.setItem("pendingSubId", res.local_subscription_id || "");
-            navigate("/billing/success?subscription_id=" + (res.subscription_id || ""));
-          } else {
-            throw new Error("Unexpected response from server");
+            navigate(`/billing/success?subscription_id=${res.subscription_id}`);
+            return;
           }
+          throw new Error("Unexpected response from server");
         } catch (e: any) {
           console.error(e);
           toast({
@@ -178,9 +169,7 @@ const PlanSelection = () => {
             variant: "destructive",
           });
         } finally {
-          setLoading(false);
-          setShowCardModal(false);
-          try { cardInstanceRef.current?.teardown?.(); } catch {}
+          setSubmitting(false);
         }
       },
       onError: (err: any) => {
@@ -193,36 +182,34 @@ const PlanSelection = () => {
       },
     });
 
-    // Render fields
-    if (card.isEligible()) {
-      card.NameField().render("#pp-card-name");
-      card.NumberField().render("#pp-card-number");
-      card.ExpiryField().render("#pp-card-expiry");
-      card.CVVField().render("#pp-card-cvv");
-    } else {
-      throw new Error("Card fields not eligible for this buyer/account.");
+    // OFFICIAL fields (PayPal renders the inputs)
+    if (!card.isEligible()) {
+      throw new Error("PayPal card fields not eligible for this buyer.");
     }
+    card.NameField().render("#pp-name");
+    card.NumberField().render("#pp-number");
+    card.ExpiryField().render("#pp-expiry");
+    card.CVVField().render("#pp-cvv");
 
-    cardInstanceRef.current = card;
+    cardRef.current = card;
   };
 
-  const handlePlanSelect = async (planType: string) => {
+  const startCardFlow = async (planType: string) => {
     if (!user) return;
     setSelectedPlan(planType);
     try {
-      setLoading(true);
-      await ensurePayPalReady();
-      setShowCardModal(true);
-      // Slight delay so modal DOM exists before rendering fields
+      await ensurePayPal();
+      setShowCardBlock(true);
+      // Wait a tick for containers to mount
       setTimeout(() => {
-        renderCardFields(planType).catch((e) => {
+        renderPayPalCardFields().catch((e) => {
           console.error(e);
           toast({
             title: "Payment error",
-            description: e?.message || "Unable to render card fields.",
+            description: e?.message || "Unable to load PayPal card form.",
             variant: "destructive",
           });
-          setShowCardModal(false);
+          setShowCardBlock(false);
           setSelectedPlan(null);
         });
       }, 50);
@@ -230,12 +217,10 @@ const PlanSelection = () => {
       console.error(e);
       toast({
         title: "Payment error",
-        description: e?.message || "Unable to initialize card payment.",
+        description: e?.message || "Unable to initialize PayPal.",
         variant: "destructive",
       });
       setSelectedPlan(null);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -274,6 +259,7 @@ const PlanSelection = () => {
               </p>
             </div>
 
+            {/* Plans */}
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {plans.map((plan) => (
                 <Card
@@ -321,69 +307,57 @@ const PlanSelection = () => {
                     <Button
                       className="w-full"
                       variant={plan.popular ? "default" : "outline"}
-                      disabled={loading && selectedPlan === plan.id}
-                      onClick={() => handlePlanSelect(plan.id)}
+                      disabled={!!selectedPlan && selectedPlan !== plan.id}
+                      onClick={() => startCardFlow(plan.id)}
                     >
-                      {loading && selectedPlan === plan.id ? "Processing…" : "Pay by Card"}
+                      {selectedPlan === plan.id && showCardBlock ? "Card form below" : "Pay by Card"}
                     </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
+
+            {/* OFFICIAL PayPal Card Fields (inline, no custom inputs) */}
+            {showCardBlock && (
+              <div className="max-w-3xl mx-auto mt-10 border rounded-xl p-6">
+                <div className="mb-4">
+                  <div className="text-lg font-semibold">Card details (secured by PayPal)</div>
+                  <div className="text-sm text-muted-foreground">
+                    We never see or store your card information. The fields below are rendered by PayPal.
+                  </div>
+                </div>
+
+                {/* Empty containers – PayPal renders the official inputs here */}
+                <div className="space-y-4">
+                  <div id="pp-name" className="border rounded-md p-3" />
+                  <div id="pp-number" className="border rounded-md p-3" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div id="pp-expiry" className="border rounded-md p-3" />
+                    <div id="pp-cvv" className="border rounded-md p-3" />
+                  </div>
+                </div>
+
+                <Button
+                  className="mt-6"
+                  disabled={submitting}
+                  onClick={() => {
+                    try { cardRef.current?.submit(); } catch (e) {
+                      console.error(e);
+                      toast({
+                        title: "Payment error",
+                        description: "Could not submit PayPal card form.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  {submitting ? "Processing…" : "Subscribe"}
+                </Button>
+              </div>
+            )}
           </div>
         </SidebarInset>
       </div>
-
-      {/* Card modal */}
-      {showCardModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-xl p-6 shadow-xl relative">
-            <button
-              className="absolute right-3 top-3 p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              onClick={() => {
-                setShowCardModal(false);
-                try { cardInstanceRef.current?.teardown?.(); } catch {}
-                setSelectedPlan(null);
-              }}
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-xl font-semibold mb-4">Enter card details</h3>
-
-            <div className="space-y-4">
-              <div id="pp-card-name" className="border rounded-md p-3" />
-              <div id="pp-card-number" className="border rounded-md p-3" />
-              <div className="grid grid-cols-2 gap-3">
-                <div id="pp-card-expiry" className="border rounded-md p-3" />
-                <div id="pp-card-cvv" className="border rounded-md p-3" />
-              </div>
-            </div>
-
-            <Button
-              className="mt-6 w-full"
-              disabled={loading}
-              onClick={() => {
-                try {
-                  cardInstanceRef.current?.submit();
-                } catch (e) {
-                  console.error(e);
-                  toast({
-                    title: "Payment error",
-                    description: "Could not submit card form.",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              {loading ? "Processing…" : "Subscribe"}
-            </Button>
-          </div>
-        </div>
-      )}
     </SidebarProvider>
   );
-};
-
-export default PlanSelection;
+}
