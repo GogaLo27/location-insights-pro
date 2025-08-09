@@ -258,6 +258,27 @@ const PlanManagement = () => {
                         >
                           {submittingPlan === p.plan_type ? "Redirecting…" : "Pay with PayPal / Card"}
                         </Button>
+                        <div id="paypal-button-container-P-297729854X929900CNCLXZ2I"></div>
+<script src="https://www.paypal.com/sdk/js?client-id=AeH6W11a3ex2t64XXmQnAFs4-OawYaWNe22tTm5y3GVjRKMxPfaKtLf-oMdA3UfSA0E5nzBMXjYVlAMj&vault=true&intent=subscription" data-sdk-integration-source="button-factory"></script>
+<script>
+  paypal.Buttons({
+      style: {
+          shape: 'rect',
+          color: 'gold',
+          layout: 'vertical',
+          label: 'subscribe'
+      },
+      createSubscription: function(data, actions) {
+        return actions.subscription.create({
+          /* Creates the subscription */
+          plan_id: 'P-297729854X929900CNCLXZ2I'
+        });
+      },
+      onApprove: function(data, actions) {
+        alert(data.subscriptionID); // You can add optional success message for the subscriber here
+      }
+  }).render('#paypal-button-container-P-297729854X929900CNCLXZ2I'); // Renders the PayPal button
+</script>
                       </div>
                     </CardContent>
                   </Card>
