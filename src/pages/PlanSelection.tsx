@@ -183,12 +183,10 @@ const PlanSelection = () => {
           Pay by card without a PayPal account.
         </div>
         <PayPalCardCheckout
-          clientId={paypalClientId}
           amount={plan.amount}
           currency="USD"
           reference={`plan-${plan.id}`}
           authToken={supabaseJwt}
-          // defaults call /functions/v1/paypal-create-order and /functions/v1/paypal-capture-order
         />
       </div>
     );

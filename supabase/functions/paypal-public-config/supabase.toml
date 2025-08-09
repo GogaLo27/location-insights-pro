@@ -1,0 +1,2 @@
+name = "paypal-public-config"
+verify_jwt = false
