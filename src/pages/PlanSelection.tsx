@@ -26,56 +26,60 @@ const PlanSelection = () => {
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  // PlanSelection.tsx — only showing the key handler; keep the rest of your component
-const handlePlanSelect = async (planType: string) => {
-  if (!user) return;
-  setSelectedPlan(planType);
+  const handlePlanSelect = async (planType: string) => {
+    if (!user) return;
+    setSelectedPlan(planType);
 
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const supabaseJwt = session?.access_token || "";
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const supabaseJwt = session?.access_token || "";
 
-    const res = await supabase.functions.invoke('paypal-create-subscription', {
-      body: {
-        plan_type: planType, // 'starter' | 'professional' | 'enterprise'
-        return_url: `${window.location.origin}/billing/success`,
-        cancel_url: `${window.location.origin}/billing/cancel`,
-      },
-      headers: { Authorization: `Bearer ${supabaseJwt}` },
-    });
+      const res = await supabase.functions.invoke("paypal-create-subscription", {
+        body: {
+          plan_type: planType, // 'starter' | 'professional' | 'enterprise'
+          return_url: `${window.location.origin}/billing/success`,
+          cancel_url: `${window.location.origin}/billing/cancel`,
+        },
+        headers: { Authorization: `Bearer ${supabaseJwt}` },
+      });
 
-    // supabase-js returns { data, error }; data can be a string
-    if (res.error) {
-      console.error("invoke error:", res.error);
-      throw new Error(res.error.message || "Edge function error");
+      if (res.error) {
+        console.error("invoke error:", res.error);
+        throw new Error(res.error.message || "Edge function error");
+      }
+
+      let payload: any = res.data;
+      if (typeof payload === "string") {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          /* noop */
+        }
+      }
+
+      if (!payload?.approval_url) {
+        console.error("Unexpected payload shape:", payload);
+        throw new Error("No approval_url returned");
+      }
+
+      if (payload.subscription_id) {
+        localStorage.setItem("pendingSubId", payload.subscription_id);
+      }
+
+      // Redirect to PayPal hosted checkout (official UI)
+      window.location.href = payload.approval_url;
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "Payment error",
+        description: e.message || "Failed to start subscription",
+        variant: "destructive",
+      });
+      setSelectedPlan(null);
     }
-
-    let payload: any = res.data;
-    if (typeof payload === "string") {
-      try { payload = JSON.parse(payload); } catch { /* leave as-is */ }
-    }
-
-    if (!payload?.approval_url) {
-      console.error("Unexpected payload shape:", payload);
-      throw new Error("No approval_url returned");
-    }
-
-    if (payload.subscription_id) {
-      localStorage.setItem("pendingSubId", payload.subscription_id);
-    }
-
-    // ✅ redirect to PayPal
-    window.location.href = payload.approval_url;
-  } catch (e: any) {
-    console.error(e);
-    toast({
-      title: "Payment error",
-      description: e.message || "Failed to start subscription",
-      variant: "destructive",
-    });
-    setSelectedPlan(null);
-  }
-};
+  };
 
   const plans = [
     {
@@ -121,17 +125,15 @@ const handlePlanSelect = async (planType: string) => {
         "Custom integrations",
         "Dedicated account manager",
       ],
-      locations: -1, // -1 means unlimited
+      locations: -1,
       reviews: -1,
     },
   ];
 
-  // If not authenticated and not loading, send to landing page
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
   }
 
-  // Show a spinner while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -172,9 +174,7 @@ const handlePlanSelect = async (planType: string) => {
                   key={plan.id}
                   className={`relative cursor-pointer transition-all hover:shadow-lg ${
                     plan.popular ? "border-primary shadow-lg scale-105" : ""
-                  } ${
-                    selectedPlan === plan.id ? "ring-2 ring-primary" : ""
-                  }`}
+                  } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
                 >
                   {plan.popular && (
                     <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">

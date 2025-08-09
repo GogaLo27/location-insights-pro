@@ -136,7 +136,7 @@ const PlanManagement = () => {
               <h1 className="text-xl font-semibold">Plan Management</h1>
             </div>
           </header>
-          
+
           <div className="flex-1 space-y-4 p-8 pt-6">
             <div className="mb-8">
               <h1 className="text-3xl font-bold mb-2">Manage Your Plan</h1>
@@ -191,8 +191,8 @@ const PlanManagement = () => {
                           </li>
                         ))}
                       </ul>
-                      <Button 
-                        className="w-full" 
+                      <Button
+                        className="w-full"
                         variant={plan.current ? "outline" : plan.popular ? "default" : "outline"}
                         disabled={plan.current}
                         onClick={() => handlePlanChange(plan.id)}

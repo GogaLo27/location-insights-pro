@@ -19,7 +19,6 @@ export default function BillingSuccess() {
     async function poll() {
       tries++;
 
-      // Prefer local id (our DB id). If not, try to find by provider id.
       let subRow: any = null;
       if (localId) {
         const { data } = await sb
@@ -40,12 +39,13 @@ export default function BillingSuccess() {
       if (subRow?.status === "active") {
         setStatus("Subscription active! Redirecting to dashboard…");
         localStorage.removeItem("pendingSubId");
-        setTimeout(() => { window.location.href = "/dashboard"; }, 1000);
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1000);
         return;
       }
 
-      // Every 3rd attempt, ask the server to sync from PayPal (fallback)
-      if ((tries % 3 === 0) && (localId || providerId)) {
+      if (tries % 3 === 0 && (localId || providerId)) {
         const { data: session } = await supabase.auth.getSession();
         const jwt = session.session?.access_token || "";
         await supabase.functions.invoke("paypal-sync-subscription", {
