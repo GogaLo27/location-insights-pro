@@ -1,121 +1,157 @@
-// /supabase/functions/paypal-webhook/index.ts
-// Verifies PayPal webhook via their Verify API, then updates your DB accordingly.
+// deno-lint-ignore-file no-explicit-any
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
 
-const PAYPAL_BASE = Deno.env.get("PAYPAL_BASE") || "https://api-m.paypal.com";
-const CLIENT_ID = Deno.env.get("PAYPAL_CLIENT_ID")!;
-const CLIENT_SECRET = Deno.env.get("PAYPAL_SECRET")!;
-const WEBHOOK_ID = Deno.env.get("PAYPAL_WEBHOOK_ID")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const PAYPAL_CLIENT_ID  = Deno.env.get("PAYPAL_CLIENT_ID")!;
+const PAYPAL_SECRET     = Deno.env.get("PAYPAL_SECRET")!;
+const PAYPAL_BASE       = Deno.env.get("PAYPAL_BASE_URL") || "https://api-m.sandbox.paypal.com";
+const PAYPAL_WEBHOOK_ID = Deno.env.get("PAYPAL_WEBHOOK_ID")!;
 
-function j(status: number, body: any) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+function requireEnv() {
+  const missing: string[] = [];
+  if (!PAYPAL_CLIENT_ID)  missing.push("PAYPAL_CLIENT_ID");
+  if (!PAYPAL_SECRET)     missing.push("PAYPAL_SECRET");
+  if (!PAYPAL_WEBHOOK_ID) missing.push("PAYPAL_WEBHOOK_ID");
+  if (!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (missing.length) throw new Error("Missing env: " + missing.join(", "));
 }
 
-async function getAccessToken(): Promise<string> {
-  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+async function getPaypalToken(): Promise<string> {
+  const r = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: "POST",
     headers: {
-      Authorization: "Basic " + btoa(`${CLIENT_ID}:${CLIENT_SECRET}`),
+      Authorization: "Basic " + btoa(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
   });
-  if (!res.ok) throw new Error(`OAuth failed: ${res.status}`);
-  const data = await res.json();
-  return data.access_token;
+  const t = await r.text();
+  if (!r.ok) throw new Error(`token ${r.status} ${t}`);
+  return JSON.parse(t).access_token as string;
 }
 
-async function insertEvent(event_type: string, subscription_id: string | null, raw: any) {
-  await fetch(`${SUPABASE_URL}/rest/v1/subscription_events`, {
+async function verifySignature(headers: Headers, payload: any): Promise<boolean> {
+  const token = await getPaypalToken();
+  const vr = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
     method: "POST",
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ event_type, subscription_id, raw }),
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      auth_algo:         headers.get("paypal-auth-algo"),
+      cert_url:          headers.get("paypal-cert-url"),
+      transmission_id:   headers.get("paypal-transmission-id"),
+      transmission_sig:  headers.get("paypal-transmission-sig"),
+      transmission_time: headers.get("paypal-transmission-time"),
+      webhook_id:        PAYPAL_WEBHOOK_ID,
+      webhook_event:     payload,
+    }),
   });
+  const json = await vr.json();
+  if (!vr.ok) throw new Error(`verify ${vr.status} ${JSON.stringify(json)}`);
+  return json.verification_status === "SUCCESS";
 }
 
-async function updateSubscriptionByProviderId(providerId: string, patch: any) {
-  await fetch(`${SUPABASE_URL}/rest/v1/subscriptions?provider_subscription_id=eq.${providerId}`, {
-    method: "PATCH",
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify(patch),
-  });
-}
-
-Deno.serve(async (req) => {
-  if (req.method !== "POST") return j(405, { error: "Method not allowed" });
-
-  const transmissionId = req.headers.get("paypal-transmission-id");
-  const transmissionTime = req.headers.get("paypal-transmission-time");
-  const certUrl = req.headers.get("paypal-cert-url");
-  const authAlgo = req.headers.get("paypal-auth-algo");
-  const transmissionSig = req.headers.get("paypal-transmission-sig");
-
-  let body: any = {};
-  try {
-    body = await req.json();
-  } catch {
-    return j(400, { error: "Invalid JSON" });
+function mapStatus(event: string, resourceStatus?: string) {
+  switch (event) {
+    case "BILLING.SUBSCRIPTION.ACTIVATED":
+      return "active";
+    case "BILLING.SUBSCRIPTION.SUSPENDED":
+      return "suspended";
+    case "BILLING.SUBSCRIPTION.CANCELLED":
+      return "canceled";
+    case "BILLING.SUBSCRIPTION.EXPIRED":
+      return "expired";
+    case "BILLING.SUBSCRIPTION.CREATED":
+      return resourceStatus?.toLowerCase() || "pending";
+    case "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
+    case "PAYMENT.SALE.DENIED":
+      return "past_due";
+    default:
+      return resourceStatus?.toLowerCase();
   }
+}
+
+serve(async (req) => {
+  if (req.method !== "POST") return new Response("ok", { status: 200 });
 
   try {
-    // Verify webhook
-    const token = await getAccessToken();
-    const verifyRes = await fetch(`${PAYPAL_BASE}/v1/notifications/verify-webhook-signature`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        auth_algo: authAlgo,
-        cert_url: certUrl,
-        transmission_id: transmissionId,
-        transmission_sig: transmissionSig,
-        transmission_time: transmissionTime,
-        webhook_id: WEBHOOK_ID,
-        webhook_event: body,
-      }),
-    });
-    const verifyData = await verifyRes.json();
-    if (!verifyRes.ok || (verifyData?.verification_status !== "SUCCESS" && verifyData?.verification_status !== "SUCCESSFUL" && verifyData?.verification_status !== "VERIFIED")) {
-      return j(400, { error: "webhook_verification_failed", details: verifyData });
+    requireEnv();
+
+    const body = await req.json().catch(() => ({}));
+    const eventType = body?.event_type as string;
+    const resource  = body?.resource || {};
+    const providerId = resource?.id as string | undefined;
+
+    console.log("[paypal-webhook] event:", eventType, "provider:", providerId);
+
+    // 1) Verify signature. If it fails, tell PayPal to retry (400) and log why.
+    try {
+      const ok = await verifySignature(req.headers, body);
+      if (!ok) {
+        console.error("[verify] status != SUCCESS");
+        return new Response("signature failed", { status: 400 });
+      }
+    } catch (e) {
+      console.error("[verify] error", e);
+      return new Response("signature error", { status: 400 });
     }
 
-    const eventType = body?.event_type || "";
-    const resource = body?.resource || {};
-    const providerId = resource?.id || resource?.billing_agreement_id || null;
+    // 2) We only proceed with a subscription id
+    if (!providerId) {
+      console.error("[webhook] missing resource.id");
+      return new Response("bad payload", { status: 400 });
+    }
 
-    // Record event
-    await insertEvent(eventType, null, body);
+    // 3) Find our row
+    const { data: sub, error: findErr } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("provider_subscription_id", providerId)
+      .maybeSingle();
 
-    // Update subscription row by provider id if we have one
-    if (providerId) {
-      if (eventType === "BILLING.SUBSCRIPTION.ACTIVATED") {
-        const nextEnd = resource?.billing_info?.next_billing_time || null;
-        await updateSubscriptionByProviderId(providerId, { status: "active", current_period_end: nextEnd });
-      } else if (eventType === "BILLING.SUBSCRIPTION.CANCELLED") {
-        await updateSubscriptionByProviderId(providerId, { status: "canceled" });
-      } else if (eventType === "BILLING.SUBSCRIPTION.SUSPENDED") {
-        await updateSubscriptionByProviderId(providerId, { status: "paused" });
-      } else if (eventType === "BILLING.SUBSCRIPTION.EXPIRED") {
-        await updateSubscriptionByProviderId(providerId, { status: "expired" });
-      } else if (eventType === "BILLING.SUBSCRIPTION.UPDATED") {
-        const nextEnd = resource?.billing_info?.next_billing_time || null;
-        await updateSubscriptionByProviderId(providerId, { current_period_end: nextEnd });
+    if (findErr) {
+      console.error("[db] select error", findErr);
+      return new Response("db error", { status: 500 });
+    }
+    if (!sub) {
+      console.error("[db] no local subscription for", providerId);
+      return new Response("not found", { status: 404 });
+    }
+
+    // 4) Update status
+    const newStatus = mapStatus(eventType, resource?.status);
+    if (newStatus) {
+      const { error: updErr } = await supabase
+        .from("subscriptions")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", sub.id);
+      if (updErr) {
+        console.error("[db] update error", updErr);
+        return new Response("db update error", { status: 500 });
+      }
+
+      if (newStatus === "active") {
+        const { error: planErr } = await supabase.from("user_plans").upsert({
+          user_id: sub.user_id,
+          plan_type: sub.plan_type,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+        if (planErr) {
+          console.error("[db] user_plans upsert error", planErr);
+          // but still return 200; plan sync can be retried on next event
+        }
       }
     }
 
-    return j(200, { ok: true });
-  } catch (e: any) {
-    return j(500, { error: "server_error", message: e?.message || String(e) });
+    // 5) Success → PayPal will mark “Sent”
+    return new Response("ok", { status: 200 });
+  } catch (e) {
+    console.error("[webhook] fatal", e);
+    return new Response("error", { status: 500 });
   }
 });
