@@ -1,168 +1,197 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import {
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarInset,
+} from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { supabase } from "@/integrations/supabase/client";
+import { CheckCircle, MapPin, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Crown, Zap, Building } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-interface UserPlan {
+type BillingPlanRow = {
   id: string;
-  plan_type: string;
+  plan_type: "starter" | "professional" | "enterprise";
+  provider: "paypal";
+  provider_plan_id: string; // PayPal plan id "P-XXXX"
+  price_cents: number;
+  currency: string; // "USD"
+  interval: "month";
+  metadata: Record<string, unknown>;
   created_at: string;
-}
+  updated_at: string;
+};
 
-interface BillingPlan {
-  plan_type: string;
-  provider_plan_id: string;
-}
+const currencyFmt = (amountCents: number, currency: string) =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
+    (amountCents || 0) / 100
+  );
 
-declare global {
-  interface Window {
-    paypal: any;
-  }
-}
-
-const PlanManagement = () => {
+export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
+  const [plans, setPlans] = useState<BillingPlanRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
-  const paypalRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchCurrentPlan();
-      fetchBillingPlans();
-    }
-  }, [user]);
+    let mounted = true;
+    async function load() {
+      if (!user) return;
+      setLoading(true);
+      try {
+        // fetch PayPal plans from DB
+        const { data, error } = await supabase
+          .from("billing_plans")
+          .select(
+            "id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at"
+          )
+          .eq("provider", "paypal")
+          .order("price_cents", { ascending: true });
 
-  useEffect(() => {
-    if (billingPlans.length > 0) {
-      loadPayPalSDK();
-    }
-  }, [billingPlans]);
-
-  const fetchCurrentPlan = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("user_plans")
-        .select("*")
-        .eq("user_id", user?.id)
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      setCurrentPlan(data);
-    } catch (error) {
-      console.error("Error fetching plan:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchBillingPlans = async () => {
-    const { data, error } = await supabase
-      .from("billing_plans")
-      .select("plan_type, provider_plan_id")
-      .eq("provider", "paypal");
-
-    if (error) {
-      console.error("Error fetching billing plans:", error);
-      return;
-    }
-    setBillingPlans(data || []);
-  };
-
-  const loadPayPalSDK = async () => {
-    if (document.getElementById("paypal-sdk")) {
-      renderPayPalButtons();
-      return;
-    }
-
-    // Fetch clientId from Supabase config table (adjust table/key as per your setup)
-    const { data: configData, error } = await supabase
-      .from("config")
-      .select("value")
-      .eq("key", "PAYPAL_CLIENT_ID")
-      .single();
-
-    if (error) {
-      console.error("Error fetching PayPal client ID:", error);
-      return;
-    }
-
-    const clientId = configData?.value;
-    if (!clientId) {
-      console.error("Missing PayPal Client ID");
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "paypal-sdk";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription&disable-funding=paypal,venmo`;
-    script.async = true;
-    script.onload = renderPayPalButtons;
-    document.body.appendChild(script);
-  };
-
-  const renderPayPalButtons = () => {
-    billingPlans.forEach((bp) => {
-      if (paypalRefs.current[bp.plan_type] && window.paypal) {
-        window.paypal
-          .Buttons({
-            style: {
-              shape: "rect",
-              color: "gold",
-              layout: "vertical",
-              label: "subscribe",
-            },
-            createSubscription: (data: any, actions: any) => {
-              return actions.subscription.create({
-                plan_id: bp.provider_plan_id,
-              });
-            },
-            onApprove: (data: any) => {
-              toast({
-                title: "Payment Approved",
-                description: `Subscription ID: ${data.subscriptionID}`,
-              });
-              window.location.href = `/billing-success?subscription_id=${data.subscriptionID}`;
-            },
-            onError: (err: any) => {
-              console.error("PayPal Error:", err);
-              toast({
-                title: "Payment Error",
-                description: "Something went wrong with PayPal checkout.",
-                variant: "destructive",
-              });
-            },
-          })
-          .render(paypalRefs.current[bp.plan_type]!);
+        if (error) throw error;
+        if (!mounted) return;
+        setPlans(data || []);
+      } catch (e: any) {
+        console.error(e);
+        toast({
+          title: "Failed to load plans",
+          description: e.message || "Could not fetch billing plans.",
+          variant: "destructive",
+        });
+      } finally {
+        if (mounted) setLoading(false);
       }
-    });
-  };
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [user, toast]);
 
-  const plans = [
-    { id: "starter", name: "Starter", price: "$29", description: "Perfect for small businesses", icon: Zap, features: ["Up to 3 locations", "Basic analytics", "Review monitoring", "Email support"], current: currentPlan?.plan_type === "starter" },
-    { id: "professional", name: "Professional", price: "$79", description: "Ideal for growing businesses", icon: Crown, features: ["Up to 10 locations", "Advanced analytics", "AI review analysis", "Priority support", "Custom reports"], current: currentPlan?.plan_type === "professional", popular: true },
-    { id: "enterprise", name: "Enterprise", price: "$199", description: "For large organizations", icon: Building, features: ["Unlimited locations", "Full analytics suite", "AI-powered insights", "24/7 support", "Custom integrations", "Dedicated account manager"], current: currentPlan?.plan_type === "enterprise" },
-  ];
+  // You can keep/adjust these feature bullets per plan_type
+  const featureMap: Record<
+    BillingPlanRow["plan_type"],
+    { locations: number; reviews: number; features: string[]; popular?: boolean }
+  > = useMemo(
+    () => ({
+      starter: {
+        locations: 3,
+        reviews: 100,
+        features: [
+          "Up to 3 locations",
+          "Basic analytics",
+          "Review monitoring",
+          "Email support",
+        ],
+      },
+      professional: {
+        locations: 10,
+        reviews: 500,
+        features: [
+          "Up to 10 locations",
+          "Advanced analytics",
+          "AI review analysis",
+          "Priority support",
+          "Custom reports",
+        ],
+        popular: true,
+      },
+      enterprise: {
+        locations: -1,
+        reviews: -1,
+        features: [
+          "Unlimited locations",
+          "Full analytics suite",
+          "AI-powered insights",
+          "24/7 support",
+          "Custom integrations",
+          "Dedicated account manager",
+        ],
+      },
+    }),
+    []
+  );
 
-  if (!user && !authLoading) return <Navigate to="/" replace />;
+  if (!user && !authLoading) {
+    return <Navigate to="/" replace />;
+  }
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading plans...</p>
+          <p className="text-lg text-muted-foreground">Loading…</p>
         </div>
       </div>
     );
   }
+
+  const handleSubscribe = async (planType: BillingPlanRow["plan_type"]) => {
+    try {
+      setSubmittingPlan(planType);
+
+      // Get Supabase auth JWT
+      const { data: authData } = await supabase.auth.getSession();
+      const jwt = authData.session?.access_token || "";
+
+      // Use your existing edge function that returns approval_url
+      const res = await supabase.functions.invoke("paypal-create-subscription", {
+        body: {
+          plan_type: planType, // keep existing contract; backend should map to provider_plan_id
+          return_url: `${window.location.origin}/billing/success`,
+          cancel_url: `${window.location.origin}/billing/cancel`,
+        },
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+
+      if (res.error) {
+        throw new Error(res.error.message || "Edge function error");
+      }
+
+      let payload: any = res.data;
+      if (typeof payload === "string") {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!payload?.approval_url) {
+        console.error("Unexpected payload shape:", payload);
+        throw new Error("No approval_url returned");
+      }
+
+      if (payload.subscription_id) {
+        localStorage.setItem("pendingSubId", payload.subscription_id);
+      }
+
+      // Redirect to PayPal. If Guest Checkout / ACDC is enabled,
+      // buyer can pay by card without logging in (per PayPal docs).
+      window.location.href = payload.approval_url;
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "Payment error",
+        description: e.message || "Failed to start subscription",
+        variant: "destructive",
+      });
+      setSubmittingPlan(null);
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -171,60 +200,96 @@ const PlanManagement = () => {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-4 ml-4">
-              <h1 className="text-xl font-semibold">Plan Management</h1>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-lg font-semibold">Choose Your Plan</h1>
             </div>
           </header>
 
           <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Manage Your Plan</h1>
-              <p className="text-muted-foreground">Upgrade or downgrade your plan to fit your business needs</p>
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold mb-4">
+                Welcome to Location Insights Pro!
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Choose the perfect plan for your business needs. You can
+                upgrade or downgrade at any time.
+              </p>
             </div>
 
-            {currentPlan && (
-              <Card className="mb-6 border-accent">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Badge variant="default" className="bg-accent text-white">Current Plan</Badge>
-                    {currentPlan.plan_type.charAt(0).toUpperCase() + currentPlan.plan_type.slice(1)}
-                  </CardTitle>
-                  <CardDescription>
-                    Active since {new Date(currentPlan.created_at).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => {
-                const IconComponent = plan.icon;
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {plans.map((p) => {
+                const f = featureMap[p.plan_type];
+                const price = currencyFmt(p.price_cents, p.currency);
                 return (
-                  <Card key={plan.id} className={`relative ${plan.popular ? "border-accent shadow-lg" : ""} ${plan.current ? "bg-accent/5" : ""}`}>
-                    {plan.popular && (
-                      <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-accent text-white">Most Popular</Badge>
+                  <Card
+                    key={p.id}
+                    className={`relative transition-all hover:shadow-lg ${
+                      f?.popular ? "border-primary shadow-lg scale-105" : ""
+                    } ${submittingPlan === p.plan_type ? "ring-2 ring-primary" : ""}`}
+                  >
+                    {f?.popular && (
+                      <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
+                        Most Popular
+                      </Badge>
                     )}
                     <CardHeader className="text-center">
-                      <div className="mx-auto mb-4 p-3 bg-accent/10 rounded-full w-fit">
-                        <IconComponent className="h-6 w-6 text-accent" />
-                      </div>
-                      <CardTitle className="flex items-center justify-center gap-2">
-                        {plan.name}
-                        {plan.current && <Badge variant="outline">Current</Badge>}
+                      <CardTitle className="text-2xl capitalize">
+                        {p.plan_type}
                       </CardTitle>
-                      <div className="text-3xl font-bold text-accent">{plan.price}<span className="text-sm text-muted-foreground">/month</span></div>
-                      <CardDescription>{plan.description}</CardDescription>
+                      <div className="text-3xl font-bold">
+                        {price}
+                        <span className="text-base font-normal text-muted-foreground">
+                          /{p.interval}
+                        </span>
+                      </div>
+                      <CardDescription>
+                        {p.plan_type === "starter"
+                          ? "Perfect for small businesses"
+                          : p.plan_type === "professional"
+                          ? "Ideal for growing businesses"
+                          : "For large organizations"}
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2 mb-6">
-                        {plan.features.map((feature) => (
-                          <li key={feature} className="flex items-center">
-                            <Check className="h-4 w-4 text-accent mr-2 flex-shrink-0" />
+
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-4 h-4 text-primary" />
+                          <span className="font-medium">
+                            {f.locations === -1
+                              ? "Unlimited locations"
+                              : `Up to ${f.locations} locations`}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Star className="w-4 h-4 text-primary" />
+                          <span className="font-medium">
+                            {f.reviews === -1
+                              ? "Unlimited reviews"
+                              : `Up to ${f.reviews} reviews`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {f.features.map((feature, idx) => (
+                          <div key={idx} className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-primary" />
                             <span className="text-sm">{feature}</span>
-                          </li>
+                          </div>
                         ))}
-                      </ul>
-                      <div ref={(el) => (paypalRefs.current[plan.id] = el)} />
+                      </div>
+
+                      {/* PayPal/Card button */}
+                      <Button
+                        className="w-full"
+                        onClick={() => handleSubscribe(p.plan_type)}
+                        disabled={submittingPlan === p.plan_type}
+                      >
+                        {submittingPlan === p.plan_type
+                          ? "Redirecting…"
+                          : "Pay with PayPal / Card"}
+                      </Button>
                     </CardContent>
                   </Card>
                 );
@@ -235,6 +300,4 @@ const PlanManagement = () => {
       </div>
     </SidebarProvider>
   );
-};
-
-export default PlanManagement;
+}

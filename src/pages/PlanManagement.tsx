@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,103 +12,146 @@ import { Check, Crown, Zap, Building } from "lucide-react";
 
 interface UserPlan {
   id: string;
-  plan_type: string;
+  plan_type: "starter" | "professional" | "enterprise";
   created_at: string;
 }
+
+type BillingPlanRow = {
+  id: string;
+  plan_type: "starter" | "professional" | "enterprise";
+  provider: "paypal";
+  provider_plan_id: string;
+  price_cents: number;
+  currency: string;
+  interval: "month";
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+const icons: Record<string, any> = {
+  starter: Zap,
+  professional: Crown,
+  enterprise: Building,
+};
+
+const currencyFmt = (amountCents: number, currency: string) =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
+    (amountCents || 0) / 100
+  );
 
 const PlanManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState<BillingPlanRow[]>([]);
+  const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchCurrentPlan();
+      fetchPlans();
     }
   }, [user]);
 
-  const fetchCurrentPlan = async () => {
+  const fetchPlans = async () => {
     try {
       const { data, error } = await supabase
-        .from('user_plans')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
+        .from("billing_plans")
+        .select("id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at")
+        .eq("provider", "paypal")
+        .order("price_cents", { ascending: true });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      setCurrentPlan(data);
+      if (error) throw error;
+      setPlans(data || []);
     } catch (error) {
-      console.error('Error fetching plan:', error);
+      console.error("Error fetching billing_plans:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load plans.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePlanChange = async (planType: string) => {
-    if (!user) return;
-
+  const fetchCurrentPlan = async () => {
     try {
-      const { error } = await supabase
-        .from('user_plans')
-        .upsert({
-          user_id: user.id,
-          plan_type: planType,
-        }, {
-          onConflict: 'user_id'
-        });
+      const { data, error } = await supabase
+        .from("user_plans")
+        .select("id,plan_type,created_at")
+        .eq("user_id", user?.id)
+        .single();
 
-      if (error) throw error;
-
-      toast({
-        title: "Plan Updated",
-        description: `You've successfully switched to the ${planType} plan.`,
-      });
-
-      fetchCurrentPlan();
+      if (error && (error as any).code !== "PGRST116") {
+        throw error;
+      }
+      setCurrentPlan(data as any);
     } catch (error) {
-      console.error('Error updating plan:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update plan.",
-        variant: "destructive",
-      });
+      console.error("Error fetching plan:", error);
     }
   };
 
-  const plans = [
-    {
-      id: 'starter',
-      name: 'Starter',
-      price: '$29',
-      description: 'Perfect for small businesses',
-      icon: Zap,
-      features: ['Up to 3 locations', 'Basic analytics', 'Review monitoring', 'Email support'],
-      current: currentPlan?.plan_type === 'starter'
-    },
-    {
-      id: 'professional',
-      name: 'Professional',
-      price: '$79',
-      description: 'Ideal for growing businesses',
-      icon: Crown,
-      features: ['Up to 10 locations', 'Advanced analytics', 'AI review analysis', 'Priority support', 'Custom reports'],
-      current: currentPlan?.plan_type === 'professional',
-      popular: true
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: '$199',
-      description: 'For large organizations',
-      icon: Building,
-      features: ['Unlimited locations', 'Full analytics suite', 'AI-powered insights', '24/7 support', 'Custom integrations', 'Dedicated account manager'],
-      current: currentPlan?.plan_type === 'enterprise'
+  const handleSubscribe = async (planType: BillingPlanRow["plan_type"]) => {
+    if (!user) return;
+    try {
+      setSubmittingPlan(planType);
+      const { data: authData } = await supabase.auth.getSession();
+      const jwt = authData.session?.access_token || "";
+
+      const res = await supabase.functions.invoke("paypal-create-subscription", {
+        body: {
+          plan_type: planType,
+          return_url: `${window.location.origin}/billing/success`,
+          cancel_url: `${window.location.origin}/billing/cancel`,
+        },
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+
+      if (res.error) throw new Error(res.error.message || "Edge function error");
+
+      let payload: any = res.data;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+
+      if (!payload?.approval_url) throw new Error("No approval_url returned");
+
+      if (payload.subscription_id) {
+        localStorage.setItem("pendingSubId", payload.subscription_id);
+      }
+
+      window.location.href = payload.approval_url;
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "Payment error",
+        description: e.message || "Failed to start subscription",
+        variant: "destructive",
+      });
+      setSubmittingPlan(null);
     }
-  ];
+  };
+
+  const featureMap: Record<
+    BillingPlanRow["plan_type"],
+    { features: string[] }
+  > = useMemo(
+    () => ({
+      starter: {
+        features: ["Up to 3 locations", "Basic analytics", "Review monitoring", "Email support"],
+      },
+      professional: {
+        features: ["Up to 10 locations", "Advanced analytics", "AI review analysis", "Priority support", "Custom reports"],
+      },
+      enterprise: {
+        features: ["Unlimited locations", "Full analytics suite", "AI-powered insights", "24/7 support", "Custom integrations", "Dedicated account manager"],
+      },
+    }),
+    []
+  );
 
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -162,11 +205,15 @@ const PlanManagement = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((plan) => {
-                const IconComponent = plan.icon;
+              {plans.map((p) => {
+                const IconComponent = icons[p.plan_type] || Zap;
+                const bullets = featureMap[p.plan_type]?.features || [];
+                const price = currencyFmt(p.price_cents, p.currency);
+                const isCurrent = currentPlan?.plan_type === p.plan_type;
+
                 return (
-                  <Card key={plan.id} className={`relative ${plan.popular ? 'border-accent shadow-lg' : ''} ${plan.current ? 'bg-accent/5' : ''}`}>
-                    {plan.popular && (
+                  <Card key={p.id} className={`relative ${isCurrent ? "bg-accent/5" : ""}`}>
+                    {p.plan_type === "professional" && (
                       <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-accent text-white">
                         Most Popular
                       </Badge>
@@ -175,30 +222,43 @@ const PlanManagement = () => {
                       <div className="mx-auto mb-4 p-3 bg-accent/10 rounded-full w-fit">
                         <IconComponent className="h-6 w-6 text-accent" />
                       </div>
-                      <CardTitle className="flex items-center justify-center gap-2">
-                        {plan.name}
-                        {plan.current && <Badge variant="outline">Current</Badge>}
+                      <CardTitle className="flex items-center justify-center gap-2 capitalize">
+                        {p.plan_type}
+                        {isCurrent && <Badge variant="outline">Current</Badge>}
                       </CardTitle>
-                      <div className="text-3xl font-bold text-accent">{plan.price}<span className="text-sm text-muted-foreground">/month</span></div>
-                      <CardDescription>{plan.description}</CardDescription>
+                      <div className="text-3xl font-bold text-accent">
+                        {price}
+                        <span className="text-sm text-muted-foreground">/{p.interval}</span>
+                      </div>
+                      <CardDescription>
+                        {p.plan_type === "starter"
+                          ? "Perfect for small businesses"
+                          : p.plan_type === "professional"
+                          ? "Ideal for growing businesses"
+                          : "For large organizations"}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2 mb-6">
-                        {plan.features.map((feature) => (
+                        {bullets.map((feature) => (
                           <li key={feature} className="flex items-center">
                             <Check className="h-4 w-4 text-accent mr-2 flex-shrink-0" />
                             <span className="text-sm">{feature}</span>
                           </li>
                         ))}
                       </ul>
-                      <Button
-                        className="w-full"
-                        variant={plan.current ? "outline" : plan.popular ? "default" : "outline"}
-                        disabled={plan.current}
-                        onClick={() => handlePlanChange(plan.id)}
-                      >
-                        {plan.current ? 'Current Plan' : `Switch to ${plan.name}`}
-                      </Button>
+
+                      <div className="space-y-2">
+                        {/* PayPal/Card button per plan */}
+                        <Button
+                          className="w-full"
+                          variant={isCurrent ? "outline" : "default"}
+                          disabled={submittingPlan === p.plan_type}
+                          onClick={() => handleSubscribe(p.plan_type)}
+                        >
+                          {submittingPlan === p.plan_type ? "Redirecting…" : "Pay with PayPal / Card"}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 );
