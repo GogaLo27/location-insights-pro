@@ -18,6 +18,7 @@ import {
 import { AppSidebar } from '@/components/AppSidebar';
 import { MapPin, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePlan } from '@/hooks/usePlan';
 
 const LocationSelection = () => {
   const { user } = useAuth();
@@ -30,6 +31,8 @@ const LocationSelection = () => {
     loading,
     refreshLocations,
   } = useLocationContext();
+  const { plan } = usePlan();
+  const allowedLocations = plan?.plan_type === 'starter' ? 3 : plan?.plan_type === 'professional' ? 10 : plan?.plan_type === 'enterprise' ? Infinity : 1;
 
   // Load locations if none are loaded
   useEffect(() => {
@@ -82,6 +85,9 @@ const LocationSelection = () => {
                 Please select which Google Business location you want to use as
                 your default. You can change this later from the location
                 selector.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Locations: {locations.length} of {allowedLocations === Infinity ? 'unlimited' : allowedLocations} allowed
               </p>
             </div>
             {loading ? (

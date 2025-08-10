@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { useLocation } from "@/contexts/LocationContext";
 import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import ReplyDialog from "@/components/ReplyDialog";
+import LocationSelector from "@/components/LocationSelector";
 
 interface Review {
   id: string;
@@ -46,6 +47,17 @@ const Reviews = () => {
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   
+  const userKey = user?.id || 'anon';
+  const locKey = (() => {
+    const sl: any = selectedLocation;
+    if (!sl) return 'none';
+    const direct = sl?.id || sl?.location_id;
+    if (direct) return String(direct);
+    const gp: string | undefined = sl?.google_place_id;
+    const tail = gp ? gp.split('/').pop() : '';
+    return tail || 'none';
+  })();
+  
   const {
     isAnalyzing,
     progress,
@@ -54,7 +66,7 @@ const Reviews = () => {
     startProgress,
     updateProgress,
     finishProgress
-  } = useAnalysisProgress(`analysis_${user?.id || 'anon'}_${resolveLocationId() || 'none'}`);
+  } = useAnalysisProgress(`analysis_${userKey}_${locKey}`);
 
   const {
     isAnalyzing: isFetching,
@@ -64,7 +76,7 @@ const Reviews = () => {
     startProgress: startFetch,
     updateProgress: updateFetch,
     finishProgress: finishFetch
-  } = useAnalysisProgress(`fetch_${user?.id || 'anon'}_${resolveLocationId() || 'none'}`);
+  } = useAnalysisProgress(`fetch_${userKey}_${locKey}`);
 
   useEffect(() => {
     if (user && selectedLocation) {
@@ -166,8 +178,9 @@ const Reviews = () => {
               ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
             })));
           }
-          }
-          finishFetch();
+        }
+      }
+
     } catch (error) {
       console.error("Error fetching reviews:", error);
       if (forceRefresh) {
@@ -188,37 +201,50 @@ const Reviews = () => {
   const saveReviewsToDatabase = async (googleReviews: any[], locationId: string, onProgress?: (processed: number, total: number) => void) => {
     if (!user) return;
 
-    let processed = 0;
     const total = googleReviews.length;
+    onProgress?.(0, total);
+
+    // Fetch existing reviews to avoid overwriting AI analysis
+    const { data: existingRows, error: existingErr } = await supabase
+      .from('saved_reviews')
+      .select('google_review_id')
+      .eq('user_id', user.id)
+      .eq('location_id', locationId);
+
+    if (existingErr) {
+      console.error('Error fetching existing reviews:', existingErr);
+    }
+
+    const existingIds = new Set((existingRows || []).map((r: any) => r.google_review_id));
+
+    const newRecords: any[] = [];
+    let processed = 0;
 
     for (const review of googleReviews) {
-      try {
-        // Insert-only for existing reviews to preserve prior AI analysis
-        const { error: upsertError } = await supabase
-          .from('saved_reviews')
-          .upsert({
-            user_id: user.id,
-            google_review_id: review.google_review_id,
-            location_id: locationId,
-            author_name: review.author_name,
-            rating: review.rating,
-            text: review.text,
-            review_date: review.review_date,
-            reply_text: review.reply_text,
-            reply_date: review.reply_date,
-          }, {
-            onConflict: 'user_id,google_review_id',
-            ignoreDuplicates: true
-          });
-        
-        if (upsertError) {
-          console.error('Upsert error for review:', review.google_review_id, upsertError);
-        }
-      } catch (error) {
-        console.error('Error saving review:', error);
-      } finally {
-        processed += 1;
-        onProgress?.(processed, total);
+      processed += 1;
+      onProgress?.(processed, total);
+      if (existingIds.has(review.google_review_id)) continue; // preserve existing rows and AI fields
+
+      newRecords.push({
+        user_id: user.id,
+        google_review_id: review.google_review_id,
+        location_id: locationId,
+        author_name: review.author_name,
+        rating: review.rating,
+        text: review.text,
+        review_date: review.review_date,
+        reply_text: review.reply_text,
+        reply_date: review.reply_date,
+      });
+    }
+
+    // Batch insert new reviews (if any)
+    const chunkSize = 100;
+    for (let i = 0; i < newRecords.length; i += chunkSize) {
+      const chunk = newRecords.slice(i, i + chunkSize);
+      const { error } = await supabase.from('saved_reviews').insert(chunk);
+      if (error) {
+        console.error('Insert error for chunk:', error);
       }
     }
   };
@@ -374,6 +400,7 @@ const Reviews = () => {
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Reviews</h1>
+              <LocationSelector />
             </div>
             <div className="flex items-center space-x-4 ml-auto">
               <Button 

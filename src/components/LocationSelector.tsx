@@ -8,6 +8,7 @@ import {
 import { MapPin, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePlan } from "@/hooks/usePlan";
 
 interface Location {
   id: string;
