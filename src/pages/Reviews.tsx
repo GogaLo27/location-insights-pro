@@ -46,15 +46,25 @@ const Reviews = () => {
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   
-  const { 
-    isAnalyzing, 
-    progress, 
-    total, 
-    completed, 
-    startProgress, 
-    updateProgress, 
-    finishProgress 
-  } = useAnalysisProgress();
+  const {
+    isAnalyzing,
+    progress,
+    total,
+    completed,
+    startProgress,
+    updateProgress,
+    finishProgress
+  } = useAnalysisProgress(`analysis_${user?.id || 'anon'}_${resolveLocationId() || 'none'}`);
+
+  const {
+    isAnalyzing: isFetching,
+    progress: fetchProgressValue,
+    total: fetchTotal,
+    completed: fetchCompleted,
+    startProgress: startFetch,
+    updateProgress: updateFetch,
+    finishProgress: finishFetch
+  } = useAnalysisProgress(`fetch_${user?.id || 'anon'}_${resolveLocationId() || 'none'}`);
 
   useEffect(() => {
     if (user && selectedLocation) {
@@ -93,7 +103,10 @@ const Reviews = () => {
     const locationId = resolveLocationId();
     if (!locationId) return;
 
-    if (forceRefresh) setLoading(true);
+    if (forceRefresh) {
+      setLoading(true);
+      startFetch();
+    }
     
     try {
       // First, quickly load saved reviews from database for instant display
@@ -136,8 +149,9 @@ const Reviews = () => {
             location_id: locationId
           }));
 
-          // Merge with saved reviews and save new ones
-          await saveReviewsToDatabase(googleReviews, locationId);
+          await saveReviewsToDatabase(googleReviews, locationId, (processed, total) => {
+            updateFetch(processed, total);
+          });
 
           // Get updated reviews from database
           const { data: updatedReviews } = await supabase
@@ -152,8 +166,8 @@ const Reviews = () => {
               ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
             })));
           }
-        }
-      }
+          }
+          finishFetch();
     } catch (error) {
       console.error("Error fetching reviews:", error);
       if (forceRefresh) {
@@ -164,16 +178,22 @@ const Reviews = () => {
         });
       }
     } finally {
-      if (forceRefresh) setLoading(false);
+      if (forceRefresh) {
+        setLoading(false);
+        finishFetch();
+      }
     }
   };
 
-  const saveReviewsToDatabase = async (googleReviews: any[], locationId: string) => {
+  const saveReviewsToDatabase = async (googleReviews: any[], locationId: string, onProgress?: (processed: number, total: number) => void) => {
     if (!user) return;
+
+    let processed = 0;
+    const total = googleReviews.length;
 
     for (const review of googleReviews) {
       try {
-        // Use upsert with conflict resolution - update existing or insert new
+        // Insert-only for existing reviews to preserve prior AI analysis
         const { error: upsertError } = await supabase
           .from('saved_reviews')
           .upsert({
@@ -186,14 +206,9 @@ const Reviews = () => {
             review_date: review.review_date,
             reply_text: review.reply_text,
             reply_date: review.reply_date,
-            ai_sentiment: review.ai_sentiment,
-            ai_tags: review.ai_tags,
-            ai_issues: review.ai_issues,
-            ai_suggestions: review.ai_suggestions,
-            ai_analyzed_at: review.ai_sentiment ? new Date().toISOString() : null,
           }, {
             onConflict: 'user_id,google_review_id',
-            ignoreDuplicates: false
+            ignoreDuplicates: true
           });
         
         if (upsertError) {
@@ -201,6 +216,9 @@ const Reviews = () => {
         }
       } catch (error) {
         console.error('Error saving review:', error);
+      } finally {
+        processed += 1;
+        onProgress?.(processed, total);
       }
     }
   };
@@ -333,7 +351,7 @@ const Reviews = () => {
     return <Navigate to="/" replace />;
   }
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -371,7 +389,7 @@ const Reviews = () => {
                 )}
                 {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
               </Button>
-              <Button onClick={() => fetchReviews(true)} size="sm" disabled={isAnalyzing}>
+              <Button onClick={() => fetchReviews(true)} size="sm" disabled={isAnalyzing || isFetching}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
@@ -379,8 +397,26 @@ const Reviews = () => {
           </header>
           
           <div className="flex-1 space-y-6 p-8 pt-6">
+            {/* Fetch Progress Bar */}
+            {(isFetching || (fetchProgressValue > 0 && fetchProgressValue < 100)) && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Refreshing Reviews</span>
+                      <span>{Math.round(fetchProgressValue)}%</span>
+                    </div>
+                    <Progress value={fetchProgressValue} className="w-full" />
+                    <p className="text-xs text-muted-foreground">
+                      {isFetching ? `Fetched ${fetchCompleted} of ${fetchTotal}…` : 'Refresh complete!'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Analysis Progress Bar */}
-            {(isAnalyzing || progress > 0) && (
+            {(isAnalyzing || (progress > 0 && progress < 100)) && (
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-2">

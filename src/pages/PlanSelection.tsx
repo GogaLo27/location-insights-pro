@@ -52,7 +52,7 @@ export default function PlanSelection() {
       setLoading(true);
       try {
         // fetch PayPal plans from DB
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("billing_plans")
           .select(
             "id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at"
@@ -62,7 +62,7 @@ export default function PlanSelection() {
 
         if (error) throw error;
         if (!mounted) return;
-        setPlans(data || []);
+        setPlans((data as any) || []);
       } catch (e: any) {
         console.error(e);
         toast({

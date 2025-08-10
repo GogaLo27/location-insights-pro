@@ -2,6 +2,8 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { usePlan } from "@/hooks/usePlan";
 import {
   Sidebar,
   SidebarContent,
@@ -37,6 +39,7 @@ const navigationItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const { user, signOut } = useAuth();
+  const { plan } = usePlan();
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
@@ -95,13 +98,19 @@ export function AppSidebar() {
       <SidebarFooter className="border-t">
         <div className="p-4 space-y-2">
           {!collapsed && (
-            <div className="space-y-1">
-              <Badge variant="secondary" className="capitalize w-full justify-center">
-                Free Plan
-              </Badge>
-              <p className="text-xs text-muted-foreground truncate">
-                {user?.email}
-              </p>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={(user as any)?.user_metadata?.picture || (user as any)?.user_metadata?.avatar_url || undefined} alt={user?.email || "User"} />
+                <AvatarFallback>{(user?.email || "U").substring(0,1).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <Badge variant="secondary" className="capitalize">
+                  {(plan?.plan_type || "free").replace(/_/g, " ")}
+                </Badge>
+                <p className="text-xs text-muted-foreground truncate">
+                  {user?.email}
+                </p>
+              </div>
             </div>
           )}
           <Button 

@@ -57,14 +57,14 @@ const PlanManagement = () => {
 
   const fetchPlans = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("billing_plans")
         .select("id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at")
         .eq("provider", "paypal")
         .order("price_cents", { ascending: true });
 
       if (error) throw error;
-      setPlans(data || []);
+      setPlans((data as any) || []);
     } catch (error) {
       console.error("Error fetching billing_plans:", error);
       toast({
