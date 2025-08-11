@@ -1,23 +1,6 @@
+// /supabase/functions/generate-ai-reply/index.ts
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-// SAFE env read + diagnostics (masked)
-const rawKey = Deno.env.get('OPENAI_API_KEY');
-const openAIApiKey = rawKey.trim();
-
-function keyDebug() {
-  return {
-    present: !!rawKey,                      // was anything set at all?
-    presentAfterTrim: !!openAIApiKey,       // still present after trim?
-    length: rawKey.length,                  // raw length (including any newline)
-    lengthAfterTrim: openAIApiKey.length,   // length after trim
-    startsWith: openAIApiKey.slice(0, 7),   // "sk-...." (masked)
-    endsWith: openAIApiKey.slice(-4),       // last 4 chars (masked)
-    leadingWhitespace: /^\s+/.test(rawKey),
-    trailingWhitespace: /\s+$/.test(rawKey),
-    lastCharCode: rawKey.length ? rawKey.charCodeAt(rawKey.length - 1) : null, // 10 or 13 means newline/CR
-  };
-}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,9 +21,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // ---- DEBUG: print masked env info once per request
-    console.log("OPENAI_KEY_DEBUG", keyDebug());
-
+    const rawKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+    const openAIApiKey = rawKey.trim();
     if (!openAIApiKey) {
       return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
         status: 500,
@@ -80,11 +62,11 @@ serve(async (req) => {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openAIApiKey}`,
+        "Authorization": `Bearer ${openAIApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o-mini", // also OK: 'gpt-4.1-2025-04-14' if enabled on your account
         messages: [
           { role: "system", content: "You are a professional business reply generator. Generate helpful, empathetic, and professional responses to customer reviews." },
           { role: "user", content: prompt },
@@ -97,7 +79,6 @@ serve(async (req) => {
     if (!response.ok) {
       const t = await response.text().catch(() => "");
       console.error("OpenAI API error:", response.status, t);
-      // pass through 401 so you can see it clearly in the client
       return new Response(JSON.stringify({ error: `OpenAI API error: ${response.status}` }), {
         status: response.status,
         headers: corsHeaders,

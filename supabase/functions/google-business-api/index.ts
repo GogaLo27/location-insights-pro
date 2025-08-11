@@ -1,5 +1,4 @@
 // /supabase/functions/google-business-api/index.ts
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -8,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-google-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -23,7 +21,7 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    const body = await req.json();
     const { action, locationId, query, startDate, endDate, replyText, review_id } = body || {};
 
     // ---- Auth: Supabase user (JWT from client)
@@ -34,7 +32,6 @@ serve(async (req) => {
     const supabaseJwt = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(supabaseJwt);
     if (authError || !user) return jsonError("Unauthorized", 401);
-    const userId = user.id;
 
     // ---- Google access token (from client)
     const googleAccessToken = req.headers.get("X-Google-Token");
@@ -48,15 +45,15 @@ serve(async (req) => {
     switch (action) {
       case "get_user_locations":
       case "fetch_user_locations":
-        return await fetchUserLocations(userId, googleAccessToken);
+        return await fetchUserLocations(user.id, googleAccessToken);
 
       case "search_locations":
         if (!query) return jsonError("Missing 'query' for search_locations", 400);
-        return await searchLocations(userId, query, googleAccessToken);
+        return await searchLocations(user.id, query, googleAccessToken);
 
       case "fetch_reviews":
         if (!locationId) return jsonError("Missing 'locationId' for fetch_reviews", 400);
-        return await fetchLocationReviews(userId, locationId, googleAccessToken); // persists to DB
+        return await fetchLocationReviews(locationId, googleAccessToken);
 
       case "fetch_analytics":
         if (!locationId) return jsonError("Missing 'locationId' for fetch_analytics", 400);
@@ -66,7 +63,7 @@ serve(async (req) => {
         if (!locationId) return jsonError("Missing 'locationId' for reply_to_review", 400);
         if (!review_id) return jsonError("Missing 'review_id' (Google reviewId) for reply_to_review", 400);
         if (!replyText) return jsonError("Missing 'replyText' for reply_to_review", 400);
-        return await replyToReview(userId, locationId, review_id, replyText, googleAccessToken); // persists to DB
+        return await replyToReview(locationId, review_id, replyText, googleAccessToken, user.id);
 
       default:
         return jsonError("Invalid action", 400);
@@ -75,7 +72,7 @@ serve(async (req) => {
     console.error("Error in google-business-api function:", error);
     return new Response(JSON.stringify({ error: error?.message ?? "Internal error" }), {
       status: 500,
-      headers: corsHeaders,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
@@ -85,7 +82,7 @@ serve(async (req) => {
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: corsHeaders,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -115,7 +112,7 @@ async function googleApiRequest(
     console.error(`Google API Error: ${response.status} - ${errorText}`);
     throw new Error(`Google API request failed: ${response.status}`);
   }
-  if (response.status === 204) return {}; // no content
+  if (response.status === 204) return {};
   return await response.json();
 }
 
@@ -232,73 +229,7 @@ function mapStarRatingToNumber(star: string | undefined): number {
   }
 }
 
-// Persist one review row into DB (update if exists, else insert), using your schema incl. user_id
-async function persistReviewRow(userId: string, r: {
-  google_review_id: string;
-  location_id: string;
-  author_name: string;
-  rating: number;
-  text: string;
-  review_date: string | null;
-  reply_text: string | null;
-  reply_date: string | null;
-}) {
-  try {
-    const { data: existing, error: selErr } = await supabase
-      .from("reviews")
-      .select("id")
-      .eq("google_review_id", r.google_review_id)
-      .eq("location_id", r.location_id)
-      .maybeSingle();
-
-    if (selErr) {
-      console.error("DB select error (reviews):", selErr);
-      return;
-    }
-
-    if (existing) {
-      const { error: updErr } = await supabase
-        .from("reviews")
-        .update({
-          author_name: r.author_name,
-          rating: r.rating,
-          text: r.text,
-          review_date: r.review_date,
-          reply_text: r.reply_text,
-          reply_date: r.reply_date,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-      if (updErr) console.error("DB update error (reviews):", updErr);
-    } else {
-      const { error: insErr } = await supabase
-        .from("reviews")
-        .insert([{
-          user_id: userId,
-          google_review_id: r.google_review_id,
-          location_id: r.location_id,
-          author_name: r.author_name,
-          rating: r.rating,
-          text: r.text,
-          review_date: r.review_date,
-          reply_text: r.reply_text,
-          reply_date: r.reply_date,
-          ai_sentiment: null,
-          ai_tags: [],
-          ai_analyzed_at: null,
-          ai_issues: null,
-          ai_suggestions: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }]);
-      if (insErr) console.error("DB insert error (reviews):", insErr);
-    }
-  } catch (e) {
-    console.error("persistReviewRow error:", e);
-  }
-}
-
-async function fetchLocationReviews(userId: string, locationId: string, accessToken: string) {
+async function fetchLocationReviews(locationId: string, accessToken: string) {
   try {
     const accountIds = await getAllAccountIds(accessToken);
     let allReviews: any[] = [];
@@ -327,21 +258,6 @@ async function fetchLocationReviews(userId: string, locationId: string, accessTo
             location_id: locationId,
           }));
           allReviews.push(...formatted);
-
-          // Persist to DB (so manual Google replies are saved locally)
-          for (const r of formatted) {
-            await persistReviewRow(userId, {
-              google_review_id: r.google_review_id,
-              location_id: r.location_id,
-              author_name: r.author_name,
-              rating: r.rating,
-              text: r.text,
-              review_date: r.review_date,
-              reply_text: r.reply_text,
-              reply_date: r.reply_date,
-            });
-          }
-
           nextPageToken = data.nextPageToken ?? null;
         } while (nextPageToken);
 
@@ -359,57 +275,55 @@ async function fetchLocationReviews(userId: string, locationId: string, accessTo
   }
 }
 
-async function replyToReview(userId: string, locationId: string, reviewId: string, replyText: string, accessToken: string) {
+/** ✅ After replying on Google, also persist reply into saved_reviews so UI updates immediately */
+async function replyToReview(
+  locationId: string,
+  reviewId: string,
+  replyText: string,
+  accessToken: string,
+  userId: string
+) {
   const accountIds = await getAllAccountIds(accessToken);
   for (const accountId of accountIds) {
     try {
       const url = `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}/reviews/${reviewId}/reply`;
       await googleApiRequest(url, accessToken, "PUT", undefined, { comment: replyText });
 
-      // Persist reply immediately so UI reflects the change
-      const replyUpdateTime = new Date().toISOString();
+      // Persist to DB
+      try {
+        const now = new Date().toISOString();
 
-      const { data: existing, error: selErr } = await supabase
-        .from("reviews")
-        .select("id")
-        .eq("google_review_id", reviewId)
-        .eq("location_id", locationId)
-        .maybeSingle();
+        const { data: existing, error: selErr } = await supabase
+          .from("saved_reviews")
+          .select("id")
+          .eq("google_review_id", reviewId)
+          .eq("location_id", locationId)
+          .maybeSingle();
 
-      if (selErr) {
-        console.error("DB select error (reply persist):", selErr);
-      } else if (existing) {
-        const { error: updErr } = await supabase
-          .from("reviews")
-          .update({
-            reply_text: replyText,
-            reply_date: replyUpdateTime,
-            updated_at: replyUpdateTime,
-          })
-          .eq("id", existing.id);
-        if (updErr) console.error("DB update error (reply persist):", updErr);
-      } else {
-        const { error: insErr } = await supabase
-          .from("reviews")
-          .insert([{
+        if (selErr) console.error("DB select error (saved_reviews):", selErr);
+
+        if (existing) {
+          const { error: updErr } = await supabase
+            .from("saved_reviews")
+            .update({ reply_text: replyText, reply_date: now, updated_at: now })
+            .eq("id", existing.id);
+          if (updErr) console.error("DB update error (saved_reviews):", updErr);
+        } else {
+          const { error: insErr } = await supabase.from("saved_reviews").insert([{
             user_id: userId,
             google_review_id: reviewId,
             location_id: locationId,
-            author_name: "", // unknown if not fetched yet
+            author_name: "Unknown",
             rating: 0,
             text: "",
-            review_date: null,
+            review_date: now,
             reply_text: replyText,
-            reply_date: replyUpdateTime,
-            ai_sentiment: null,
-            ai_tags: [],
-            ai_analyzed_at: null,
-            ai_issues: null,
-            ai_suggestions: null,
-            created_at: replyUpdateTime,
-            updated_at: replyUpdateTime,
+            reply_date: now,
           }]);
-        if (insErr) console.error("DB insert error (reply persist):", insErr);
+          if (insErr) console.error("DB insert error (saved_reviews):", insErr);
+        }
+      } catch (dbErr) {
+        console.error("Persist reply error:", dbErr);
       }
 
       return json({ ok: true });
@@ -427,6 +341,7 @@ async function fetchLocationAnalytics(
   endDate?: any
 ) {
   try {
+    // Determine date range defaults if none provided
     const today = new Date();
     const defaultEnd = {
       year: today.getFullYear(),
@@ -484,6 +399,7 @@ async function fetchLocationAnalytics(
     const urlWithParams = `${baseUrl}?${queryString}`;
 
     const response = await googleApiRequest(urlWithParams, accessToken, 'GET');
+
     return json({ analytics: response });
   } catch (error) {
     console.error('Error fetching analytics:', error);

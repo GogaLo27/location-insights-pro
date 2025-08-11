@@ -680,7 +680,7 @@ const Reviews = () => {
               </Badge>
             </div>
           ) : (
-            <ReplyDialog review={review} onReplySubmitted={fetchReviews} />
+            <ReplyDialog review={review} onReplySubmitted={() => fetchReviews(true)} />
           )}
                         </div>
                       </div>

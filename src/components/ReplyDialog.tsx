@@ -1,3 +1,4 @@
+// /src/components/ReplyDialog.tsx
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,7 @@ interface Review {
 
 interface ReplyDialogProps {
   review: Review;
-  onReplySubmitted: () => void;
+  onReplySubmitted: () => void; // will call with fetchReviews(true) in the parent
 }
 
 const ReplyDialog = ({ review, onReplySubmitted }: ReplyDialogProps) => {
@@ -32,12 +33,11 @@ const ReplyDialog = ({ review, onReplySubmitted }: ReplyDialogProps) => {
   const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Get the actual text: prefer prop -> saved_reviews -> reviews
+  // Prefer prop text; if empty, try DB (saved_reviews then reviews)
   const fetchReviewTextIfMissing = async (): Promise<string> => {
     const propText = (review?.text ?? "").trim();
     if (propText) return propText;
 
-    // 1) try saved_reviews (the table your page actually uses)
     const { data: saved, error: errSaved } = await supabase
       .from("saved_reviews")
       .select("text")
@@ -46,7 +46,6 @@ const ReplyDialog = ({ review, onReplySubmitted }: ReplyDialogProps) => {
       .maybeSingle();
     if (!errSaved && saved?.text?.trim()) return saved.text.trim();
 
-    // 2) fallback to reviews
     const { data: base, error: errBase } = await supabase
       .from("reviews")
       .select("text")
@@ -83,15 +82,17 @@ Please write a thoughtful, professional response that:
 
 Keep the response under 150 words.`.trim();
 
-      // Send as JSON object; function supports this shape
       const { data, error } = await supabase.functions.invoke("generate-ai-reply", {
         body: { prompt },
       });
+      console.log("generate-ai-reply result", { data, error });
 
       if (error) throw error;
-      if (!data?.reply) throw new Error(data?.error || "AI reply not available.");
 
-      setReplyText(data.reply);
+      const reply = typeof data === "string" ? data : (data?.reply ?? "");
+      if (!reply) throw new Error((data as any)?.error || "AI reply not available.");
+
+      setReplyText(reply);
       toast({ title: "AI Reply Generated", description: "You can edit the response before sending." });
     } catch (error) {
       console.error("Error generating AI reply:", error);
@@ -151,7 +152,7 @@ Keep the response under 150 words.`.trim();
       setOpen(false);
       setReplyText("");
       setMode("manual");
-      onReplySubmitted();
+      onReplySubmitted(); // parent will force a fresh fetch
     } catch (error) {
       console.error("Error sending reply:", error);
       toast({
