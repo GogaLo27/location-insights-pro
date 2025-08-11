@@ -204,33 +204,47 @@ const Reviews = () => {
     }
   };
 
-  const saveReviewsToDatabase = async (googleReviews: any[], locationId: string, onProgress?: (processed: number, total: number) => void) => {
-    if (!user) return;
+  const saveReviewsToDatabase = async (
+  googleReviews: any[],
+  locationId: string,
+  onProgress?: (processed: number, total: number) => void
+) => {
+  if (!user) return;
 
-    const total = googleReviews.length;
-    onProgress?.(0, total);
+  const total = googleReviews.length;
+  onProgress?.(0, total);
 
-    // Fetch existing reviews to avoid overwriting AI analysis
-    const { data: existingRows, error: existingErr } = await supabase
-      .from('saved_reviews')
-      .select('google_review_id')
-      .eq('user_id', user.id)
-      .eq('location_id', locationId);
+  // Fetch existing rows for comparison, not just IDs
+  const { data: existingRows, error: existingErr } = await supabase
+    .from("saved_reviews")
+    .select("google_review_id, text, reply_text, reply_date")
+    .eq("user_id", user.id)
+    .eq("location_id", locationId);
 
-    if (existingErr) {
-      console.error('Error fetching existing reviews:', existingErr);
-    }
+  if (existingErr) {
+    console.error("Error fetching existing reviews:", existingErr);
+  }
 
-    const existingIds = new Set((existingRows || []).map((r: any) => r.google_review_id));
+  const existingMap = new Map<string, { text: string | null; reply_text: string | null; reply_date: string | null }>();
+  (existingRows || []).forEach((r: any) => {
+    existingMap.set(r.google_review_id, {
+      text: r.text,
+      reply_text: r.reply_text,
+      reply_date: r.reply_date,
+    });
+  });
 
-    const newRecords: any[] = [];
-    let processed = 0;
+  const newRecords: any[] = [];
+  let processed = 0;
 
-    for (const review of googleReviews) {
-      processed += 1;
-      onProgress?.(processed, total);
-      if (existingIds.has(review.google_review_id)) continue; // preserve existing rows and AI fields
+  for (const review of googleReviews) {
+    processed += 1;
+    onProgress?.(processed, total);
 
+    const existing = existingMap.get(review.google_review_id);
+
+    if (!existing) {
+      // Insert new
       newRecords.push({
         user_id: user.id,
         google_review_id: review.google_review_id,
@@ -242,18 +256,41 @@ const Reviews = () => {
         reply_text: review.reply_text,
         reply_date: review.reply_date,
       });
+      continue;
     }
 
-    // Batch insert new reviews (if any)
-    const chunkSize = 100;
-    for (let i = 0; i < newRecords.length; i += chunkSize) {
-      const chunk = newRecords.slice(i, i + chunkSize);
-      const { error } = await supabase.from('saved_reviews').insert(chunk);
-      if (error) {
-        console.error('Insert error for chunk:', error);
+    // UPDATE if existing.text is empty but Google has text, or reply info changed
+    const needText = (!existing.text || !existing.text.trim()) && (review.text && review.text.trim());
+    const needReply =
+      (review.reply_text && review.reply_text !== existing.reply_text) ||
+      (review.reply_date && review.reply_date !== existing.reply_date);
+
+    if (needText || needReply) {
+      const updates: any = {};
+      if (needText) updates.text = review.text;
+      if (needReply) {
+        updates.reply_text = review.reply_text || null;
+        updates.reply_date = review.reply_date || null;
       }
+
+      const { error: updErr } = await supabase
+        .from("saved_reviews")
+        .update(updates)
+        .eq("google_review_id", review.google_review_id)
+        .eq("location_id", locationId);
+
+      if (updErr) console.error("Update error:", updErr);
     }
-  };
+  }
+
+  // Batch insert new rows
+  const chunkSize = 100;
+  for (let i = 0; i < newRecords.length; i += chunkSize) {
+    const chunk = newRecords.slice(i, i + chunkSize);
+    const { error } = await supabase.from("saved_reviews").insert(chunk);
+    if (error) console.error("Insert error for chunk:", error);
+  }
+};
 
   const runAIAnalysis = async () => {
     if (!user || isAnalyzing) return;
