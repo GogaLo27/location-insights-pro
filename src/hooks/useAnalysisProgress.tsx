@@ -8,6 +8,7 @@ interface AnalysisProgress {
   startProgress: () => void;
   updateProgress: (completed: number, total: number) => void;
   finishProgress: () => void;
+  resetProgress: () => void;
 }
 
 export const useAnalysisProgress = (namespace: string = 'default'): AnalysisProgress => {
@@ -25,7 +26,7 @@ useEffect(() => {
     setIsAnalyzing(savedAnalyzing);
     setCompleted(savedCompleted);
     setTotal(savedTotal);
-    
+
     if (savedTotal > 0) {
       setProgress((savedCompleted / savedTotal) * 100);
     }
@@ -37,21 +38,28 @@ useEffect(() => {
     setProgress(0);
     setCompleted(0);
     setTotal(0);
-    
-  localStorage.setItem(storageKey, JSON.stringify({
-    isAnalyzing: true,
-    completed: 0,
-    total: 0
-  }));
+    localStorage.setItem(storageKey, JSON.stringify({
+      isAnalyzing: true,
+      completed: 0,
+      total: 0
+    }));
+  };
+
+  const resetProgress = () => {
+    setIsAnalyzing(false);
+    setProgress(0);
+    setCompleted(0);
+    setTotal(0);
+    localStorage.removeItem(storageKey);
   };
 
   const updateProgress = (newCompleted: number, newTotal: number) => {
     setCompleted(newCompleted);
     setTotal(newTotal);
-    
+
     const newProgress = newTotal > 0 ? (newCompleted / newTotal) * 100 : 0;
     setProgress(newProgress);
-    
+
   localStorage.setItem(storageKey, JSON.stringify({
     isAnalyzing: true,
     completed: newCompleted,
@@ -62,7 +70,7 @@ useEffect(() => {
   const finishProgress = () => {
     setIsAnalyzing(false);
     setProgress(100);
-    
+
   setTimeout(() => {
     setProgress(0);
     setCompleted(0);
@@ -78,6 +86,7 @@ useEffect(() => {
     completed,
     startProgress,
     updateProgress,
-    finishProgress
+    finishProgress,
+    resetProgress
   };
 };

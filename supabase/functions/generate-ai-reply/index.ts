@@ -46,7 +46,16 @@ serve(async (req) => {
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      throw new Error('Failed to parse OpenAI response as JSON');
+    }
+
+    if (!data || !Array.isArray(data.choices) || !data.choices[0]?.message?.content) {
+      throw new Error('OpenAI response missing expected reply content');
+    }
     const reply = data.choices[0].message.content;
 
     return new Response(JSON.stringify({ reply }), {
