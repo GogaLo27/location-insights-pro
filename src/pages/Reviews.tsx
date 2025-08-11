@@ -46,7 +46,7 @@ const Reviews = () => {
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
-  
+
   const userKey = user?.id || 'anon';
   const locKey = (() => {
     const sl: any = selectedLocation;
@@ -57,7 +57,7 @@ const Reviews = () => {
     const tail = gp ? gp.split('/').pop() : '';
     return tail || 'none';
   })();
-  
+
   const {
     isAnalyzing,
     progress,
@@ -65,7 +65,8 @@ const Reviews = () => {
     completed,
     startProgress,
     updateProgress,
-    finishProgress
+    finishProgress,
+    resetProgress
   } = useAnalysisProgress(`analysis_${userKey}_${locKey}`);
 
   const {
@@ -75,10 +76,15 @@ const Reviews = () => {
     completed: fetchCompleted,
     startProgress: startFetch,
     updateProgress: updateFetch,
-    finishProgress: finishFetch
+    finishProgress: finishFetch,
+    resetProgress: resetFetchProgress
   } = useAnalysisProgress(`fetch_${userKey}_${locKey}`);
 
   useEffect(() => {
+    // Reset progress and reviews when location changes
+    resetProgress();
+    resetFetchProgress();
+    setReviews([]);
     if (user && selectedLocation) {
       fetchReviews(false); // Load cached reviews quickly
     }
@@ -119,7 +125,7 @@ const Reviews = () => {
       setLoading(true);
       startFetch();
     }
-    
+
     try {
       // First, quickly load saved reviews from database for instant display
       const { data: savedReviews, error: dbError } = await supabase
@@ -198,33 +204,47 @@ const Reviews = () => {
     }
   };
 
-  const saveReviewsToDatabase = async (googleReviews: any[], locationId: string, onProgress?: (processed: number, total: number) => void) => {
-    if (!user) return;
+  const saveReviewsToDatabase = async (
+  googleReviews: any[],
+  locationId: string,
+  onProgress?: (processed: number, total: number) => void
+) => {
+  if (!user) return;
 
-    const total = googleReviews.length;
-    onProgress?.(0, total);
+  const total = googleReviews.length;
+  onProgress?.(0, total);
 
-    // Fetch existing reviews to avoid overwriting AI analysis
-    const { data: existingRows, error: existingErr } = await supabase
-      .from('saved_reviews')
-      .select('google_review_id')
-      .eq('user_id', user.id)
-      .eq('location_id', locationId);
+  // Fetch existing rows for comparison, not just IDs
+  const { data: existingRows, error: existingErr } = await supabase
+    .from("saved_reviews")
+    .select("google_review_id, text, reply_text, reply_date")
+    .eq("user_id", user.id)
+    .eq("location_id", locationId);
 
-    if (existingErr) {
-      console.error('Error fetching existing reviews:', existingErr);
-    }
+  if (existingErr) {
+    console.error("Error fetching existing reviews:", existingErr);
+  }
 
-    const existingIds = new Set((existingRows || []).map((r: any) => r.google_review_id));
+  const existingMap = new Map<string, { text: string | null; reply_text: string | null; reply_date: string | null }>();
+  (existingRows || []).forEach((r: any) => {
+    existingMap.set(r.google_review_id, {
+      text: r.text,
+      reply_text: r.reply_text,
+      reply_date: r.reply_date,
+    });
+  });
 
-    const newRecords: any[] = [];
-    let processed = 0;
+  const newRecords: any[] = [];
+  let processed = 0;
 
-    for (const review of googleReviews) {
-      processed += 1;
-      onProgress?.(processed, total);
-      if (existingIds.has(review.google_review_id)) continue; // preserve existing rows and AI fields
+  for (const review of googleReviews) {
+    processed += 1;
+    onProgress?.(processed, total);
 
+    const existing = existingMap.get(review.google_review_id);
+
+    if (!existing) {
+      // Insert new
       newRecords.push({
         user_id: user.id,
         google_review_id: review.google_review_id,
@@ -236,25 +256,48 @@ const Reviews = () => {
         reply_text: review.reply_text,
         reply_date: review.reply_date,
       });
+      continue;
     }
 
-    // Batch insert new reviews (if any)
-    const chunkSize = 100;
-    for (let i = 0; i < newRecords.length; i += chunkSize) {
-      const chunk = newRecords.slice(i, i + chunkSize);
-      const { error } = await supabase.from('saved_reviews').insert(chunk);
-      if (error) {
-        console.error('Insert error for chunk:', error);
+    // UPDATE if existing.text is empty but Google has text, or reply info changed
+    const needText = (!existing.text || !existing.text.trim()) && (review.text && review.text.trim());
+    const needReply =
+      (review.reply_text && review.reply_text !== existing.reply_text) ||
+      (review.reply_date && review.reply_date !== existing.reply_date);
+
+    if (needText || needReply) {
+      const updates: any = {};
+      if (needText) updates.text = review.text;
+      if (needReply) {
+        updates.reply_text = review.reply_text || null;
+        updates.reply_date = review.reply_date || null;
       }
+
+      const { error: updErr } = await supabase
+        .from("saved_reviews")
+        .update(updates)
+        .eq("google_review_id", review.google_review_id)
+        .eq("location_id", locationId);
+
+      if (updErr) console.error("Update error:", updErr);
     }
-  };
+  }
+
+  // Batch insert new rows
+  const chunkSize = 100;
+  for (let i = 0; i < newRecords.length; i += chunkSize) {
+    const chunk = newRecords.slice(i, i + chunkSize);
+    const { error } = await supabase.from("saved_reviews").insert(chunk);
+    if (error) console.error("Insert error for chunk:", error);
+  }
+};
 
   const runAIAnalysis = async () => {
     if (!user || isAnalyzing) return;
-    
+
     try {
       startProgress();
-      
+
       // Get reviews that haven't been analyzed yet
       const { data: unanalyzedReviews } = await supabase
         .from('saved_reviews')
@@ -279,7 +322,7 @@ const Reviews = () => {
 
       for (let i = 0; i < unanalyzedReviews.length; i += batchSize) {
         const batch = unanalyzedReviews.slice(i, i + batchSize);
-        
+
         const { supabaseJwt } = await getSessionTokens();
         const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
           body: { reviews: batch },
@@ -302,7 +345,7 @@ const Reviews = () => {
               })
               .eq('google_review_id', analyzedReview.google_review_id);
           }
-          
+
           processedCount += batch.length;
           updateProgress(processedCount, unanalyzedReviews.length);
         }
@@ -403,9 +446,9 @@ const Reviews = () => {
               <LocationSelector />
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              <Button 
-                onClick={runAIAnalysis} 
-                size="sm" 
+              <Button
+                onClick={runAIAnalysis}
+                size="sm"
                 variant="outline"
                 disabled={isAnalyzing}
               >
@@ -422,7 +465,7 @@ const Reviews = () => {
               </Button>
             </div>
           </header>
-          
+
           <div className="flex-1 space-y-6 p-8 pt-6">
             {/* Fetch Progress Bar */}
             {(isFetching || (fetchProgressValue > 0 && fetchProgressValue < 100)) && (
@@ -589,8 +632,8 @@ const Reviews = () => {
                     <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-2">No reviews found</h3>
                     <p className="text-muted-foreground">
-                      {reviews.length === 0 
-                        ? "No reviews available for this location." 
+                      {reviews.length === 0
+                        ? "No reviews available for this location."
                         : "Try adjusting your filters to see more reviews."}
                     </p>
                   </CardContent>
@@ -622,8 +665,8 @@ const Reviews = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           {review.ai_sentiment && (
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`${getSentimentColor(review.ai_sentiment)} ${getSentimentBg(review.ai_sentiment)}`}
                             >
                               {review.ai_sentiment}
@@ -646,7 +689,7 @@ const Reviews = () => {
                       {review.text && (
                         <p className="text-muted-foreground mb-4">{review.text}</p>
                       )}
-                      
+
                       {review.ai_tags && review.ai_tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-4">
                           {review.ai_tags.map((tag, index) => (
