@@ -61,7 +61,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       setLoading(true);
       
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP@gmail.com') {
+      if (user.email === 'demoLIP29@gmail.com') {
         const { mockLocations } = await import('@/utils/mockData');
         setLocations(mockLocations);
         setLoading(false);
@@ -99,7 +99,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     
     try {
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP@gmail.com') {
+      if (user.email === 'demoLIP29@gmail.com') {
         const { mockSelectedLocation } = await import('@/utils/mockData');
         setSelectedLocation({
           google_place_id: mockSelectedLocation.google_place_id,
