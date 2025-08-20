@@ -59,6 +59,15 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     
     try {
       setLoading(true);
+      
+      // Check if demo user and use mock data
+      if (user.email === 'demoLIP@gmail.com') {
+        const { mockLocations } = await import('@/utils/mockData');
+        setLocations(mockLocations);
+        setLoading(false);
+        return;
+      }
+      
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       
       if (!supabaseJwt || !googleAccessToken) {
@@ -89,6 +98,16 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     if (!user) return;
     
     try {
+      // Check if demo user and use mock data
+      if (user.email === 'demoLIP@gmail.com') {
+        const { mockSelectedLocation } = await import('@/utils/mockData');
+        setSelectedLocation({
+          google_place_id: mockSelectedLocation.google_place_id,
+          location_name: mockSelectedLocation.location_name
+        });
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('user_selected_locations')
         .select('google_place_id, location_name')

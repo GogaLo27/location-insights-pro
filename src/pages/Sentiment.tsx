@@ -53,12 +53,26 @@ const Sentiment = () => {
   useEffect(() => {
     if (user) {
       fetchLocations();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
       fetchSentimentData();
     }
   }, [user, selectedLocation, selectedPeriod, dateRange]);
 
   const fetchLocations = async () => {
+    if (!user) return;
+    
     try {
+      // Check if demo user and use mock data
+      if (user.email === 'demoLIP@gmail.com') {
+        const { mockLocations } = await import('@/utils/mockData');
+        setLocations(mockLocations);
+        return;
+      }
+      
       // Use edge function to get locations
       const { data, error } = await supabase.functions.invoke('google-business-api', {
         body: { 
@@ -78,8 +92,24 @@ const Sentiment = () => {
   };
 
   const fetchSentimentData = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
+      
+      // Check if demo user and use mock data
+      if (user.email === 'demoLIP@gmail.com') {
+        const { mockReviews } = await import('@/utils/mockData');
+        let filteredReviews = mockReviews.filter(review => review.ai_sentiment !== null);
+        
+        if (selectedLocation !== "all") {
+          filteredReviews = filteredReviews.filter(review => review.location_id === selectedLocation);
+        }
+        
+        const processedData = processReviewsIntoSentimentData(filteredReviews);
+        setSentimentData(processedData);
+        return;
+      }
       
       // Get sentiment data from saved reviews
       let query = supabase

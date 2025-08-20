@@ -15,6 +15,7 @@ import LocationSelection from './pages/LocationSelection';
 import BillingSuccess from './pages/BillingSuccess';
 import BillingCancel from './pages/BillingCancel';
 import OrderHistory from './pages/OrderHistory';
+import Privacy from './pages/Privacy';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -117,6 +118,9 @@ const App = () => (
               }
             />
 
+            {/* Public routes */}
+            <Route path="/privacy" element={<Privacy />} />
+            
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<NotFound />} />
           </Routes>

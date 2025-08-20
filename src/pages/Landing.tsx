@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { MapPin, BarChart3, MessageSquare, Brain, Star, CheckCircle } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
+import Footer from "@/components/Footer";
 
 const Landing = () => {
   const { signInWithGoogle, user } = useAuth();
@@ -231,20 +232,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t py-12 px-4 bg-gradient-to-t from-muted/20 to-background">
-        <div className="container mx-auto text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-6 h-6 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-              <MapPin className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Location Insights Pro
-            </span>
-          </div>
-          <p className="text-muted-foreground">&copy; 2024 Location Insights Pro. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };
