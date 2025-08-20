@@ -1,4 +1,4 @@
-export const DEMO_EMAIL = 'demoLIP@gmail.com';
+export const DEMO_EMAIL = 'demoLIP29@gmail.com';
 
 export const mockLocations = [
   {
