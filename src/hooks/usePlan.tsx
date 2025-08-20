@@ -29,7 +29,7 @@ export const usePlan = () => {
       setLoading(true);
       
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP@gmail.com') {
+      if (user.email === 'demoLIP29@gmail.com') {
         const { mockUserPlan } = await import('@/utils/mockData');
         setPlan(mockUserPlan);
         setLoading(false);
