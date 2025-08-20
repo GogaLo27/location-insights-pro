@@ -128,7 +128,7 @@ const Reviews = () => {
 
     try {
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP@gmail.com') {
+      if (user.email === 'demoLIP29@gmail.com') {
         const { mockReviews } = await import('@/utils/mockData');
         let filteredReviews = mockReviews;
         
