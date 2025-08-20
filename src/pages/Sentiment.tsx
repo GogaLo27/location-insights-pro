@@ -67,7 +67,7 @@ const Sentiment = () => {
     
     try {
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP@gmail.com') {
+      if (user.email === 'demoLIP29@gmail.com') {
         const { mockLocations } = await import('@/utils/mockData');
         setLocations(mockLocations);
         return;
@@ -98,7 +98,7 @@ const Sentiment = () => {
       setLoading(true);
       
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP@gmail.com') {
+      if (user.email === 'demoLIP29@gmail.com') {
         const { mockReviews } = await import('@/utils/mockData');
         let filteredReviews = mockReviews.filter(review => review.ai_sentiment !== null);
         
