@@ -185,15 +185,9 @@ const Analytics = () => {
   };
 
   // Process the raw multiDailyMetricTimeSeries format from Google
-  // Process the raw multiDailyMetricTimeSeries format from Google
 const processAnalyticsData = (raw: any): AnalyticsData[] => {
   if (!raw) return [];
 
-  // Normalize the series list.  Google’s API may return:
-  // 1. An array of metric series directly.
-  // 2. An object with `multiDailyMetricTimeSeries`,
-  //    where each entry contains a `dailyMetricTimeSeries` array.
-  // 3. An object with `dailyMetricTimeSeries` flat.
   let seriesList: any[] = [];
   if (Array.isArray(raw)) {
     seriesList = raw;
@@ -214,8 +208,8 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
   seriesList.forEach((series: any) => {
     const metric: string = series.dailyMetric || series.metric || "";
     const points: any[] =
-      series.timeSeries?.datedValues || // official GBP Performance API shape
-      series.timeSeries || // fallback to array directly
+      series.timeSeries?.datedValues ||
+      series.timeSeries ||
       [];
     points.forEach((dp: any, index: number) => {
       const d = dp.date || dp.timeDimension?.timeRange?.startDate;
@@ -343,11 +337,9 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
-              {/* Context-driven location selector */}
               <LocationSelector />
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              {/* Date range selector */}
               <Select value={dateRange} onValueChange={setDateRange}>
                 <SelectTrigger className="w-32">
                   <SelectValue />

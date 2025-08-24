@@ -1,4 +1,4 @@
-export const DEMO_EMAIL = 'demoLIP29@gmail.com';
+export const DEMO_EMAIL = 'demolip29@gmail.com';
 
 export const mockLocations = [
   {
@@ -8,7 +8,7 @@ export const mockLocations = [
     address: '123 Main St, San Francisco, CA 94102'
   },
   {
-    id: 'demo-location-2', 
+    id: 'demo-location-2',
     name: 'Demo Cafe Uptown',
     google_place_id: 'ChIJDemo0987654321',
     address: '456 Oak Ave, San Francisco, CA 94110'

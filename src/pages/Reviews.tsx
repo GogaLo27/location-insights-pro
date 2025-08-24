@@ -128,14 +128,14 @@ const Reviews = () => {
 
     try {
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP29@gmail.com') {
+      if (user.email === 'demolip29@gmail.com') {
         const { mockReviews } = await import('@/utils/mockData');
         let filteredReviews = mockReviews;
-        
+
         if (locationId && locationId !== 'all') {
           filteredReviews = mockReviews.filter(review => review.location_id === locationId);
         }
-        
+
         setReviews(filteredReviews.map(review => ({
           ...review,
           ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
@@ -144,7 +144,7 @@ const Reviews = () => {
         finishFetch();
         return;
       }
-      
+
       // First, quickly load saved reviews from database for instant display
       const { data: savedReviews, error: dbError } = await supabase
         .from('saved_reviews')

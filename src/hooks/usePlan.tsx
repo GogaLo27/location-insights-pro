@@ -27,15 +27,15 @@ export const usePlan = () => {
 
     try {
       setLoading(true);
-      
+
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP29@gmail.com') {
+      if (user.email === 'demolip29@gmail.com') {
         const { mockUserPlan } = await import('@/utils/mockData');
         setPlan(mockUserPlan);
         setLoading(false);
         return;
       }
-      
+
       const { data, error } = await supabase
         .from('user_plans')
         .select('*')

@@ -64,18 +64,18 @@ const Sentiment = () => {
 
   const fetchLocations = async () => {
     if (!user) return;
-    
+
     try {
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP29@gmail.com') {
+      if (user.email === 'demolip29@gmail.com') {
         const { mockLocations } = await import('@/utils/mockData');
         setLocations(mockLocations);
         return;
       }
-      
+
       // Use edge function to get locations
       const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { 
+        body: {
           action: 'get_user_locations'
         }
       });
@@ -93,24 +93,24 @@ const Sentiment = () => {
 
   const fetchSentimentData = async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
-      
+
       // Check if demo user and use mock data
-      if (user.email === 'demoLIP29@gmail.com') {
+      if (user.email === 'demolip29@gmail.com') {
         const { mockReviews } = await import('@/utils/mockData');
         let filteredReviews = mockReviews.filter(review => review.ai_sentiment !== null);
-        
+
         if (selectedLocation !== "all") {
           filteredReviews = filteredReviews.filter(review => review.location_id === selectedLocation);
         }
-        
+
         const processedData = processReviewsIntoSentimentData(filteredReviews);
         setSentimentData(processedData);
         return;
       }
-      
+
       // Get sentiment data from saved reviews
       let query = supabase
         .from('saved_reviews')
@@ -146,7 +146,7 @@ const Sentiment = () => {
     reviews.forEach(review => {
       let key = '';
       const reviewDate = new Date(review.review_date);
-      
+
       switch (selectedPeriod) {
         case 'daily':
           key = format(reviewDate, 'yyyy-MM-dd');
@@ -243,7 +243,7 @@ const Sentiment = () => {
   const handleGenerateSentiment = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
-        body: { 
+        body: {
           action: 'generate_sentiment_analysis',
           location_id: selectedLocation !== "all" ? selectedLocation : undefined,
           period_type: selectedPeriod,
@@ -258,7 +258,7 @@ const Sentiment = () => {
         title: "Success",
         description: "Sentiment analysis generated successfully",
       });
-      
+
       fetchSentimentData();
     } catch (error) {
       console.error('Error generating sentiment analysis:', error);
@@ -278,30 +278,30 @@ const Sentiment = () => {
   ];
 
   const getDatePresets = () => [
-    { 
-      label: "Last 30 days", 
-      from: subDays(new Date(), 30), 
-      to: new Date() 
+    {
+      label: "Last 30 days",
+      from: subDays(new Date(), 30),
+      to: new Date()
     },
-    { 
-      label: "Last 3 months", 
-      from: subMonths(new Date(), 3), 
-      to: new Date() 
+    {
+      label: "Last 3 months",
+      from: subMonths(new Date(), 3),
+      to: new Date()
     },
-    { 
-      label: "Last 6 months", 
-      from: subMonths(new Date(), 6), 
-      to: new Date() 
+    {
+      label: "Last 6 months",
+      from: subMonths(new Date(), 6),
+      to: new Date()
     },
-    { 
-      label: "Last year", 
-      from: subYears(new Date(), 1), 
-      to: new Date() 
+    {
+      label: "Last year",
+      from: subYears(new Date(), 1),
+      to: new Date()
     },
-    { 
-      label: "Last 2 years", 
-      from: subYears(new Date(), 2), 
-      to: new Date() 
+    {
+      label: "Last 2 years",
+      from: subYears(new Date(), 2),
+      to: new Date()
     }
   ];
 
@@ -312,7 +312,7 @@ const Sentiment = () => {
     const totalNegative = sentimentData.reduce((sum, item) => sum + item.negative_count, 0);
     const totalNeutral = sentimentData.reduce((sum, item) => sum + item.neutral_count, 0);
     const total = totalPositive + totalNegative + totalNeutral;
-    
+
     const avgRating = sentimentData.reduce((sum, item) => sum + item.average_rating, 0) / sentimentData.length;
     const avgSentimentScore = sentimentData.reduce((sum, item) => sum + item.sentiment_score, 0) / sentimentData.length;
 
@@ -372,7 +372,7 @@ const Sentiment = () => {
               </Select>
             </div>
           </header>
-          
+
           <div className="flex-1 space-y-4 p-8 pt-6">
             <div className="flex justify-between items-center mb-8">
               <div>
@@ -433,7 +433,7 @@ const Sentiment = () => {
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange.from && dateRange.to 
+                          {dateRange.from && dateRange.to
                             ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
                             : "Pick a date range"
                           }
@@ -521,9 +521,9 @@ const Sentiment = () => {
                         </div>
                         <p className="text-sm text-muted-foreground">Average Rating</p>
                         <p className="text-xs mt-1 font-medium">
-                          {stats.avgRating >= 4.5 ? "Excellent Performance" : 
-                           stats.avgRating >= 4.0 ? "Very Good Performance" : 
-                           stats.avgRating >= 3.5 ? "Good Performance" : 
+                          {stats.avgRating >= 4.5 ? "Excellent Performance" :
+                           stats.avgRating >= 4.0 ? "Very Good Performance" :
+                           stats.avgRating >= 3.5 ? "Good Performance" :
                            stats.avgRating >= 3.0 ? "Average Performance" : "Requires Immediate Attention"}
                         </p>
                       </div>
@@ -533,9 +533,9 @@ const Sentiment = () => {
                         </div>
                         <p className="text-sm text-muted-foreground">Positive Sentiment</p>
                         <p className="text-xs mt-1 font-medium">
-                          {stats.positivePercentage >= 80 ? "Outstanding Customer Satisfaction" : 
-                           stats.positivePercentage >= 70 ? "Strong Customer Satisfaction" : 
-                           stats.positivePercentage >= 60 ? "Good Customer Satisfaction" : 
+                          {stats.positivePercentage >= 80 ? "Outstanding Customer Satisfaction" :
+                           stats.positivePercentage >= 70 ? "Strong Customer Satisfaction" :
+                           stats.positivePercentage >= 60 ? "Good Customer Satisfaction" :
                            stats.positivePercentage >= 50 ? "Fair Customer Satisfaction" : "Critical - Immediate Action Required"}
                         </p>
                       </div>
@@ -545,8 +545,8 @@ const Sentiment = () => {
                         </div>
                         <p className="text-sm text-muted-foreground">Total Reviews Analyzed</p>
                         <p className="text-xs mt-1 font-medium">
-                          {stats.total >= 100 ? "Statistically Significant" : 
-                           stats.total >= 50 ? "Good Sample Size" : 
+                          {stats.total >= 100 ? "Statistically Significant" :
+                           stats.total >= 50 ? "Good Sample Size" :
                            stats.total >= 20 ? "Moderate Sample" : "Limited Data - Gather More Reviews"}
                         </p>
                       </div>
@@ -571,17 +571,17 @@ const Sentiment = () => {
                             ))}
                           </div>
                         </div>
-                        
+
                         {stats.positivePercentage >= 70 && (
                           <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
                             <h5 className="text-sm text-success font-semibold mb-2">Performance Validation</h5>
                             <p className="text-xs text-success/80">
-                              Your {stats.positivePercentage.toFixed(0)}% positive sentiment score indicates strong customer satisfaction. 
+                              Your {stats.positivePercentage.toFixed(0)}% positive sentiment score indicates strong customer satisfaction.
                               Maintain current service standards and consider scaling successful practices.
                             </p>
                           </div>
                         )}
-                        
+
                         <div className="border-t pt-4">
                           <h5 className="font-medium text-success mb-2">Strategic Recommendations:</h5>
                           <ul className="text-xs space-y-1 text-success/80">
@@ -643,7 +643,7 @@ const Sentiment = () => {
                           ))}
                         </div>
                       </div>
-                      
+
                       <div>
                         <h4 className="font-medium text-primary mb-3">Strategic Focus:</h4>
                         <div className="space-y-3">
@@ -655,7 +655,7 @@ const Sentiment = () => {
                               </p>
                             </div>
                           )}
-                          
+
                           {stats.avgRating < 4.0 && (
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                               <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">⭐ Boost Overall Rating</p>
@@ -664,7 +664,7 @@ const Sentiment = () => {
                               </p>
                             </div>
                           )}
-                          
+
                           <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">💬 Engage Proactively</p>
                             <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
@@ -729,7 +729,7 @@ const Sentiment = () => {
                           <p className="text-sm text-muted-foreground">Negative</p>
                         </div>
                       </div>
-                      
+
                       <div className="grid md:grid-cols-2 gap-6">
                         {data.top_positive_tags && data.top_positive_tags.length > 0 && (
                           <div>
@@ -743,7 +743,7 @@ const Sentiment = () => {
                             </div>
                           </div>
                         )}
-                        
+
                         {data.top_negative_tags && data.top_negative_tags.length > 0 && (
                           <div>
                             <h4 className="font-semibold text-red-600 mb-2">Top Negative Tags</h4>
@@ -757,7 +757,7 @@ const Sentiment = () => {
                           </div>
                         )}
                       </div>
-                      
+
                       {/* Issues and Suggestions Section */}
                       {((data.top_issues && data.top_issues.length > 0) || (data.top_suggestions && data.top_suggestions.length > 0)) && (
                         <div className="grid md:grid-cols-2 gap-6 mt-6">
@@ -776,7 +776,7 @@ const Sentiment = () => {
                               </div>
                             </div>
                           )}
-                          
+
                           {data.top_suggestions && data.top_suggestions.length > 0 && (
                             <div>
                               <h4 className="font-semibold text-primary mb-3 flex items-center">
@@ -794,7 +794,7 @@ const Sentiment = () => {
                           )}
                         </div>
                       )}
-                      
+
                       {/* Show message if no actionable insights */}
                       {(!data.top_issues || data.top_issues.length === 0) && (!data.top_suggestions || data.top_suggestions.length === 0) && (
                         <div className="mt-6 p-4 bg-muted/50 rounded-lg text-center">
