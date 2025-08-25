@@ -117,6 +117,35 @@ const Analytics = () => {
 
     try {
       setLoading(true);
+      // Demo: synthesize time series when in demo mode
+      if (user?.email === 'demolip29@gmail.com') {
+        const days = parseInt(dateRange);
+        const endDate = new Date();
+        const series: AnalyticsData[] = [] as any;
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date(endDate);
+          d.setDate(endDate.getDate() - i);
+          const base = 100 + (locationId === 'demo-location-2' ? -20 : 0);
+          const wobble = 1 + Math.sin(i / 3) * 0.2;
+          series.push({
+            date: format(d, 'MMM dd'),
+            businessImpressionsDesktopMaps: Math.round(base * wobble * 2.1),
+            businessImpressionsMobileMaps: Math.round(base * wobble * 2.6),
+            businessImpressionsDesktopSearch: Math.round(base * wobble * 1.7),
+            businessImpressionsMobileSearch: Math.round(base * wobble * 2.0),
+            websiteClicks: Math.round(base * wobble * 0.15),
+            callClicks: Math.round(base * wobble * 0.08),
+            businessDirectionRequests: Math.round(base * wobble * 0.12),
+            businessConversations: Math.round(base * wobble * 0.03),
+            businessBookings: Math.round(base * wobble * 0.02),
+            businessFoodOrders: Math.round(base * wobble * 0.05),
+            businessFoodMenuClicks: Math.round(base * wobble * 0.07),
+          });
+        }
+        setAnalyticsData(series);
+        setLoading(false);
+        return;
+      }
       const endDate = new Date();
       const startDate = subDays(endDate, parseInt(dateRange));
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();

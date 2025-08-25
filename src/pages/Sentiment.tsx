@@ -99,10 +99,12 @@ const Sentiment = () => {
 
       // Check if demo user and use mock data
       if (user.email === 'demolip29@gmail.com') {
-        const { mockReviews } = await import('@/utils/mockData');
+        const { mockReviews, mockLocations } = await import('@/utils/mockData');
         let filteredReviews = mockReviews.filter(review => review.ai_sentiment !== null);
 
         if (selectedLocation !== "all") {
+          // selectedLocation here is an id from the dropdown populated by fetchLocations
+          // which uses mockLocations in demo mode, so it aligns to mock ids
           filteredReviews = filteredReviews.filter(review => review.location_id === selectedLocation);
         }
 

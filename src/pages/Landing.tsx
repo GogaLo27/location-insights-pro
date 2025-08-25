@@ -6,7 +6,7 @@ import { useAuth } from "@/components/ui/auth-provider";
 import Footer from "@/components/Footer";
 
 const Landing = () => {
-  const { signInWithGoogle, user } = useAuth();
+  const { signInWithGoogle, signInAsDemo, user } = useAuth();
 
   const features = [
     {
@@ -36,7 +36,7 @@ const Landing = () => {
       reviews: "100"
     },
     {
-      name: "Professional", 
+      name: "Professional",
       price: "$79",
       description: "For growing businesses",
       features: ["5 locations", "500 reviews/month", "Advanced analytics", "AI insights", "Priority support"],
@@ -71,13 +71,23 @@ const Landing = () => {
               ReviewLip
             </span>
           </div>
-          <Button 
-            onClick={signInWithGoogle} 
-            className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 animate-fade-in"
-            style={{ animationDelay: '0.2s' }}
-          >
-            Sign in with Google
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={signInWithGoogle}
+              className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 animate-fade-in"
+              style={{ animationDelay: '0.2s' }}
+            >
+              Sign in with Google
+            </Button>
+            <Button
+              variant="outline"
+              onClick={signInAsDemo}
+              className="animate-fade-in"
+              style={{ animationDelay: '0.25s' }}
+            >
+              Continue with Demo
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -86,7 +96,7 @@ const Landing = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5"></div>
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-72 h-72 bg-accent/10 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
-        
+
         <div className="container mx-auto text-center relative z-10">
           <Badge variant="secondary" className="mb-4 bg-gradient-to-r from-primary/10 to-accent/10 border border-accent/20 animate-fade-in hover:scale-105 transition-transform duration-200">
             <Brain className="w-4 h-4 mr-2" />
@@ -96,20 +106,20 @@ const Landing = () => {
             Transform Your Google Business Insights
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto animate-fade-in" style={{ animationDelay: '0.4s' }}>
-            Get AI-powered sentiment analysis, automated review responses, and deep insights 
+            Get AI-powered sentiment analysis, automated review responses, and deep insights
             from your Google Business Profile. Turn customer feedback into actionable business intelligence.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            <Button 
-              onClick={signInWithGoogle} 
+            <Button
+              onClick={signInWithGoogle}
               size="lg"
               className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-lg px-8 py-6"
             >
               <BarChart3 className="w-5 h-5 mr-2" />
               Start Free Analysis
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="lg"
               className="text-lg px-8 py-6 border-2 hover:bg-muted/50 transition-all duration-300 hover:scale-105 group"
               asChild
@@ -118,6 +128,14 @@ const Landing = () => {
                 <MessageSquare className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
                 Learn More
               </a>
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="text-lg px-8 py-6"
+              onClick={signInAsDemo}
+            >
+              Explore Demo
             </Button>
           </div>
         </div>
@@ -136,8 +154,8 @@ const Landing = () => {
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Card 
-                key={feature.title} 
+              <Card
+                key={feature.title}
                 className="border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-lg hover:-translate-y-2 group animate-fade-in bg-gradient-card"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
@@ -171,11 +189,11 @@ const Landing = () => {
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {plans.map((plan, index) => (
-              <Card 
-                key={plan.name} 
+              <Card
+                key={plan.name}
                 className={`relative border-2 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 group animate-fade-in ${
-                  plan.name === "Professional" 
-                    ? "border-primary shadow-elegant bg-gradient-to-br from-primary/5 to-accent/5 scale-105" 
+                  plan.name === "Professional"
+                    ? "border-primary shadow-elegant bg-gradient-to-br from-primary/5 to-accent/5 scale-105"
                     : "hover:border-primary/20 bg-gradient-card"
                 }`}
                 style={{ animationDelay: `${index * 0.1}s` }}
@@ -202,17 +220,18 @@ const Landing = () => {
                       </div>
                     ))}
                   </div>
-                  <Button 
-                    onClick={signInWithGoogle} 
+                  <Button
+                    onClick={signInWithGoogle}
                     className={`w-full transition-all duration-300 hover:scale-105 ${
-                      plan.name === "Professional" 
-                        ? "bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-glow" 
+                      plan.name === "Professional"
+                        ? "bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-glow"
                         : "hover:bg-primary/90"
                     }`}
                     variant={plan.name === "Professional" ? "default" : "outline"}
                   >
                     Get Started
                   </Button>
+                  <Button variant="ghost" className="w-full" onClick={signInAsDemo}>Try Demo</Button>
                 </CardContent>
               </Card>
             ))}
@@ -230,7 +249,7 @@ const Landing = () => {
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Join thousands of businesses using AI to understand their customers better
             </p>
-            <Button 
+            <Button
               onClick={signInWithGoogle}
               size="lg"
               className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-glow transition-all duration-300 hover:scale-110 text-lg px-12 py-6"

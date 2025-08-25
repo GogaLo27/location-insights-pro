@@ -129,11 +129,18 @@ const Reviews = () => {
     try {
       // Check if demo user and use mock data
       if (user.email === 'demolip29@gmail.com') {
-        const { mockReviews } = await import('@/utils/mockData');
+        const { mockReviews, mockLocations } = await import('@/utils/mockData');
         let filteredReviews = mockReviews;
 
-        if (locationId && locationId !== 'all') {
-          filteredReviews = mockReviews.filter(review => review.location_id === locationId);
+        if (locationId && locationId !== 'all' && selectedLocation) {
+          // Map the selected demo location's google_place_id to its mock id
+          // selectedLocation only has google_place_id + location_name in demo
+          const demoPlaceId: string | undefined = (selectedLocation as any).google_place_id;
+          const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
+          const demoLocationId = match?.id;
+          if (demoLocationId) {
+            filteredReviews = mockReviews.filter(review => review.location_id === demoLocationId);
+          }
         }
 
         setReviews(filteredReviews.map(review => ({

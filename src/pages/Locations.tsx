@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
 
 interface Location {
   id: string;
@@ -71,6 +72,27 @@ const Locations = () => {
   const fetchLocations = async () => {
     try {
       setLoading(true);
+      // Demo: use mock locations without calling Google
+      if (user?.email === DEMO_EMAIL) {
+        const demo: Location[] = mockLocations.map((m) => ({
+          id: m.id,
+          google_place_id: m.google_place_id,
+          name: m.name,
+          address: m.address ?? null,
+          phone: null,
+          website: null,
+          rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+          total_reviews: m.id === 'demo-location-2' ? 178 : 342,
+          latitude: null,
+          longitude: null,
+          status: 'active',
+          last_fetched_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+        setLocations(demo);
+        return;
+      }
       let { data: { session } } = await supabase.auth.getSession();
       let googleAccessToken = session?.provider_token;
       if (!googleAccessToken) {
@@ -111,6 +133,26 @@ const Locations = () => {
 
   const fetchFromGoogle = async () => {
     try {
+      if (user?.email === DEMO_EMAIL) {
+        toast({ title: "Demo Mode", description: "Using mock locations in demo." });
+        setLocations(mockLocations.map((m) => ({
+          id: m.id,
+          google_place_id: m.google_place_id,
+          name: m.name,
+          address: m.address ?? null,
+          phone: null,
+          website: null,
+          rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+          total_reviews: m.id === 'demo-location-2' ? 178 : 342,
+          latitude: null,
+          longitude: null,
+          status: 'active',
+          last_fetched_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }) as any));
+        return;
+      }
       let { data: { session } } = await supabase.auth.getSession();
       let googleAccessToken = session?.provider_token;
       if (!googleAccessToken) {
@@ -157,6 +199,31 @@ const Locations = () => {
         description: "Please enter a search term",
         variant: "destructive",
       });
+      return;
+    }
+    // Demo: pretend search found our mock locations and show them
+    if (user?.email === DEMO_EMAIL) {
+      const filtered = mockLocations.filter((l) =>
+        l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (l.address || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setLocations((filtered.length > 0 ? filtered : mockLocations).map((m) => ({
+        id: m.id,
+        google_place_id: m.google_place_id,
+        name: m.name,
+        address: m.address ?? null,
+        phone: null,
+        website: null,
+        rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+        total_reviews: m.id === 'demo-location-2' ? 178 : 342,
+        latitude: null,
+        longitude: null,
+        status: 'active',
+        last_fetched_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })) as any);
+      toast({ title: "Success", description: `Found ${(filtered.length > 0 ? filtered : mockLocations).length} locations` });
       return;
     }
     if (profile && locations.length >= profile.locations_limit) {
@@ -271,8 +338,8 @@ const Locations = () => {
                       onKeyPress={(e) => e.key === 'Enter' && handleSearchLocations()}
                     />
                   </div>
-                  <Button 
-                    onClick={handleSearchLocations} 
+                  <Button
+                    onClick={handleSearchLocations}
                     disabled={!searchTerm.trim() || isSearching}
                   >
                     {isSearching ? (
@@ -308,7 +375,7 @@ const Locations = () => {
                             {location.address}
                           </CardDescription>
                         </div>
-                        <Badge 
+                        <Badge
                           variant={location.status === 'active' ? 'default' : 'secondary'}
                           className="capitalize"
                         >

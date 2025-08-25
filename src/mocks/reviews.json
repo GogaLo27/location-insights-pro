@@ -1,0 +1,28 @@
+// src/mocks/reviews.json
+[
+  {
+    "reviewId": "r1",
+    "locationId": "locations/123",
+    "starRating": 5,
+    "comment": "Great espresso and vibe.",
+    "reviewer": "Anna K.",
+    "createTime": "2025-07-01T10:00:00Z",
+    "reply": { "comment": "Thanks Anna! ☕", "updateTime": "2025-07-02T12:00:00Z" }
+  },
+  {
+    "reviewId": "r2",
+    "locationId": "locations/123",
+    "starRating": 3,
+    "comment": "Nice place but a bit crowded.",
+    "reviewer": "Giorgi M.",
+    "createTime": "2025-07-05T13:30:00Z"
+  },
+  {
+    "reviewId": "r3",
+    "locationId": "locations/456",
+    "starRating": 4,
+    "comment": "Clean gym, good equipment.",
+    "reviewer": "Nino D.",
+    "createTime": "2025-07-04T09:10:00Z"
+  }
+]
