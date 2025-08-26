@@ -15,6 +15,15 @@ export const mockLocations = [
   }
 ];
 
+// Base seed snippets used to synthesize a larger set of demo reviews
+const baseSnippets = [
+  { author: 'Sarah Johnson', text: 'Amazing food and excellent service! The pasta was perfectly cooked and the staff was very attentive. Will definitely come back again.', rating: 5, tags: ['food quality', 'service', 'pasta', 'staff'], sentiment: 'positive' },
+  { author: 'Mike Chen', text: 'The food was okay but the wait time was really long. We waited almost 45 minutes for our order. The atmosphere is nice though.', rating: 3, tags: ['wait time', 'food quality', 'atmosphere'], sentiment: 'neutral' },
+  { author: 'Emily Davis', text: 'Disappointing experience. The food was cold when it arrived and the server seemed uninterested. Expected much better based on the reviews.', rating: 2, tags: ['food temperature', 'service attitude', 'expectations'], sentiment: 'negative' },
+  { author: 'David Wilson', text: 'Great coffee and cozy atmosphere! Perfect place to work on my laptop. The wifi is fast and the baristas are friendly.', rating: 5, tags: ['coffee quality', 'atmosphere', 'wifi', 'staff'], sentiment: 'positive' },
+  { author: 'Lisa Martinez', text: 'The coffee is good but quite expensive for the portion size. Also, the place gets very crowded in the mornings.', rating: 3, tags: ['pricing', 'portion size', 'crowding'], sentiment: 'neutral' },
+];
+
 export const mockReviews = [
   {
     id: 'demo-review-1',
@@ -133,3 +142,48 @@ export const mockSelectedLocation = {
 export const isDemoUser = (email: string | undefined) => {
   return email === DEMO_EMAIL;
 };
+
+// Generate 50 reviews per location deterministically for demo mode
+export function getDemoReviewsForLocation(locationId: string): any[] {
+  const reviews: any[] = [];
+  const total = 50;
+  const now = new Date();
+  for (let i = 0; i < total; i++) {
+    const seed = baseSnippets[i % baseSnippets.length];
+    const dayOffset = i;
+    const d = new Date(now);
+    d.setDate(now.getDate() - dayOffset);
+    const id = `${locationId}-rev-${i + 1}`;
+    const rating = seed.rating + ((i % 10 === 0) ? -1 : 0);
+    const clippedRating = Math.max(1, Math.min(5, rating));
+    const sentiment = clippedRating >= 4 ? 'positive' : clippedRating <= 2 ? 'negative' : 'neutral';
+    reviews.push({
+      id,
+      user_id: 'demo-user-id',
+      google_review_id: id,
+      location_id: locationId,
+      author_name: seed.author,
+      text: seed.text,
+      rating: clippedRating,
+      review_date: d.toISOString(),
+      reply_text: i % 4 === 0 ? 'Thanks for your feedback! We appreciate your support.' : null,
+      reply_date: i % 4 === 0 ? new Date(d.getTime() + 24 * 3600 * 1000).toISOString() : null,
+      ai_sentiment: sentiment,
+      ai_tags: seed.tags,
+      ai_issues: sentiment === 'negative' ? ['Service delays', 'Temperature control'] : [],
+      ai_suggestions: sentiment !== 'negative' ? ['Maintain service levels'] : ['Improve speed of service'],
+      ai_analyzed_at: new Date(d.getTime() + 2 * 3600 * 1000).toISOString(),
+      created_at: d.toISOString(),
+      updated_at: d.toISOString()
+    });
+  }
+  // Sort newest first
+  return reviews.sort((a, b) => +new Date(b.review_date) - +new Date(a.review_date));
+}
+
+export function getAllDemoReviews(): any[] {
+  return [
+    ...getDemoReviewsForLocation('demo-location-1'),
+    ...getDemoReviewsForLocation('demo-location-2'),
+  ];
+}

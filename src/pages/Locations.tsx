@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
+import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 
 interface Location {
   id: string;
@@ -41,6 +42,8 @@ interface Profile {
 const Locations = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { setSelectedLocation } = useLocationContext();
   const [locations, setLocations] = useState<Location[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,7 +85,7 @@ const Locations = () => {
           phone: null,
           website: null,
           rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
-          total_reviews: m.id === 'demo-location-2' ? 178 : 342,
+          total_reviews: 50,
           latitude: null,
           longitude: null,
           status: 'active',
@@ -143,7 +146,7 @@ const Locations = () => {
           phone: null,
           website: null,
           rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
-          total_reviews: m.id === 'demo-location-2' ? 178 : 342,
+          total_reviews: 50,
           latitude: null,
           longitude: null,
           status: 'active',
@@ -215,7 +218,7 @@ const Locations = () => {
         phone: null,
         website: null,
         rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
-        total_reviews: m.id === 'demo-location-2' ? 178 : 342,
+        total_reviews: 50,
         latitude: null,
         longitude: null,
         status: 'active',
@@ -323,9 +326,9 @@ const Locations = () => {
 
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle>Add New Location</CardTitle>
+                <CardTitle>Find Location</CardTitle>
                 <CardDescription>
-                  Search for your Google Business location to start tracking reviews and analytics
+                  Type to filter your locations. To add new ones, use search.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -365,7 +368,16 @@ const Locations = () => {
               </Card>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {locations.map((location) => (
+                {locations
+                  .filter((l) => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      l.name.toLowerCase().includes(q) ||
+                      (l.address || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((location) => (
                   <Card key={location.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
                       <div className="flex items-start justify-between">
@@ -407,10 +419,32 @@ const Locations = () => {
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/reviews'}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={async () => {
+                              await setSelectedLocation({
+                                google_place_id: location.google_place_id,
+                                location_name: location.name,
+                              });
+                              navigate('/reviews');
+                            }}
+                          >
                             View Reviews
                           </Button>
-                          <Button variant="outline" size="sm" className="w-full" onClick={() => window.location.href = '/sentiment'}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={async () => {
+                              await setSelectedLocation({
+                                google_place_id: location.google_place_id,
+                                location_name: location.name,
+                              });
+                              navigate('/sentiment');
+                            }}
+                          >
                             Analytics
                           </Button>
                         </div>

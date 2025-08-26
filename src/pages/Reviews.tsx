@@ -41,6 +41,8 @@ const Reviews = () => {
   const { selectedLocation } = useLocation();
   const { toast } = useToast();
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
@@ -86,6 +88,7 @@ const Reviews = () => {
     resetFetchProgress();
     setReviews([]);
     if (user && selectedLocation) {
+      setPage(1);
       fetchReviews(false); // Load cached reviews quickly
     }
   }, [user, selectedLocation]);
@@ -129,8 +132,8 @@ const Reviews = () => {
     try {
       // Check if demo user and use mock data
       if (user.email === 'demolip29@gmail.com') {
-        const { mockReviews, mockLocations } = await import('@/utils/mockData');
-        let filteredReviews = mockReviews;
+        const { getDemoReviewsForLocation, mockLocations } = await import('@/utils/mockData');
+        let filteredReviews: any[] = [];
 
         if (locationId && locationId !== 'all' && selectedLocation) {
           // Map the selected demo location's google_place_id to its mock id
@@ -139,7 +142,7 @@ const Reviews = () => {
           const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
           const demoLocationId = match?.id;
           if (demoLocationId) {
-            filteredReviews = mockReviews.filter(review => review.location_id === demoLocationId);
+            filteredReviews = getDemoReviewsForLocation(demoLocationId);
           }
         }
 
@@ -432,6 +435,9 @@ const Reviews = () => {
     return matchesSearch && matchesSentiment && matchesRating && matchesTag;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredReviews.length / pageSize));
+  const pagedReviews = filteredReviews.slice((page - 1) * pageSize, page * pageSize);
+
   const getAverageRating = () =>
     reviews.length === 0 ? 0 : (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1);
 
@@ -664,7 +670,7 @@ const Reviews = () => {
                   </CardContent>
                 </Card>
               ) : (
-                filteredReviews.map((review) => (
+                pagedReviews.map((review) => (
                   <Card key={review.id}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
@@ -744,6 +750,22 @@ const Reviews = () => {
                     </CardContent>
                   </Card>
                 ))
+              )}
+              {/* Pagination */}
+              {filteredReviews.length > 0 && (
+                <div className="flex items-center justify-between pt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Page {page} of {totalPages} — {filteredReviews.length} reviews
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
