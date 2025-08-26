@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
@@ -43,6 +45,7 @@ const currencyFmt = (amountCents: number, currency: string) =>
 const PlanManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<BillingPlanRow[]>([]);
@@ -265,6 +268,8 @@ const PlanManagement = () => {
                 );
               })}
             </div>
+
+            {/* Theme selector moved to header toggle */}
           </div>
         </SidebarInset>
       </div>

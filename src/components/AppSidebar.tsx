@@ -46,10 +46,12 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-muted text-primary font-medium" : "hover:bg-muted/50";
+    isActive
+      ? "bg-muted font-medium text-sidebar-foreground dark:text-white dark:bg-neutral-800"
+      : "hover:bg-muted/50 text-sidebar-foreground/80 hover:text-sidebar-foreground dark:text-white/80 dark:hover:text-white dark:hover:bg-neutral-800/70";
 
   return (
-    <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
+    <Sidebar className={(collapsed ? "w-14 " : "w-60 ") + "bg-sidebar text-sidebar-foreground dark:bg-background dark:text-foreground"} collapsible="icon">
       <SidebarHeader className="border-b">
         <div className="flex items-center space-x-2 px-4 py-4">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -63,7 +65,7 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="dark:text-white/80">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navigationItems.map((item) => (
@@ -81,13 +83,13 @@ export function AppSidebar() {
         </SidebarGroup>
         
         <SidebarGroup>
-          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupLabel className="dark:text-white/80">Account</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton>
                   <Settings className="h-4 w-4" />
-                  {!collapsed && <span>Settings</span>}
+                  {!collapsed && <span className="dark:text-white">Settings</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

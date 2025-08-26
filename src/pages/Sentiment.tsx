@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import LocationSelector from "@/components/LocationSelector";
+import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { MapPin, TrendingUp, TrendingDown, Minus, Calendar as CalendarIcon, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -41,55 +42,19 @@ const Sentiment = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("monthly");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subMonths(new Date(), 6),
     to: new Date()
   });
-
-  useEffect(() => {
-    if (user) {
-      fetchLocations();
-    }
-  }, [user]);
+  const { selectedLocation: ctxSelectedLocation } = useLocationContext();
 
   useEffect(() => {
     if (user) {
       fetchSentimentData();
     }
-  }, [user, selectedLocation, selectedPeriod, dateRange]);
-
-  const fetchLocations = async () => {
-    if (!user) return;
-
-    try {
-      // Check if demo user and use mock data
-      if (user.email === 'demolip29@gmail.com') {
-        const { mockLocations } = await import('@/utils/mockData');
-        setLocations(mockLocations);
-        return;
-      }
-
-      // Use edge function to get locations
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: {
-          action: 'get_user_locations'
-        }
-      });
-
-      if (!error && data?.locations) {
-        setLocations(data.locations);
-      } else {
-        setLocations([]);
-      }
-    } catch (error) {
-      console.error('Error fetching locations:', error);
-      setLocations([]);
-    }
-  };
+  }, [user, ctxSelectedLocation?.google_place_id, selectedPeriod, dateRange]);
 
   const fetchSentimentData = async () => {
     if (!user) return;
@@ -97,16 +62,24 @@ const Sentiment = () => {
     try {
       setLoading(true);
 
-      // Check if demo user and use mock data
+      // Check if demo user and use the same generated demo reviews as Reviews page
       if (user.email === 'demolip29@gmail.com') {
-        const { mockReviews, mockLocations } = await import('@/utils/mockData');
-        let filteredReviews = mockReviews.filter(review => review.ai_sentiment !== null);
-
-        if (selectedLocation !== "all") {
-          // selectedLocation here is an id from the dropdown populated by fetchLocations
-          // which uses mockLocations in demo mode, so it aligns to mock ids
-          filteredReviews = filteredReviews.filter(review => review.location_id === selectedLocation);
+        const { getDemoReviewsForLocation, mockLocations } = await import('@/utils/mockData');
+        let filteredReviews: any[] = [];
+        const demoPlaceId: string | undefined = (ctxSelectedLocation as any)?.google_place_id;
+        const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
+        const demoLocationId = match?.id || mockLocations[0]?.id;
+        if (demoLocationId) {
+          filteredReviews = getDemoReviewsForLocation(demoLocationId);
         }
+
+        // Apply date range filter
+        filteredReviews = filteredReviews
+          .filter((r) => r.ai_sentiment !== null)
+          .filter((r) => {
+            const d = new Date(r.review_date);
+            return d >= dateRange.from && d <= dateRange.to;
+          });
 
         const processedData = processReviewsIntoSentimentData(filteredReviews);
         setSentimentData(processedData);
@@ -121,8 +94,9 @@ const Sentiment = () => {
         .lte('review_date', format(dateRange.to, 'yyyy-MM-dd'))
         .not('ai_sentiment', 'is', null);
 
-      if (selectedLocation !== "all") {
-        query = query.eq('location_id', selectedLocation);
+      const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
+      if (locationId) {
+        query = query.eq('location_id', locationId);
       }
 
       const { data: reviews, error } = await query;
@@ -247,7 +221,7 @@ const Sentiment = () => {
       const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
         body: {
           action: 'generate_sentiment_analysis',
-          location_id: selectedLocation !== "all" ? selectedLocation : undefined,
+          location_id: ctxSelectedLocation?.google_place_id,
           period_type: selectedPeriod,
           start_date: format(dateRange.from, 'yyyy-MM-dd'),
           end_date: format(dateRange.to, 'yyyy-MM-dd')
@@ -358,21 +332,7 @@ const Sentiment = () => {
             <div className="flex items-center space-x-4 ml-4">
               <LocationSelector />
             </div>
-            <div className="flex items-center space-x-4 ml-auto">
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="flex items-center space-x-4 ml-auto"></div>
           </header>
 
           <div className="flex-1 space-y-4 p-8 pt-6">

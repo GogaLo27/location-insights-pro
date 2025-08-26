@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DEMO_EMAIL } from "@/utils/mockData";
 
 interface SubscriptionRow {
   id: string;
@@ -39,6 +40,35 @@ export default function OrderHistory() {
       if (!user) return;
       setLoading(true);
       try {
+        // Demo: populate mock subscriptions and events
+        if (user.email === DEMO_EMAIL) {
+          if (!mounted) return;
+          const now = new Date();
+          const iso = (d: Date) => d.toISOString();
+          const subId = "demo-sub-001";
+          const demoSubs: SubscriptionRow[] = [
+            {
+              id: subId,
+              plan_type: "professional",
+              status: "active",
+              provider_subscription_id: "I-FAKEPAYPAL-0001",
+              created_at: iso(new Date(now.getTime() - 90 * 24 * 3600 * 1000)),
+              updated_at: iso(new Date(now.getTime() - 1 * 24 * 3600 * 1000)),
+              current_period_end: iso(new Date(now.getTime() + 20 * 24 * 3600 * 1000)),
+              cancel_at_period_end: false,
+            },
+          ];
+          const demoEvents: EventRow[] = [
+            { id: "evt-001", event_type: "subscription_created", created_at: iso(new Date(now.getTime() - 90 * 24 * 3600 * 1000)), subscription_id: subId },
+            { id: "evt-002", event_type: "payment_succeeded", created_at: iso(new Date(now.getTime() - 60 * 24 * 3600 * 1000)), subscription_id: subId },
+            { id: "evt-003", event_type: "payment_succeeded", created_at: iso(new Date(now.getTime() - 30 * 24 * 3600 * 1000)), subscription_id: subId },
+            { id: "evt-004", event_type: "plan_updated", created_at: iso(new Date(now.getTime() - 25 * 24 * 3600 * 1000)), subscription_id: subId },
+            { id: "evt-005", event_type: "payment_succeeded", created_at: iso(new Date(now.getTime() - 1 * 24 * 3600 * 1000)), subscription_id: subId },
+          ];
+          setSubs(demoSubs);
+          setEvents(demoEvents);
+          return;
+        }
         const sb: any = supabase;
         const { data: subsData } = await sb
           .from("subscriptions")
