@@ -15,13 +15,21 @@ export const mockLocations = [
   }
 ];
 
-// Base seed snippets used to synthesize a larger set of demo reviews
-const baseSnippets = [
+// Location-specific seed snippets used to synthesize larger sets of demo reviews
+const restaurantSnippets = [
   { author: 'Sarah Johnson', text: 'Amazing food and excellent service! The pasta was perfectly cooked and the staff was very attentive. Will definitely come back again.', rating: 5, tags: ['food quality', 'service', 'pasta', 'staff'], sentiment: 'positive' },
   { author: 'Mike Chen', text: 'The food was okay but the wait time was really long. We waited almost 45 minutes for our order. The atmosphere is nice though.', rating: 3, tags: ['wait time', 'food quality', 'atmosphere'], sentiment: 'neutral' },
   { author: 'Emily Davis', text: 'Disappointing experience. The food was cold when it arrived and the server seemed uninterested. Expected much better based on the reviews.', rating: 2, tags: ['food temperature', 'service attitude', 'expectations'], sentiment: 'negative' },
+  { author: 'James Park', text: 'The steak was cooked perfectly and the wine pairing was on point. Cozy vibe.', rating: 5, tags: ['steak', 'wine', 'ambiance'], sentiment: 'positive' },
+  { author: 'Priya Patel', text: 'Loved the vegetarian options but the desserts were underwhelming.', rating: 4, tags: ['vegetarian', 'dessert'], sentiment: 'neutral' },
+];
+
+const cafeSnippets = [
   { author: 'David Wilson', text: 'Great coffee and cozy atmosphere! Perfect place to work on my laptop. The wifi is fast and the baristas are friendly.', rating: 5, tags: ['coffee quality', 'atmosphere', 'wifi', 'staff'], sentiment: 'positive' },
   { author: 'Lisa Martinez', text: 'The coffee is good but quite expensive for the portion size. Also, the place gets very crowded in the mornings.', rating: 3, tags: ['pricing', 'portion size', 'crowding'], sentiment: 'neutral' },
+  { author: 'Hiro Tanaka', text: 'Flat white was perfect, but they ran out of almond croissants by noon.', rating: 4, tags: ['coffee', 'bakery'], sentiment: 'positive' },
+  { author: 'Ava Thompson', text: 'Tables were sticky and there was a long line. Needs better rush-hour management.', rating: 2, tags: ['cleanliness', 'queue'], sentiment: 'negative' },
+  { author: 'Omar Khaled', text: 'Love the outdoor seating and the matcha latte. Calm vibe in the afternoon.', rating: 5, tags: ['outdoor seating', 'matcha', 'vibe'], sentiment: 'positive' },
 ];
 
 export const mockReviews = [
@@ -148,8 +156,9 @@ export function getDemoReviewsForLocation(locationId: string): any[] {
   const reviews: any[] = [];
   const total = 50;
   const now = new Date();
+  const snippets = locationId === 'demo-location-2' ? cafeSnippets : restaurantSnippets;
   for (let i = 0; i < total; i++) {
-    const seed = baseSnippets[i % baseSnippets.length];
+    const seed = snippets[i % snippets.length];
     const dayOffset = i;
     const d = new Date(now);
     d.setDate(now.getDate() - dayOffset);
