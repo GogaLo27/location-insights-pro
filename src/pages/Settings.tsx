@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -339,35 +339,7 @@ const Settings = () => {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    if (!currentPlan) return;
 
-    try {
-      const { data: authData } = await supabase.auth.getSession();
-      const jwt = authData.session?.access_token || "";
-
-      const res = await supabase.functions.invoke("paypal-sync-subscription", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-      if (res.error) throw new Error(res.error.message);
-
-      toast({
-        title: "Subscription Cancelled",
-        description: "Your subscription has been cancelled successfully.",
-      });
-
-      // Refresh plan data
-      fetchUserData();
-    } catch (error) {
-      console.error("Error cancelling subscription:", error);
-      toast({
-        title: "Error",
-        description: "Failed to cancel subscription. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const getPlanIcon = (planType: string) => {
     switch (planType) {
@@ -535,33 +507,7 @@ const Settings = () => {
                       </div>
                     )}
 
-                    {currentPlan && (
-                      <div className="space-y-4">
-                        <Separator />
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold">Cancel Subscription</h4>
-                            <p className="text-sm text-muted-foreground">
-                              Cancel your subscription at any time
-                            </p>
-                          </div>
-                          <Button variant="outline" onClick={handleCancelSubscription}>
-                            Cancel Subscription
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold">Billing History</h4>
-                            <p className="text-sm text-muted-foreground">
-                              View your past invoices and payments
-                            </p>
-                          </div>
-                          <Button variant="outline" asChild>
-                            <a href="/orders">View History</a>
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    
                   </CardContent>
                 </Card>
               </TabsContent>

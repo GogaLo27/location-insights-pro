@@ -51,13 +51,13 @@ export default function PlanSelection() {
       if (!user) return;
       setLoading(true);
       try {
-        // fetch PayPal plans from DB
+        // fetch fake plans from DB
         const { data, error } = await (supabase as any)
           .from("billing_plans")
           .select(
             "id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at"
           )
-          .eq("provider", "paypal")
+          .eq("provider", "fake")
           .order("price_cents", { ascending: true });
 
         if (error) throw error;
@@ -147,12 +147,10 @@ export default function PlanSelection() {
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
-      // Use your existing edge function that returns approval_url
-      const res = await supabase.functions.invoke("paypal-create-subscription", {
+      // Use fake payment system
+      const res = await supabase.functions.invoke("fake-payment", {
         body: {
-          plan_type: planType, // keep existing contract; backend should map to provider_plan_id
-          return_url: `${window.location.origin}/billing/success`,
-          cancel_url: `${window.location.origin}/billing/cancel`,
+          plan_type: planType,
         },
         headers: { Authorization: `Bearer ${jwt}` },
       });
@@ -170,23 +168,28 @@ export default function PlanSelection() {
         }
       }
 
-      if (!payload?.approval_url) {
+      if (!payload?.success) {
         console.error("Unexpected payload shape:", payload);
-        throw new Error("No approval_url returned");
+        throw new Error("Payment failed");
       }
 
-      if (payload.subscription_id) {
-        localStorage.setItem("pendingSubId", payload.subscription_id);
-      }
+      // Show success message
+      toast({
+        title: "Payment Successful!",
+        description: payload.message || "Your subscription has been activated.",
+      });
 
-      // Redirect to PayPal. If Guest Checkout / ACDC is enabled,
-      // buyer can pay by card without logging in (per PayPal docs).
-      window.location.href = payload.approval_url;
+      // Redirect to dashboard
+      if (payload.redirect_url) {
+        window.location.href = payload.redirect_url;
+      } else {
+        window.location.href = "/dashboard";
+      }
     } catch (e: any) {
       console.error(e);
       toast({
         title: "Payment error",
-        description: e.message || "Failed to start subscription",
+        description: e.message || "Failed to process payment",
         variant: "destructive",
       });
       setSubmittingPlan(null);
@@ -281,15 +284,15 @@ export default function PlanSelection() {
                       </div>
 
                       {/* PayPal/Card button */}
-                      <Button
-                        className="w-full"
-                        onClick={() => handleSubscribe(p.plan_type)}
-                        disabled={submittingPlan === p.plan_type}
-                      >
-                        {submittingPlan === p.plan_type
-                          ? "Redirecting…"
-                          : "Pay with PayPal / Card"}
-                      </Button>
+                                             <Button
+                         className="w-full"
+                         onClick={() => handleSubscribe(p.plan_type)}
+                         disabled={submittingPlan === p.plan_type}
+                       >
+                         {submittingPlan === p.plan_type
+                           ? "Processing..."
+                           : "Activate Plan (Free Demo)"}
+                       </Button>
                     </CardContent>
                   </Card>
                 );
