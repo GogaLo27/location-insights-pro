@@ -14,6 +14,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DEMO_EMAIL } from "@/utils/mockData";
 import { 
   Settings as SettingsIcon, 
   CreditCard, 
@@ -67,6 +68,30 @@ const Settings = () => {
     
     setSaving(true);
     try {
+      // Handle demo user differently
+      if (user?.email === DEMO_EMAIL) {
+        // For demo users, just update the local state and save to localStorage
+        const updatedProfile = {
+          ...userProfile,
+          two_factor_auth: twoFactorAuth,
+          session_timeout: parseInt(sessionTimeout),
+          updated_at: new Date().toISOString(),
+        };
+        setUserProfile(updatedProfile);
+        
+        // Save to localStorage for demo persistence
+        localStorage.setItem('demo_user_profile', JSON.stringify(updatedProfile));
+        
+        toast({
+          title: "Security Settings Updated",
+          description: "Your security settings have been successfully updated.",
+        });
+        
+        setSaving(false);
+        return;
+      }
+
+      // Real user - use Edge Function
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
@@ -107,6 +132,51 @@ const Settings = () => {
 
   const fetchUserData = async () => {
     try {
+      // Handle demo user differently
+      if (user?.email === DEMO_EMAIL) {
+        // For demo users, use mock data and localStorage
+        const savedProfile = localStorage.getItem('demo_user_profile');
+        
+        if (savedProfile) {
+          const profileData = JSON.parse(savedProfile);
+          setUserProfile(profileData);
+          setTwoFactorAuth(profileData.two_factor_auth || false);
+          setSessionTimeout(profileData.session_timeout?.toString() || "30");
+        } else {
+          // Create default demo profile
+          const defaultProfile = {
+            id: user?.id || "demo-user-id",
+            email: user?.email || DEMO_EMAIL,
+            full_name: "Demo User",
+            company_name: "Demo Company",
+            phone: "+1 (555) 123-4567",
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            language: "en",
+            two_factor_auth: false,
+            session_timeout: 30,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setUserProfile(defaultProfile);
+          setTwoFactorAuth(false);
+          setSessionTimeout("30");
+          
+          // Save to localStorage
+          localStorage.setItem('demo_user_profile', JSON.stringify(defaultProfile));
+        }
+
+        // Set demo plan
+        setCurrentPlan({
+          id: "demo-plan-1",
+          plan_type: "professional",
+          created_at: new Date().toISOString(),
+        });
+        
+        setLoading(false);
+        return;
+      }
+
+      // Real user - fetch from database
       // Fetch current plan
       const { data: planData } = await supabase
         .from("user_plans")
@@ -153,6 +223,28 @@ const Settings = () => {
     
     setSaving(true);
     try {
+      // Handle demo user differently
+      if (user?.email === DEMO_EMAIL) {
+        // For demo users, just update the local state and save to localStorage
+        const updatedProfile = {
+          ...userProfile,
+          updated_at: new Date().toISOString(),
+        };
+        setUserProfile(updatedProfile);
+        
+        // Save to localStorage for demo persistence
+        localStorage.setItem('demo_user_profile', JSON.stringify(updatedProfile));
+        
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been successfully updated.",
+        });
+        
+        setSaving(false);
+        return;
+      }
+
+      // Real user - use Edge Function
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
@@ -200,6 +292,24 @@ const Settings = () => {
 
     setDeleting(true);
     try {
+      // Handle demo user differently
+      if (user?.email === DEMO_EMAIL) {
+        // For demo users, just clear localStorage and sign out
+        localStorage.removeItem('demo_user_profile');
+        localStorage.removeItem('lip_demo_mode');
+        
+        toast({
+          title: "Demo Account Deleted",
+          description: "Your demo account has been deleted. You will be signed out.",
+        });
+
+        // Sign out and redirect
+        await signOut();
+        window.location.href = "/";
+        return;
+      }
+
+      // Real user - use Edge Function
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
