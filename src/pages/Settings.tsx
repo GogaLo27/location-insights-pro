@@ -167,7 +167,10 @@ const Settings = () => {
         headers: { Authorization: `Bearer ${jwt}` },
       });
 
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) {
+        console.error('Function error:', res.error);
+        throw new Error(res.error.message || 'Unknown error occurred');
+      }
 
       toast({
         title: "Profile Updated",

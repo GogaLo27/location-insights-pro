@@ -47,25 +47,67 @@ serve(async (req) => {
       )
     }
 
-    // Update the user profile
-    const { data, error } = await supabaseClient
+    // First, check if profile exists
+    const { data: existingProfile, error: checkError } = await supabaseClient
       .from('user_profiles')
-      .update({
-        full_name,
-        company_name: company_name || null,
-        phone: phone || null,
-        timezone: timezone || 'America/New_York',
-        language: language || 'en',
-        updated_at: new Date().toISOString()
-      })
+      .select('id')
       .eq('id', user.id)
-      .select()
       .single()
 
-    if (error) {
-      console.error('Error updating profile:', error)
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('Error checking profile:', checkError)
       return new Response(
-        JSON.stringify({ error: 'Failed to update profile' }),
+        JSON.stringify({ error: 'Failed to check profile existence' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    let result;
+    
+    if (existingProfile) {
+      // Update existing profile
+      result = await supabaseClient
+        .from('user_profiles')
+        .update({
+          full_name,
+          company_name: company_name || null,
+          phone: phone || null,
+          timezone: timezone || 'America/New_York',
+          language: language || 'en',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
+    } else {
+      // Insert new profile
+      result = await supabaseClient
+        .from('user_profiles')
+        .insert({
+          id: user.id,
+          email: user.email || '',
+          full_name,
+          company_name: company_name || null,
+          phone: phone || null,
+          timezone: timezone || 'America/New_York',
+          language: language || 'en',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+    }
+
+    if (result.error) {
+      console.error('Error updating/inserting profile:', result.error)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to update profile',
+          details: result.error.message 
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -76,7 +118,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        data,
+        data: result.data,
         message: 'Profile updated successfully' 
       }),
       { 
