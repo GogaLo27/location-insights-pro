@@ -87,9 +87,11 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Settings className="h-4 w-4" />
-                  {!collapsed && <span className="dark:text-white">Settings</span>}
+                <SidebarMenuButton asChild>
+                  <NavLink to="/settings" className={getNavCls}>
+                    <Settings className="h-4 w-4" />
+                    {!collapsed && <span>Settings</span>}
+                  </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/ui/auth-provider';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import CookieConsent from '@/components/CookieConsent';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Locations from './pages/Locations';
@@ -16,6 +17,9 @@ import BillingSuccess from './pages/BillingSuccess';
 import BillingCancel from './pages/BillingCancel';
 import OrderHistory from './pages/OrderHistory';
 import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import CookiePolicy from './pages/CookiePolicy';
+import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -92,6 +96,14 @@ const App = () => (
               }
             />
             <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/location-selection"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={false}>
@@ -120,10 +132,13 @@ const App = () => (
 
             {/* Public routes */}
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
             
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <CookieConsent />
         </BrowserRouter>
       </LocationProvider>
     </AuthProvider>
