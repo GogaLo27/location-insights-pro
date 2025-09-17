@@ -51,6 +51,20 @@ const Dashboard = () => {
     }
   }, [user, selectedLocation]);
 
+  // Handle page visibility changes to prevent unnecessary re-fetching
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user && selectedLocation && stats.totalReviews > 0) {
+        // Page became visible and we already have data - don't refetch
+        // This prevents the flash of 0 values when switching back to the tab
+        return;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, selectedLocation, stats.totalReviews]);
+
   const fetchProfile = async () => {
     try {
       // Use mock data until database migration is executed

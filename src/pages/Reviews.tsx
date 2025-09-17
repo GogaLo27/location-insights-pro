@@ -83,15 +83,45 @@ const Reviews = () => {
   } = useAnalysisProgress(`fetch_${userKey}_${locKey}`);
 
   useEffect(() => {
-    // Reset progress and reviews when location changes
-    resetProgress();
-    resetFetchProgress();
-    setReviews([]);
+    // Only reset and fetch if we have a valid location and user
     if (user && selectedLocation) {
-      setPage(1);
-      fetchReviews(false); // Load cached reviews quickly
+      // Check if this is actually a location change, not just re-initialization
+      const currentLocationId = resolveLocationId();
+      const lastLocationId = localStorage.getItem(`last_location_${userKey}`);
+      
+      if (currentLocationId && currentLocationId !== lastLocationId) {
+        // This is a real location change - reset everything
+        resetProgress();
+        resetFetchProgress();
+        setReviews([]);
+        setPage(1);
+        localStorage.setItem(`last_location_${userKey}`, currentLocationId);
+        fetchReviews(false); // Load cached reviews quickly
+      } else if (currentLocationId && currentLocationId === lastLocationId && reviews.length === 0) {
+        // Same location but no reviews loaded yet - just fetch without resetting
+        fetchReviews(false);
+      }
+    } else if (!user || !selectedLocation) {
+      // Clear state when user or location is not available
+      resetProgress();
+      resetFetchProgress();
+      setReviews([]);
     }
   }, [user, selectedLocation]);
+
+  // Handle page visibility changes to prevent unnecessary re-fetching
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user && selectedLocation && reviews.length > 0) {
+        // Page became visible and we already have reviews - don't refetch
+        // This prevents the flash of 0 values when switching back to the tab
+        return;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, selectedLocation, reviews.length]);
 
   const getSessionTokens = async () => {
     let { data: { session } } = await supabase.auth.getSession();

@@ -56,6 +56,20 @@ const Sentiment = () => {
     }
   }, [user, ctxSelectedLocation?.google_place_id, selectedPeriod, dateRange]);
 
+  // Handle page visibility changes to prevent unnecessary re-fetching
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user && ctxSelectedLocation && sentimentData.length > 0) {
+        // Page became visible and we already have data - don't refetch
+        // This prevents the flash of 0 values when switching back to the tab
+        return;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, ctxSelectedLocation, sentimentData.length]);
+
   const fetchSentimentData = async () => {
     if (!user) return;
 

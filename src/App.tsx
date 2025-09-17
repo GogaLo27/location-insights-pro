@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/ui/auth-provider';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ConditionalThemeProvider } from '@/components/ui/conditional-theme-provider';
 import CookieConsent from '@/components/CookieConsent';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
@@ -29,7 +30,8 @@ const App = () => (
     <AuthProvider>
       <LocationProvider>
         <BrowserRouter>
-          <Routes>
+          <ConditionalThemeProvider>
+            <Routes>
             <Route path="/" element={<Landing />} />
             <Route
               path="/plan-selection"
@@ -137,8 +139,9 @@ const App = () => (
             
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
-          <CookieConsent />
+            </Routes>
+            <CookieConsent />
+          </ConditionalThemeProvider>
         </BrowserRouter>
       </LocationProvider>
     </AuthProvider>
