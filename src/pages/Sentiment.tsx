@@ -59,15 +59,36 @@ const Sentiment = () => {
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("monthly");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: subYears(new Date(), 1),
-    to: new Date()
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(() => {
+    const now = new Date();
+    return { from: new Date('2020-01-01'), to: now }; // Default to "All Time"
   });
   const { selectedLocation: ctxSelectedLocation } = useLocationContext();
 
+  // Get date range to use - custom if set, otherwise default to all time
+  const getDateRange = () => {
+    if (dateRange) return dateRange;
+    const now = new Date();
+    return { from: new Date('2020-01-01'), to: now };
+  };
+
   // Chart data preparation
   const getSentimentTrendData = () => {
-    return sentimentData.map(data => ({
+    const currentDateRange = getDateRange();
+    // Filter sentiment data by the selected date range
+    const filteredData = sentimentData.filter(data => {
+      const dataDate = new Date(data.analysis_date);
+      return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+    });
+
+    // Sort by date to ensure chronological order
+    const sortedData = filteredData.sort((a, b) => {
+      const dateA = new Date(a.analysis_date);
+      const dateB = new Date(b.analysis_date);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    return sortedData.map(data => ({
       date: format(new Date(data.analysis_date), 'MMM d'),
       positive: data.positive_count,
       negative: data.negative_count,
@@ -87,12 +108,52 @@ const Sentiment = () => {
   };
 
   const getTopTagsData = () => {
-    const positiveTags = Array.from(new Set(sentimentData.flatMap(d => d.top_positive_tags || [])));
-    const negativeTags = Array.from(new Set(sentimentData.flatMap(d => d.top_negative_tags || [])));
+    const currentDateRange = getDateRange();
+    // Filter sentiment data by the selected date range
+    const filteredData = sentimentData.filter(data => {
+      const dataDate = new Date(data.analysis_date);
+      return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+    });
+
+    // Collect all positive and negative tags from filtered data
+    const allPositiveTags: string[] = [];
+    const allNegativeTags: string[] = [];
     
+    filteredData.forEach(data => {
+      if (data.top_positive_tags) {
+        allPositiveTags.push(...data.top_positive_tags);
+      }
+      if (data.top_negative_tags) {
+        allNegativeTags.push(...data.top_negative_tags);
+      }
+    });
+
+    // Count occurrences of each tag
+    const positiveTagCounts: { [key: string]: number } = {};
+    const negativeTagCounts: { [key: string]: number } = {};
+
+    allPositiveTags.forEach(tag => {
+      positiveTagCounts[tag] = (positiveTagCounts[tag] || 0) + 1;
+    });
+
+    allNegativeTags.forEach(tag => {
+      negativeTagCounts[tag] = (negativeTagCounts[tag] || 0) + 1;
+    });
+
+    // Convert to array and sort by count
+    const positiveTags = Object.entries(positiveTagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const negativeTags = Object.entries(negativeTagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
     return {
-      positive: positiveTags.slice(0, 5).map(tag => ({ tag, count: Math.floor(Math.random() * 20) + 5 })),
-      negative: negativeTags.slice(0, 5).map(tag => ({ tag, count: Math.floor(Math.random() * 15) + 3 }))
+      positive: positiveTags,
+      negative: negativeTags
     };
   };
 
@@ -179,12 +240,19 @@ const Sentiment = () => {
         }
 
         // Apply date range filter
+        const currentDateRange = getDateRange();
         filteredReviews = filteredReviews
           .filter((r) => r.ai_sentiment !== null)
           .filter((r) => {
             const d = new Date(r.review_date);
-            return d >= dateRange.from && d <= dateRange.to;
+            return d >= currentDateRange.from && d <= currentDateRange.to;
           });
+
+        console.log('Date range filter applied:', {
+          from: currentDateRange.from,
+          to: currentDateRange.to,
+          filteredCount: filteredReviews.length
+        });
 
         console.log('Demo reviews found:', filteredReviews.length);
         const processedData = processReviewsIntoSentimentData(filteredReviews);
@@ -194,11 +262,12 @@ const Sentiment = () => {
       }
 
       // Get sentiment data from saved reviews
+      const currentDateRange = getDateRange();
       let query = supabase
         .from('saved_reviews')
         .select('*')
-        .gte('review_date', format(dateRange.from, 'yyyy-MM-dd'))
-        .lte('review_date', format(dateRange.to, 'yyyy-MM-dd'))
+        .gte('review_date', format(currentDateRange.from, 'yyyy-MM-dd'))
+        .lte('review_date', format(currentDateRange.to, 'yyyy-MM-dd'))
         .not('ai_sentiment', 'is', null);
 
       const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
@@ -210,6 +279,11 @@ const Sentiment = () => {
 
       if (!error && reviews) {
         console.log('Reviews found:', reviews.length);
+        console.log('Date range for processing:', {
+          from: currentDateRange.from,
+          to: currentDateRange.to,
+          period: selectedPeriod
+        });
         // Process reviews into sentiment data by period
         const processedData = processReviewsIntoSentimentData(reviews);
         console.log('Processed sentiment data:', processedData);
@@ -229,7 +303,14 @@ const Sentiment = () => {
   const processReviewsIntoSentimentData = (reviews: any[]): SentimentData[] => {
     const groupedData: { [key: string]: any } = {};
 
-    reviews.forEach(review => {
+    // Filter reviews by the selected date range
+    const currentDateRange = getDateRange();
+    const filteredReviews = reviews.filter(review => {
+      const reviewDate = new Date(review.review_date);
+      return reviewDate >= currentDateRange.from && reviewDate <= currentDateRange.to;
+    });
+
+    filteredReviews.forEach(review => {
       let key = '';
       const reviewDate = new Date(review.review_date);
 
@@ -328,13 +409,14 @@ const Sentiment = () => {
 
   const handleGenerateSentiment = async () => {
     try {
+      const currentDateRange = getDateRange();
       const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
         body: {
           action: 'generate_sentiment_analysis',
           location_id: ctxSelectedLocation?.google_place_id,
           period_type: selectedPeriod,
-          start_date: format(dateRange.from, 'yyyy-MM-dd'),
-          end_date: format(dateRange.to, 'yyyy-MM-dd')
+          start_date: format(currentDateRange.from, 'yyyy-MM-dd'),
+          end_date: format(currentDateRange.to, 'yyyy-MM-dd')
         }
       });
 
@@ -365,6 +447,11 @@ const Sentiment = () => {
 
   const getDatePresets = () => [
     {
+      label: "All Time",
+      from: new Date('2020-01-01'), // Far back enough to capture all data
+      to: new Date()
+    },
+    {
       label: "Last 30 days",
       from: subDays(new Date(), 30),
       to: new Date()
@@ -394,13 +481,22 @@ const Sentiment = () => {
   const calculateOverallStats = () => {
     if (sentimentData.length === 0) return null;
 
-    const totalPositive = sentimentData.reduce((sum, item) => sum + item.positive_count, 0);
-    const totalNegative = sentimentData.reduce((sum, item) => sum + item.negative_count, 0);
-    const totalNeutral = sentimentData.reduce((sum, item) => sum + item.neutral_count, 0);
+    const currentDateRange = getDateRange();
+    // Filter sentiment data by the selected date range
+    const filteredData = sentimentData.filter(data => {
+      const dataDate = new Date(data.analysis_date);
+      return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+    });
+
+    if (filteredData.length === 0) return null;
+
+    const totalPositive = filteredData.reduce((sum, item) => sum + item.positive_count, 0);
+    const totalNegative = filteredData.reduce((sum, item) => sum + item.negative_count, 0);
+    const totalNeutral = filteredData.reduce((sum, item) => sum + item.neutral_count, 0);
     const total = totalPositive + totalNegative + totalNeutral;
 
-    const avgRating = sentimentData.reduce((sum, item) => sum + item.average_rating, 0) / sentimentData.length;
-    const avgSentimentScore = sentimentData.reduce((sum, item) => sum + item.sentiment_score, 0) / sentimentData.length;
+    const avgRating = filteredData.reduce((sum, item) => sum + item.average_rating, 0) / filteredData.length;
+    const avgSentimentScore = filteredData.reduce((sum, item) => sum + item.sentiment_score, 0) / filteredData.length;
 
     return {
       totalPositive,
@@ -511,19 +607,29 @@ const Sentiment = () => {
                     <label className="text-sm font-medium mb-2 block">Custom Date Range</label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange.from && dateRange.to
-                            ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-                            : "Pick a date range"
-                          }
-                        </Button>
+                         <Button variant="outline" className="w-full justify-start text-left">
+                           <CalendarIcon className="mr-2 h-4 w-4" />
+                           {dateRange && dateRange.from && dateRange.to
+                             ? `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+                             : "Pick a date range"
+                           }
+                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="range"
-                          selected={dateRange}
-                          onSelect={(range) => range && range.from && range.to && setDateRange({ from: range.from, to: range.to })}
+                          selected={dateRange || { from: undefined, to: undefined }}
+                          onSelect={(range) => {
+                            if (range && range.from && range.to) {
+                              // Validate that from date is not after to date
+                              if (range.from <= range.to) {
+                                setDateRange({ from: range.from, to: range.to });
+                              } else {
+                                // Swap dates if they're backwards
+                                setDateRange({ from: range.to, to: range.from });
+                              }
+                            }
+                          }}
                           numberOfMonths={2}
                         />
                       </PopoverContent>
@@ -619,103 +725,202 @@ const Sentiment = () => {
               </div>
             )}
 
-            {/* Visual Charts */}
+            {/* Simple Visual Charts */}
             {sentimentData.length > 0 && (
               <div className="grid gap-6 mb-8">
-                <div className="grid gap-6 md:grid-cols-2">
-                  {/* Sentiment Trend Chart */}
+                {/* Sentiment Overview - Simple and Clear */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5" />
+                      Sentiment Overview
+                    </CardTitle>
+                    <CardDescription>Clear breakdown of customer sentiment</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Positive Sentiment */}
+                      <div className="text-center p-6 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="text-4xl font-bold text-green-600 mb-2">
+                          {stats?.totalPositive || 0}
+                        </div>
+                        <div className="text-lg font-medium text-green-700 dark:text-green-300 mb-1">
+                          Positive Reviews
+                        </div>
+                        <div className="text-sm text-green-600/70">
+                          {stats?.positivePercentage.toFixed(1) || 0}% of total
+                        </div>
+                        <div className="w-full bg-green-200 dark:bg-green-800 rounded-full h-3 mt-3">
+                          <div 
+                            className="bg-green-600 h-3 rounded-full transition-all duration-500" 
+                            style={{ width: `${stats?.positivePercentage || 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Neutral Sentiment */}
+                      <div className="text-center p-6 bg-gray-50 dark:bg-gray-950/20 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div className="text-4xl font-bold text-gray-600 mb-2">
+                          {stats?.totalNeutral || 0}
+                        </div>
+                        <div className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Neutral Reviews
+                        </div>
+                        <div className="text-sm text-gray-600/70">
+                          {stats?.neutralPercentage.toFixed(1) || 0}% of total
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mt-3">
+                          <div 
+                            className="bg-gray-600 h-3 rounded-full transition-all duration-500" 
+                            style={{ width: `${stats?.neutralPercentage || 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Negative Sentiment */}
+                      <div className="text-center p-6 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="text-4xl font-bold text-red-600 mb-2">
+                          {stats?.totalNegative || 0}
+                        </div>
+                        <div className="text-lg font-medium text-red-700 dark:text-red-300 mb-1">
+                          Negative Reviews
+                        </div>
+                        <div className="text-sm text-red-600/70">
+                          {stats?.negativePercentage.toFixed(1) || 0}% of total
+                        </div>
+                        <div className="w-full bg-red-200 dark:bg-red-800 rounded-full h-3 mt-3">
+                          <div 
+                            className="bg-red-600 h-3 rounded-full transition-all duration-500" 
+                            style={{ width: `${stats?.negativePercentage || 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Simple Bar Chart for Sentiment Distribution */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5" />
+                      Sentiment Distribution
+                    </CardTitle>
+                    <CardDescription>Visual breakdown of sentiment types</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={[
+                        { name: 'Positive', value: stats?.totalPositive || 0, color: '#22c55e' },
+                        { name: 'Neutral', value: stats?.totalNeutral || 0, color: '#6b7280' },
+                        { name: 'Negative', value: stats?.totalNegative || 0, color: '#ef4444' }
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value: any) => [value, 'Reviews']}
+                          labelFormatter={(label) => `${label} Sentiment`}
+                        />
+                        <Bar dataKey="value" fill="#8884d8">
+                          {[
+                            { name: 'Positive', value: stats?.totalPositive || 0, color: '#22c55e' },
+                            { name: 'Neutral', value: stats?.totalNeutral || 0, color: '#6b7280' },
+                            { name: 'Negative', value: stats?.totalNegative || 0, color: '#ef4444' }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Rating Trend - Simple Line Chart */}
+                {getSentimentTrendData().length > 1 && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <TrendingUp className="w-5 h-5" />
-                        Sentiment Trends
+                        Average Rating Over Time
                       </CardTitle>
-                      <CardDescription>Sentiment distribution over time</CardDescription>
+                      <CardDescription>How your ratings have changed</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={getSentimentTrendData()}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="positive" stroke="#22c55e" strokeWidth={2} name="Positive" />
-                          <Line type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2} name="Negative" />
-                          <Line type="monotone" dataKey="neutral" stroke="#6b7280" strokeWidth={2} name="Neutral" />
+                          <YAxis domain={[0, 5]} />
+                          <Tooltip 
+                            formatter={(value: any) => [value.toFixed(1), 'Rating']}
+                            labelFormatter={(label) => `Date: ${label}`}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="rating" 
+                            stroke="#3b82f6" 
+                            strokeWidth={3} 
+                            dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                            name="Average Rating" 
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
+                )}
 
-                  {/* Sentiment Distribution Pie Chart */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <PieChartIcon className="w-5 h-5" />
-                        Sentiment Distribution
-                      </CardTitle>
-                      <CardDescription>Overall sentiment breakdown</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={getSentimentPieData()}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {getSentimentPieData().map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Top Tags Bar Charts */}
+                {/* Top Tags - Simple List Format */}
                 <div className="grid gap-6 md:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-green-600">Top Positive Tags</CardTitle>
+                      <CardTitle className="text-green-600 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        What Customers Love
+                      </CardTitle>
                       <CardDescription>Most mentioned positive aspects</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={getTopTagsData().positive} layout="horizontal">
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" />
-                          <YAxis dataKey="tag" type="category" width={100} />
-                          <Tooltip />
-                          <Bar dataKey="count" fill="#22c55e" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <div className="space-y-3">
+                        {getTopTagsData().positive.length > 0 ? (
+                          getTopTagsData().positive.map((tag, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                              <span className="font-medium text-green-800 dark:text-green-200">{tag.tag}</span>
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                {tag.count} mentions
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-muted-foreground text-center py-4">No positive tags found</p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-red-600">Top Negative Tags</CardTitle>
-                      <CardDescription>Most mentioned areas for improvement</CardDescription>
+                      <CardTitle className="text-red-600 flex items-center gap-2">
+                        <TrendingDown className="w-5 h-5" />
+                        Areas to Improve
+                      </CardTitle>
+                      <CardDescription>Most mentioned concerns</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={getTopTagsData().negative} layout="horizontal">
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" />
-                          <YAxis dataKey="tag" type="category" width={100} />
-                          <Tooltip />
-                          <Bar dataKey="count" fill="#ef4444" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <div className="space-y-3">
+                        {getTopTagsData().negative.length > 0 ? (
+                          getTopTagsData().negative.map((tag, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                              <span className="font-medium text-red-800 dark:text-red-200">{tag.tag}</span>
+                              <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                {tag.count} mentions
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-muted-foreground text-center py-4">No negative tags found</p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -785,7 +990,15 @@ const Sentiment = () => {
                         <div>
                           <h4 className="font-medium text-success mb-3">Top Performing Areas:</h4>
                           <div className="grid grid-cols-2 gap-2 mb-4">
-                            {Array.from(new Set(sentimentData.flatMap(d => d.top_positive_tags || []))).slice(0, 8).map((tag, i) => (
+                            {Array.from(new Set(
+                              sentimentData
+                                .filter(data => {
+                                  const currentDateRange = getDateRange();
+                                  const dataDate = new Date(data.analysis_date);
+                                  return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+                                })
+                                .flatMap(d => d.top_positive_tags || [])
+                            )).slice(0, 8).map((tag, i) => (
                               <Badge key={i} className="sentiment-positive justify-center py-1">{tag}</Badge>
                             ))}
                           </div>
@@ -824,14 +1037,30 @@ const Sentiment = () => {
                         <div>
                           <h4 className="font-medium text-destructive mb-2">Common Concerns:</h4>
                           <div className="flex flex-wrap gap-2 mb-4">
-                            {Array.from(new Set(sentimentData.flatMap(d => d.top_negative_tags || []))).slice(0, 6).map((tag, i) => (
+                            {Array.from(new Set(
+                              sentimentData
+                                .filter(data => {
+                                  const currentDateRange = getDateRange();
+                                  const dataDate = new Date(data.analysis_date);
+                                  return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+                                })
+                                .flatMap(d => d.top_negative_tags || [])
+                            )).slice(0, 6).map((tag, i) => (
                               <Badge key={i} className="sentiment-negative">{tag}</Badge>
                             ))}
                           </div>
                         </div>
 
                         {/* Critical Issues */}
-                        {Array.from(new Set(sentimentData.flatMap(d => d.top_issues || []))).slice(0, 3).map((issue, i) => (
+                        {Array.from(new Set(
+                          sentimentData
+                            .filter(data => {
+                              const currentDateRange = getDateRange();
+                              const dataDate = new Date(data.analysis_date);
+                              return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+                            })
+                            .flatMap(d => d.top_issues || [])
+                        )).slice(0, 3).map((issue, i) => (
                           <div key={i} className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
                             <p className="text-sm text-destructive">{issue}</p>
                           </div>
@@ -852,7 +1081,15 @@ const Sentiment = () => {
                       <div>
                         <h4 className="font-medium text-primary mb-3">Immediate Actions:</h4>
                         <div className="space-y-3">
-                          {Array.from(new Set(sentimentData.flatMap(d => d.top_suggestions || []))).slice(0, 3).map((suggestion, i) => (
+                          {Array.from(new Set(
+                            sentimentData
+                              .filter(data => {
+                                const currentDateRange = getDateRange();
+                                const dataDate = new Date(data.analysis_date);
+                                return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
+                              })
+                              .flatMap(d => d.top_suggestions || [])
+                          )).slice(0, 3).map((suggestion, i) => (
                             <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/10 rounded-lg">
                               <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium mt-0.5">
                                 {i + 1}
