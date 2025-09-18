@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2 } from "lucide-react";
+import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -17,6 +17,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import ReplyDialog from "@/components/ReplyDialog";
 import LocationSelector from "@/components/LocationSelector";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Review {
   id: string;
@@ -44,7 +45,28 @@ const Reviews = () => {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [loading, setLoading] = useState(false);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [allReviewsLoaded, setAllReviewsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [reviewsDeleted, setReviewsDeleted] = useState(false);
+  
+  // Check if reviews were deleted for this location
+  const getDeletedFlag = () => {
+    const locationId = resolveLocationId();
+    if (!locationId) return false;
+    return localStorage.getItem(`reviews_deleted_${userKey}_${locationId}`) === 'true';
+  };
+  
+  const setDeletedFlag = (deleted: boolean) => {
+    const locationId = resolveLocationId();
+    if (!locationId) return;
+    if (deleted) {
+      localStorage.setItem(`reviews_deleted_${userKey}_${locationId}`, 'true');
+    } else {
+      localStorage.removeItem(`reviews_deleted_${userKey}_${locationId}`);
+    }
+  };
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
@@ -83,29 +105,59 @@ const Reviews = () => {
   } = useAnalysisProgress(`fetch_${userKey}_${locKey}`);
 
   useEffect(() => {
+    console.log('useEffect triggered:', {
+      user: !!user,
+      selectedLocation: !!selectedLocation,
+      reviewsLength: reviews.length,
+      reviewsDeleted
+    });
+
     // Only reset and fetch if we have a valid location and user
     if (user && selectedLocation) {
       // Check if this is actually a location change, not just re-initialization
       const currentLocationId = resolveLocationId();
       const lastLocationId = localStorage.getItem(`last_location_${userKey}`);
       
+      console.log('Location check:', {
+        currentLocationId,
+        lastLocationId,
+        isLocationChange: currentLocationId !== lastLocationId
+      });
+      
       if (currentLocationId && currentLocationId !== lastLocationId) {
         // This is a real location change - reset everything
+        console.log('Location changed - resetting everything');
         resetProgress();
         resetFetchProgress();
         setReviews([]);
         setPage(1);
+        setTotalReviews(0);
+        setAllReviewsLoaded(false);
+        setReviewsDeleted(false); // Reset deletion flag on location change
+        setDeletedFlag(false); // Clear localStorage deletion flag for new location
         localStorage.setItem(`last_location_${userKey}`, currentLocationId);
         fetchReviews(false); // Load cached reviews quickly
-      } else if (currentLocationId && currentLocationId === lastLocationId && reviews.length === 0) {
-        // Same location but no reviews loaded yet - just fetch without resetting
+      } else if (currentLocationId && currentLocationId === lastLocationId && reviews.length === 0 && !getDeletedFlag()) {
+        // Same location but no reviews loaded yet - just fetch without resetting (but not if deleted)
+        console.log('Same location, no reviews, not deleted - fetching');
         fetchReviews(false);
+      } else {
+        console.log('No fetch needed:', {
+          currentLocationId: !!currentLocationId,
+          lastLocationId: !!lastLocationId,
+          reviewsLength: reviews.length,
+          reviewsDeleted
+        });
       }
     } else if (!user || !selectedLocation) {
       // Clear state when user or location is not available
+      console.log('Clearing state - no user or location');
       resetProgress();
       resetFetchProgress();
       setReviews([]);
+      setTotalReviews(0);
+      setAllReviewsLoaded(false);
+      setReviewsDeleted(false); // Reset deletion flag when clearing state
     }
   }, [user, selectedLocation]);
 
@@ -185,28 +237,55 @@ const Reviews = () => {
         return;
       }
 
-      // First, quickly load saved reviews from database for instant display
+      // First, get the total count of reviews for this location
+      const { count: totalCount, error: countError } = await supabase
+        .from('saved_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('location_id', locationId);
+
+      if (!countError && totalCount !== null) {
+        setTotalReviews(totalCount);
+      }
+
+      // Load all saved reviews from database for instant display
       const { data: savedReviews, error: dbError } = await supabase
         .from('saved_reviews')
         .select('*')
         .eq('location_id', locationId)
-        .order('review_date', { ascending: false })
-        .limit(50); // Limit for performance
+        .order('review_date', { ascending: false });
 
       if (!dbError && savedReviews) {
         setReviews(savedReviews.map(review => ({
           ...review,
           ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
         })));
+        setAllReviewsLoaded(true);
       }
 
-      // Only fetch from Google if forcing refresh or no saved reviews
-      if (forceRefresh || !savedReviews || savedReviews.length === 0) {
+      // Only fetch from Google if forcing refresh or no saved reviews (but not if reviews were intentionally deleted)
+      const shouldFetchFromGoogle = forceRefresh || ((!savedReviews || savedReviews.length === 0) && !reviewsDeleted && !getDeletedFlag());
+      
+      console.log('Fetch decision:', {
+        forceRefresh,
+        savedReviewsCount: savedReviews?.length || 0,
+        reviewsDeleted,
+        shouldFetchFromGoogle
+      });
+
+      if (shouldFetchFromGoogle) {
         const { supabaseJwt, googleAccessToken } = await getSessionTokens();
         if (!supabaseJwt || !googleAccessToken) {
           console.warn("Missing tokens - using cached reviews");
           return;
         }
+
+        console.log('🚨 CALLING GOOGLE API TO FETCH REVIEWS 🚨', {
+          locationId,
+          forceRefresh,
+          reviewsDeleted,
+          savedReviewsCount: savedReviews?.length || 0
+        });
+        console.trace('Stack trace of Google API call:');
 
         const { data, error } = await supabase.functions.invoke("google-business-api", {
           body: {
@@ -229,10 +308,10 @@ const Reviews = () => {
             updateFetch(processed, total);
           });
 
-          // Get updated reviews from database
-          const { data: updatedReviews } = await supabase
+          // Get updated reviews from database and update total count
+          const { data: updatedReviews, count: updatedCount } = await supabase
             .from('saved_reviews')
-            .select('*')
+            .select('*', { count: 'exact' })
             .eq('location_id', locationId)
             .order('review_date', { ascending: false });
 
@@ -241,6 +320,10 @@ const Reviews = () => {
               ...review,
               ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
             })));
+            if (updatedCount !== null) {
+              setTotalReviews(updatedCount);
+            }
+            setAllReviewsLoaded(true);
           }
         }
       }
@@ -375,7 +458,7 @@ const Reviews = () => {
       updateProgress(0, unanalyzedReviews.length);
 
       // Process reviews in batches for better UX
-      const batchSize = 5;
+      const batchSize = 10;
       let processedCount = 0;
 
       for (let i = 0; i < unanalyzedReviews.length; i += batchSize) {
@@ -427,6 +510,99 @@ const Reviews = () => {
     }
   };
 
+  const deleteAllReviewsForLocation = async () => {
+    if (!user || !selectedLocation || isDeleting) return;
+
+    const locationId = resolveLocationId();
+    if (!locationId) {
+      console.error('No location ID resolved');
+      toast({
+        title: "Error",
+        description: "Could not resolve location ID",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+
+      console.log('Starting delete operation for:', {
+        locationId,
+        userId: user.id,
+        selectedLocation
+      });
+
+      // First, let's check how many reviews we're about to delete
+      const { count: reviewCount, error: countError } = await supabase
+        .from('saved_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('location_id', locationId)
+        .eq('user_id', user.id);
+
+      if (countError) {
+        console.error('Error counting reviews:', countError);
+        throw countError;
+      }
+
+      console.log(`Found ${reviewCount} reviews to delete`);
+
+      if (reviewCount === 0) {
+        toast({
+          title: "Info",
+          description: "No reviews found to delete for this location",
+        });
+        return;
+      }
+
+      // Delete all reviews for the selected location
+      const { data: deletedData, error: deleteError } = await supabase
+        .from('saved_reviews')
+        .delete()
+        .eq('location_id', locationId)
+        .eq('user_id', user.id)
+        .select(); // Add select to see what was deleted
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('Successfully deleted reviews:', deletedData);
+
+      // Reset all state
+      setReviews([]);
+      setTotalReviews(0);
+      setAllReviewsLoaded(false);
+      setPage(1);
+      setReviewsDeleted(true); // Mark that reviews were intentionally deleted
+      setDeletedFlag(true); // Persist deletion flag in localStorage
+      console.log('Reviews deleted - setting reviewsDeleted flag to true');
+      resetProgress();
+      resetFetchProgress();
+      
+      // Force reset the fetch progress to ensure UI updates
+      setTimeout(() => {
+        resetFetchProgress();
+      }, 100);
+
+      toast({
+        title: "Success",
+        description: `Successfully deleted ${reviewCount} reviews and all AI analysis data for this location`,
+      });
+
+    } catch (error) {
+      console.error('Error deleting reviews:', error);
+      toast({
+        title: "Error",
+        description: `Failed to delete reviews: ${error.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const getSentimentColor = (sentiment: string | null) => {
     switch (sentiment) {
       case "positive": return "text-success border-success";
@@ -467,6 +643,13 @@ const Reviews = () => {
 
   const totalPages = Math.max(1, Math.ceil(filteredReviews.length / pageSize));
   const pagedReviews = filteredReviews.slice((page - 1) * pageSize, page * pageSize);
+  
+  // Performance optimization: limit displayed reviews for very large datasets
+  const maxDisplayedReviews = 1000;
+  const shouldShowPagination = filteredReviews.length > pageSize;
+  const displayReviews = filteredReviews.length > maxDisplayedReviews 
+    ? filteredReviews.slice(0, maxDisplayedReviews) 
+    : filteredReviews;
 
   const getAverageRating = () =>
     reviews.length === 0 ? 0 : (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1);
@@ -520,16 +703,85 @@ const Reviews = () => {
                 )}
                 {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
               </Button>
-              <Button onClick={() => fetchReviews(true)} size="sm" disabled={isAnalyzing || isFetching}>
+              <Button onClick={() => {
+                setReviewsDeleted(false); // Reset deletion flag when manually refreshing
+                setDeletedFlag(false); // Clear localStorage deletion flag
+                fetchReviews(true);
+              }} size="sm" disabled={isAnalyzing || isFetching}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
+              {selectedLocation && reviews.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      disabled={isDeleting || isAnalyzing || isFetching}
+                      onClick={() => {
+                        console.log('Delete button clicked');
+                        console.log('Current state:', {
+                          user: user?.id,
+                          selectedLocation,
+                          reviewsCount: reviews.length,
+                          locationId: resolveLocationId()
+                        });
+                      }}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 mr-2" />
+                      )}
+                      {isDeleting ? 'Deleting...' : 'Delete All'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete All Reviews</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete ALL reviews and AI analysis data for <strong>{selectedLocation.location_name}</strong>?
+                        <br /><br />
+                        This action will permanently delete:
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          <li>All {totalReviews > 0 ? totalReviews : reviews.length} reviews for this location</li>
+                          <li>All AI sentiment analysis data</li>
+                          <li>All AI tags and suggestions</li>
+                          <li>All review replies and metadata</li>
+                        </ul>
+                        <br />
+                        <strong className="text-destructive">This action cannot be undone.</strong>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={deleteAllReviewsForLocation}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete All Reviews
+                          </>
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </header>
 
           <div className="flex-1 space-y-6 p-8 pt-6">
             {/* Fetch Progress Bar */}
-            {(isFetching || (fetchProgressValue > 0 && fetchProgressValue < 100)) && (
+            {(isFetching || (fetchProgressValue > 0 && fetchProgressValue < 100 && !allReviewsLoaded)) && (
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-2">
@@ -541,6 +793,33 @@ const Reviews = () => {
                     <p className="text-xs text-muted-foreground">
                       {isFetching ? `Fetched ${fetchCompleted} of ${fetchTotal}…` : 'Refresh complete!'}
                     </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Stuck Progress Bar - Emergency Reset */}
+            {fetchProgressValue >= 100 && isFetching && (
+              <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-orange-800 dark:text-orange-200">Progress Bar Stuck</p>
+                      <p className="text-sm text-orange-600 dark:text-orange-300">
+                        The progress bar appears to be stuck. Click reset to continue.
+                      </p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        resetFetchProgress();
+                        setLoading(false);
+                        setIsDeleting(false);
+                      }}
+                    >
+                      Reset
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -571,9 +850,9 @@ const Reviews = () => {
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{reviews.length}</div>
+                  <div className="text-2xl font-bold">{totalReviews > 0 ? totalReviews : reviews.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    Active reviews
+                    {allReviewsLoaded ? 'Total reviews' : 'Loaded reviews'}
                   </p>
                 </CardContent>
               </Card>
@@ -685,9 +964,52 @@ const Reviews = () => {
               </CardContent>
             </Card>
 
+            {/* Loading indicator for large datasets */}
+            {loading && !allReviewsLoaded && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <div>
+                      <p className="font-medium">Loading reviews...</p>
+                      <p className="text-sm text-muted-foreground">
+                        {totalReviews > 0 ? `Loading ${totalReviews} reviews` : 'Fetching review data'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Reviews List */}
             <div className="space-y-4">
-              {filteredReviews.length === 0 ? (
+              {reviewsDeleted && reviews.length === 0 ? (
+                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                  <CardContent className="p-8 text-center">
+                    <div className="flex items-center justify-center mb-4">
+                      <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                        <Trash2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-medium mb-2 text-green-800 dark:text-green-200">Reviews Deleted</h3>
+                    <p className="text-green-600 dark:text-green-300 mb-4">
+                      All reviews and AI analysis data have been successfully deleted for this location.
+                    </p>
+                    <Button 
+                      onClick={() => {
+                        setReviewsDeleted(false);
+                        setDeletedFlag(false);
+                        fetchReviews(true);
+                      }}
+                      variant="outline"
+                      className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Fetch Reviews Again
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : filteredReviews.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -700,7 +1022,21 @@ const Reviews = () => {
                   </CardContent>
                 </Card>
               ) : (
-                pagedReviews.map((review) => (
+                <>
+                  {filteredReviews.length > maxDisplayedReviews && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <MessageSquare className="w-4 h-4" />
+                          <span>
+                            Showing first {maxDisplayedReviews} of {filteredReviews.length} reviews for performance.
+                            Use filters to narrow down results.
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {pagedReviews.map((review) => (
                   <Card key={review.id}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
@@ -779,13 +1115,14 @@ const Reviews = () => {
                       )}
                     </CardContent>
                   </Card>
-                ))
+                  ))}
+                </>
               )}
               {/* Pagination */}
-              {filteredReviews.length > 0 && (
+              {shouldShowPagination && (
                 <div className="flex items-center justify-between pt-4">
                   <div className="text-sm text-muted-foreground">
-                    Page {page} of {totalPages} — {filteredReviews.length} reviews
+                    Page {page} of {totalPages} — {filteredReviews.length} of {totalReviews > 0 ? totalReviews : reviews.length} reviews
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>

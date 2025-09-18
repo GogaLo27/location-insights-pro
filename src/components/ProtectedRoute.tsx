@@ -33,6 +33,7 @@ export const ProtectedRoute = ({
   const { plan, loading: planLoading } = usePlan();
   const { selectedLocation, loading: locationLoading } = useLocationContext();
 
+
   // Show loading until we know auth state, plan, and (if required) location
   if (
     authLoading ||
@@ -46,9 +47,8 @@ export const ProtectedRoute = ({
   if (!user) {
     return <Navigate to="/" replace />;
   }
-
-  // Requires a plan → go to plan selection if none exists
-  if (requiresPlan && !plan) {
+  // Requires a plan → go to plan selection if none exists (but only after loading is complete)
+  if (requiresPlan && !planLoading && !plan) {
     return <Navigate to="/plan-selection" replace />;
   }
 

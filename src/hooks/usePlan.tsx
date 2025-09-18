@@ -17,9 +17,14 @@ export const usePlan = () => {
   useEffect(() => {
     if (!user) {
       setPlan(null);
-      setLoading(false);
+      // DON'T set loading to false here - keep it true to prevent race condition
       return;
     }
+    
+    // CRITICAL: Set loading to true immediately when user is detected
+    // This prevents race condition with ProtectedRoute
+    setLoading(true);
+    
     if (user.email === DEMO_EMAIL) {
       // Always give demo a plan so route guards pass
       setPlan({
@@ -30,6 +35,8 @@ export const usePlan = () => {
       setLoading(false);
       return;
     }
+    
+    // For real users, fetch the plan
     fetchPlan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email]);
@@ -37,7 +44,8 @@ export const usePlan = () => {
   const fetchPlan = async () => {
     if (!user) return;
     try {
-      setLoading(true);
+      // Don't set loading here - it's already set in useEffect
+      
       const { data, error } = await supabase
         .from("user_plans")
         .select("*")
@@ -49,8 +57,32 @@ export const usePlan = () => {
       if (error) {
         console.error("Error fetching plan:", error);
         setPlan(null);
-      } else {
+      } else if (data) {
         setPlan(data as any);
+      } else {
+        // Auto-create a starter plan if none exists
+        try {
+          const { data: newPlan, error: createError } = await supabase
+            .from('user_plans')
+            .insert({
+              user_id: user.id,
+              plan_type: 'starter',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error creating plan:', createError);
+            setPlan(null);
+          } else {
+            setPlan(newPlan as any);
+          }
+        } catch (createErr) {
+          console.error('Error creating plan:', createErr);
+          setPlan(null);
+        }
       }
     } catch (err) {
       console.error("Error fetching plan:", err);

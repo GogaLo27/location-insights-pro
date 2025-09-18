@@ -38,11 +38,18 @@ import {
   PieChart,
   Pie,
   Cell,
+  AreaChart,
+  Area,
+  ComposedChart,
+  ScatterChart,
+  Scatter,
 } from "recharts";
-import { TrendingUp, Eye, MousePointer, Calendar, RefreshCw } from "lucide-react";
+import { TrendingUp, Eye, MousePointer, Calendar, RefreshCw, Download, Filter, TrendingDown, ArrowUpRight, ArrowDownRight, CalendarIcon, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format, subDays } from "date-fns";
+import { format, subDays, subMonths, subYears } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface AnalyticsData {
   date: string;
@@ -59,12 +66,36 @@ interface AnalyticsData {
   businessFoodMenuClicks: number;
 }
 
+interface ComparisonData {
+  current: number;
+  previous: number;
+  change: number;
+  changePercent: number;
+}
+
+interface ComparisonMetrics {
+  impressions: ComparisonData;
+  clicks: ComparisonData;
+  ctr: ComparisonData;
+  bookings: ComparisonData;
+}
+
 const Analytics = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
+  const [previousAnalyticsData, setPreviousAnalyticsData] = useState<AnalyticsData[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<string>("30");
+  const [showComparison, setShowComparison] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   // Use location context to access the list and selected location
   const {
@@ -84,8 +115,11 @@ const Analytics = () => {
   useEffect(() => {
     if (ctxSelectedLocation) {
       fetchAnalytics();
+      if (showComparison) {
+        fetchPreviousAnalytics();
+      }
     }
-  }, [ctxSelectedLocation, dateRange]);
+  }, [ctxSelectedLocation, dateRange, showComparison, isCustomRange, customDateRange]);
 
   const getSessionTokens = async () => {
     let {
@@ -146,8 +180,17 @@ const Analytics = () => {
         setLoading(false);
         return;
       }
-      const endDate = new Date();
-      const startDate = subDays(endDate, parseInt(dateRange));
+      let endDate: Date;
+      let startDate: Date;
+      
+      if (isCustomRange && customDateRange.from && customDateRange.to) {
+        if (!validateDateRange()) return;
+        startDate = customDateRange.from;
+        endDate = customDateRange.to;
+      } else {
+        endDate = new Date();
+        startDate = subDays(endDate, parseInt(dateRange));
+      }
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) {
         console.error("Missing authentication tokens");
@@ -210,6 +253,66 @@ const Analytics = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPreviousAnalytics = async () => {
+    if (!ctxSelectedLocation) return;
+
+    const locationId =
+      (ctxSelectedLocation as any).id ||
+      (ctxSelectedLocation as any).location_id ||
+      (ctxSelectedLocation as any).google_place_id?.split("/").pop();
+
+    if (!locationId) return;
+
+    try {
+      let endDate: Date;
+      let startDate: Date;
+      
+      if (isCustomRange && customDateRange.from && customDateRange.to) {
+        const rangeDays = Math.ceil((customDateRange.to.getTime() - customDateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+        endDate = subDays(customDateRange.from, 1);
+        startDate = subDays(endDate, rangeDays);
+      } else {
+        const days = parseInt(dateRange);
+        endDate = subDays(new Date(), days);
+        startDate = subDays(endDate, days);
+      }
+
+      const { supabaseJwt, googleAccessToken } = await getSessionTokens();
+      if (!supabaseJwt || !googleAccessToken) return;
+
+      const { data, error } = await supabase.functions.invoke(
+        "google-business-api",
+        {
+          body: {
+            action: "fetch_analytics",
+            locationId,
+            startDate: {
+              year: startDate.getFullYear(),
+              month: startDate.getMonth() + 1,
+              day: startDate.getDate(),
+            },
+            endDate: {
+              year: endDate.getFullYear(),
+              month: endDate.getMonth() + 1,
+              day: endDate.getDate(),
+            },
+          },
+          headers: {
+            Authorization: `Bearer ${supabaseJwt}`,
+            "X-Google-Token": googleAccessToken,
+          },
+        }
+      );
+
+      if (!error && data?.analytics) {
+        const processedData = processAnalyticsData(data.analytics);
+        setPreviousAnalyticsData(processedData);
+      }
+    } catch (error) {
+      console.error("Error fetching previous analytics:", error);
     }
   };
 
@@ -302,7 +405,11 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
     });
   });
 
-  return Object.values(byIndex);
+  return Object.values(byIndex).map(data => ({
+    ...data,
+    totalImpressions: data.businessImpressionsDesktopMaps + data.businessImpressionsMobileMaps + data.businessImpressionsDesktopSearch + data.businessImpressionsMobileSearch,
+    totalClicks: data.websiteClicks + data.callClicks + data.businessDirectionRequests,
+  }));
 };
 
   const getTotalImpressions = () => {
@@ -343,6 +450,257 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
     ];
   };
 
+  const calculateComparison = (): ComparisonMetrics => {
+    const currentImpressions = getTotalImpressions();
+    const previousImpressions = previousAnalyticsData.reduce(
+      (sum, data) =>
+        sum +
+        data.businessImpressionsDesktopMaps +
+        data.businessImpressionsMobileMaps +
+        data.businessImpressionsDesktopSearch +
+        data.businessImpressionsMobileSearch,
+      0
+    );
+
+    const currentClicks = getTotalClicks();
+    const previousClicks = previousAnalyticsData.reduce(
+      (sum, data) =>
+        sum + data.websiteClicks + data.callClicks + data.businessDirectionRequests,
+      0
+    );
+
+    const currentCTR = currentImpressions > 0 ? (currentClicks / currentImpressions) * 100 : 0;
+    const previousCTR = previousImpressions > 0 ? (previousClicks / previousImpressions) * 100 : 0;
+
+    const currentBookings = analyticsData.reduce((sum, data) => sum + data.businessBookings, 0);
+    const previousBookings = previousAnalyticsData.reduce((sum, data) => sum + data.businessBookings, 0);
+
+    const calculateChange = (current: number, previous: number) => {
+      const change = current - previous;
+      const changePercent = previous > 0 ? (change / previous) * 100 : 0;
+      return { current, previous, change, changePercent };
+    };
+
+    return {
+      impressions: calculateChange(currentImpressions, previousImpressions),
+      clicks: calculateChange(currentClicks, previousClicks),
+      ctr: calculateChange(currentCTR, previousCTR),
+      bookings: calculateChange(currentBookings, previousBookings),
+    };
+  };
+
+  const getComparisonColor = (changePercent: number) => {
+    if (changePercent > 0) return "text-green-600";
+    if (changePercent < 0) return "text-red-600";
+    return "text-gray-600";
+  };
+
+  const getComparisonIcon = (changePercent: number) => {
+    if (changePercent > 0) return <ArrowUpRight className="w-4 h-4" />;
+    if (changePercent < 0) return <ArrowDownRight className="w-4 h-4" />;
+    return null;
+  };
+
+  const getComparisonBadge = (changePercent: number) => {
+    const isPositive = changePercent > 0;
+    const isNegative = changePercent < 0;
+    const isNeutral = changePercent === 0;
+    
+    return (
+      <div className={cn(
+        "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+        isPositive && "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400",
+        isNegative && "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",
+        isNeutral && "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+      )}>
+        {getComparisonIcon(changePercent)}
+        <span>
+          {changePercent > 0 ? "+" : ""}{changePercent.toFixed(1)}%
+        </span>
+      </div>
+    );
+  };
+
+  const handleCustomDateChange = (from: Date | undefined, to: Date | undefined) => {
+    setCustomDateRange({ from, to });
+    if (from && to) {
+      setIsCustomRange(true);
+      setDateRange("custom");
+    }
+  };
+
+  const validateDateRange = () => {
+    if (!customDateRange.from || !customDateRange.to) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Please select both start and end dates.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (customDateRange.from > customDateRange.to) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Start date cannot be after end date.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const getDateRangeLabel = () => {
+    if (isCustomRange && customDateRange.from && customDateRange.to) {
+      return `${format(customDateRange.from, "MMM d")} - ${format(customDateRange.to, "MMM d, yyyy")}`;
+    }
+    return `Last ${dateRange} days`;
+  };
+
+  const ChartHelpPopover = ({ title, description, details }: { title: string; description: string; details: string[] }) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80">
+        <div className="space-y-2">
+          <h4 className="font-semibold">{title}</h4>
+          <p className="text-sm text-muted-foreground">{description}</p>
+          <div className="space-y-1">
+            {details.map((detail, index) => (
+              <div key={index} className="text-xs text-muted-foreground">
+                • {detail}
+              </div>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
+  const exportToCSV = () => {
+    if (analyticsData.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "Please load analytics data first before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let headers = [
+      "Date",
+      "Desktop Maps Impressions",
+      "Mobile Maps Impressions", 
+      "Desktop Search Impressions",
+      "Mobile Search Impressions",
+      "Website Clicks",
+      "Call Clicks",
+      "Direction Requests",
+      "Conversations",
+      "Bookings",
+      "Food Orders",
+      "Menu Clicks"
+    ];
+
+    // Add comparison headers if comparison data is available
+    if (showComparison && previousAnalyticsData.length > 0) {
+      headers = [
+        ...headers,
+        "Previous Desktop Maps Impressions",
+        "Previous Mobile Maps Impressions",
+        "Previous Desktop Search Impressions", 
+        "Previous Mobile Search Impressions",
+        "Previous Website Clicks",
+        "Previous Call Clicks",
+        "Previous Direction Requests",
+        "Previous Conversations",
+        "Previous Bookings",
+        "Previous Food Orders",
+        "Previous Menu Clicks",
+        "Impressions Change %",
+        "Clicks Change %",
+        "CTR Change %",
+        "Bookings Change %"
+      ];
+    }
+
+    const csvContent = [
+      headers.join(","),
+      ...analyticsData.map((data, index) => {
+        const row = [
+          data.date,
+          data.businessImpressionsDesktopMaps,
+          data.businessImpressionsMobileMaps,
+          data.businessImpressionsDesktopSearch,
+          data.businessImpressionsMobileSearch,
+          data.websiteClicks,
+          data.callClicks,
+          data.businessDirectionRequests,
+          data.businessConversations,
+          data.businessBookings,
+          data.businessFoodOrders,
+          data.businessFoodMenuClicks
+        ];
+
+        // Add comparison data if available
+        if (showComparison && previousAnalyticsData.length > 0) {
+          const comparison = calculateComparison();
+          const prevData = previousAnalyticsData[index] || {
+            businessImpressionsDesktopMaps: 0,
+            businessImpressionsMobileMaps: 0,
+            businessImpressionsDesktopSearch: 0,
+            businessImpressionsMobileSearch: 0,
+            websiteClicks: 0,
+            callClicks: 0,
+            businessDirectionRequests: 0,
+            businessConversations: 0,
+            businessBookings: 0,
+            businessFoodOrders: 0,
+            businessFoodMenuClicks: 0
+          };
+
+          row.push(
+            prevData.businessImpressionsDesktopMaps,
+            prevData.businessImpressionsMobileMaps,
+            prevData.businessImpressionsDesktopSearch,
+            prevData.businessImpressionsMobileSearch,
+            prevData.websiteClicks,
+            prevData.callClicks,
+            prevData.businessDirectionRequests,
+            prevData.businessConversations,
+            prevData.businessBookings,
+            prevData.businessFoodOrders,
+            prevData.businessFoodMenuClicks,
+            comparison.impressions.changePercent.toFixed(2),
+            comparison.clicks.changePercent.toFixed(2),
+            comparison.ctr.changePercent.toFixed(2),
+            comparison.bookings.changePercent.toFixed(2)
+          );
+        }
+
+        return row.join(",");
+      })
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    const fileName = `analytics-${ctxSelectedLocation?.location_name || 'data'}-${getDateRangeLabel().replace(/[^a-zA-Z0-9]/g, '-')}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.setAttribute("download", fileName);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export Successful",
+      description: `Analytics data has been exported to CSV file${showComparison ? ' with comparison data' : ''}.`,
+    });
+  };
+
   // Handle loading and authentication redirects
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -370,15 +728,21 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
             </div>
             <div className="flex items-center space-x-4 ml-auto">
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7">7 days</SelectItem>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="90">90 days</SelectItem>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="180">Last 6 months</SelectItem>
+                  <SelectItem value="365">Last year</SelectItem>
                 </SelectContent>
               </Select>
+              <Button onClick={exportToCSV} variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
               <Button onClick={fetchAnalytics} size="sm">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
@@ -397,6 +761,127 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
               </div>
             </div>
 
+            {/* Filters Section */}
+            <Card className="mb-6">
+              <CardContent className="pt-6">
+                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+                  {/* Time Period */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium whitespace-nowrap">Time Period:</label>
+                    <Select 
+                      value={isCustomRange ? "custom" : dateRange} 
+                      onValueChange={(value) => {
+                        if (value === "custom") {
+                          setIsCustomRange(true);
+                        } else {
+                          setIsCustomRange(false);
+                          setDateRange(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">Last 7 days</SelectItem>
+                        <SelectItem value="30">Last 30 days</SelectItem>
+                        <SelectItem value="90">Last 90 days</SelectItem>
+                        <SelectItem value="180">Last 6 months</SelectItem>
+                        <SelectItem value="365">Last year</SelectItem>
+                        <SelectItem value="custom">Custom Range</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Custom Date Range */}
+                  {isCustomRange && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium whitespace-nowrap">Date Range:</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-64 justify-start text-left font-normal",
+                              !customDateRange.from && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {customDateRange.from ? (
+                              customDateRange.to ? (
+                                `${format(customDateRange.from, "MMM d")} - ${format(customDateRange.to, "MMM d, yyyy")}`
+                              ) : (
+                                format(customDateRange.from, "MMM d, yyyy")
+                              )
+                            ) : (
+                              "Pick a date range"
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={customDateRange.from}
+                            selected={customDateRange}
+                            onSelect={(range) => handleCustomDateChange(range?.from, range?.to)}
+                            numberOfMonths={2}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+
+                  {/* Comparison Toggle */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium whitespace-nowrap">Comparison:</label>
+                    <Button
+                      variant={showComparison ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowComparison(!showComparison)}
+                      className="min-w-[140px]"
+                    >
+                      {showComparison ? "Hide Comparison" : "Show Comparison"}
+                    </Button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Button onClick={exportToCSV} variant="outline" size="sm">
+                      <Download className="w-4 h-4 mr-2" />
+                      Export CSV
+                    </Button>
+                    <Button onClick={fetchAnalytics} size="sm">
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Refresh Data
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Summary Info */}
+            <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Analytics Summary</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Showing data for <strong>{getDateRangeLabel()}</strong> • 
+                    Location: <strong>{ctxSelectedLocation?.location_name || 'Not selected'}</strong> • 
+                    Total records: <strong>{analyticsData.length}</strong>
+                    {showComparison && (
+                      <span> • <strong>Comparison mode</strong></span>
+                    )}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">
+                    Last updated: {format(new Date(), 'MMM d, yyyy HH:mm')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Key metrics */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -411,6 +896,14 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   <p className="text-xs text-muted-foreground">
                     Views across search & maps
                   </p>
+                  {showComparison && previousAnalyticsData.length > 0 && (
+                    <div className="mt-3">
+                      {getComparisonBadge(calculateComparison().impressions.changePercent)}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        vs previous period
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -425,6 +918,14 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   <p className="text-xs text-muted-foreground">
                     Website, calls & directions
                   </p>
+                  {showComparison && previousAnalyticsData.length > 0 && (
+                    <div className="mt-3">
+                      {getComparisonBadge(calculateComparison().clicks.changePercent)}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        vs previous period
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -442,6 +943,14 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   <p className="text-xs text-muted-foreground">
                     Clicks per impression
                   </p>
+                  {showComparison && previousAnalyticsData.length > 0 && (
+                    <div className="mt-3">
+                      {getComparisonBadge(calculateComparison().ctr.changePercent)}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        vs previous period
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -456,16 +965,94 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   <p className="text-xs text-muted-foreground">
                     Direct bookings made
                   </p>
+                  {showComparison && previousAnalyticsData.length > 0 && (
+                    <div className="mt-3">
+                      {getComparisonBadge(calculateComparison().bookings.changePercent)}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        vs previous period
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Comparison Summary */}
+            {showComparison && previousAnalyticsData.length > 0 && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5" />
+                    Performance Comparison
+                  </CardTitle>
+                  <CardDescription>
+                    Current period vs previous period performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Impressions</span>
+                        {getComparisonBadge(calculateComparison().impressions.changePercent)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getTotalImpressions().toLocaleString()} vs {calculateComparison().impressions.previous.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Clicks</span>
+                        {getComparisonBadge(calculateComparison().clicks.changePercent)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getTotalClicks().toLocaleString()} vs {calculateComparison().clicks.previous.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">CTR</span>
+                        {getComparisonBadge(calculateComparison().ctr.changePercent)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getTotalImpressions() > 0 ? ((getTotalClicks() / getTotalImpressions()) * 100).toFixed(1) : 0}% vs {calculateComparison().ctr.previous.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Bookings</span>
+                        {getComparisonBadge(calculateComparison().bookings.changePercent)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {analyticsData.reduce((sum, data) => sum + data.businessBookings, 0)} vs {calculateComparison().bookings.previous}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Charts for impressions & actions */}
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Impressions Over Time</CardTitle>
-                  <CardDescription>Daily views across search and maps</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Impressions Over Time</CardTitle>
+                      <CardDescription>Daily views across search and maps</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Impressions Over Time"
+                      description="Shows how many times your business listing appeared in Google Search and Maps results each day."
+                      details={[
+                        "Desktop Maps: Views when users see your business on Google Maps (desktop)",
+                        "Mobile Maps: Views when users see your business on Google Maps (mobile)",
+                        "Desktop Search: Views when users see your business in search results (desktop)",
+                        "Mobile Search: Views when users see your business in search results (mobile)",
+                        "Higher impressions = more visibility to potential customers"
+                      ]}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -506,8 +1093,23 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>User Actions</CardTitle>
-                  <CardDescription>Daily clicks and interactions</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>User Actions</CardTitle>
+                      <CardDescription>Daily clicks and interactions</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="User Actions"
+                      description="Shows the number of actions customers took when they found your business listing."
+                      details={[
+                        "Website Clicks: Users who clicked to visit your website",
+                        "Call Clicks: Users who clicked to call your business",
+                        "Directions: Users who requested directions to your location",
+                        "Messages: Users who started a conversation with your business",
+                        "These actions indicate customer interest and engagement"
+                      ]}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -543,8 +1145,23 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Impressions by Source</CardTitle>
-                  <CardDescription>Where your business appears</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Impressions by Source</CardTitle>
+                      <CardDescription>Where your business appears</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Impressions by Source"
+                      description="Shows the distribution of your business impressions across different Google platforms."
+                      details={[
+                        "Desktop Maps: Business listings on Google Maps (desktop version)",
+                        "Mobile Maps: Business listings on Google Maps (mobile app)",
+                        "Desktop Search: Business listings in Google Search results (desktop)",
+                        "Mobile Search: Business listings in Google Search results (mobile)",
+                        "Helps you understand which platforms drive the most visibility"
+                      ]}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -573,8 +1190,23 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Food Orders & Menu Views</CardTitle>
-                  <CardDescription>Restaurant-specific metrics</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Food Orders & Menu Views</CardTitle>
+                      <CardDescription>Restaurant-specific metrics</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Food Orders & Menu Views"
+                      description="Shows restaurant-specific engagement metrics for food-related businesses."
+                      details={[
+                        "Food Orders: Direct food orders placed through your Google Business listing",
+                        "Menu Clicks: Users who clicked to view your menu",
+                        "These metrics are only available for restaurants and food businesses",
+                        "Higher numbers indicate strong customer interest in your food offerings",
+                        "Use this data to optimize your menu presentation and food descriptions"
+                      ]}
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -596,6 +1228,228 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                       />
                     </BarChart>
                   </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Advanced Analytics Charts */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Impressions vs Clicks Trend</CardTitle>
+                      <CardDescription>Relationship between impressions and clicks over time</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Impressions vs Clicks Trend"
+                      description="Shows the relationship between how many times your business was seen (impressions) and how many actions users took (clicks)."
+                      details={[
+                        "Left axis (blue): Total impressions across all platforms",
+                        "Right axis (green): Total clicks (website, calls, directions)",
+                        "Look for patterns where impressions and clicks move together",
+                        "Gaps between impressions and clicks indicate missed opportunities",
+                        "Higher click rates relative to impressions show better engagement"
+                      ]}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={analyticsData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip />
+                      <Legend />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="totalImpressions"
+                        stackId="1"
+                        stroke="#8884d8"
+                        fill="#8884d8"
+                        fillOpacity={0.3}
+                        name="Total Impressions"
+                      />
+                      <Area
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="totalClicks"
+                        stackId="2"
+                        stroke="#82ca9d"
+                        fill="#82ca9d"
+                        fillOpacity={0.3}
+                        name="Total Clicks"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Click-Through Rate Analysis</CardTitle>
+                      <CardDescription>CTR performance over time</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Click-Through Rate Analysis"
+                      description="Shows your daily click-through rate (CTR) - the percentage of people who took action after seeing your business."
+                      details={[
+                        "CTR = (Total Clicks ÷ Total Impressions) × 100",
+                        "Higher CTR means more people are engaging with your listing",
+                        "Industry average CTR is typically 2-5%",
+                        "Consistent high CTR indicates strong listing optimization",
+                        "Use this to track the effectiveness of your business profile"
+                      ]}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={analyticsData.map(data => ({
+                      ...data,
+                      ctr: data.businessImpressionsDesktopMaps + data.businessImpressionsMobileMaps + data.businessImpressionsDesktopSearch + data.businessImpressionsMobileSearch > 0 
+                        ? ((data.websiteClicks + data.callClicks + data.businessDirectionRequests) / (data.businessImpressionsDesktopMaps + data.businessImpressionsMobileMaps + data.businessImpressionsDesktopSearch + data.businessImpressionsMobileSearch)) * 100 
+                        : 0
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [`${value.toFixed(2)}%`, 'CTR']} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="ctr"
+                        stroke="#ff7300"
+                        strokeWidth={3}
+                        name="Click-Through Rate"
+                        dot={{ fill: '#ff7300', strokeWidth: 2, r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Performance Insights */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Top Performing Day</CardTitle>
+                      <CardDescription>Best day for impressions</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Top Performing Day"
+                      description="Shows the date when your business received the highest number of impressions."
+                      details={[
+                        "Based on total impressions across all platforms",
+                        "Helps identify your peak visibility days",
+                        "Use this to understand seasonal or weekly patterns",
+                        "Consider what marketing activities happened on this day",
+                        "Replicate successful strategies on similar days"
+                      ]}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-green-600">
+                      {analyticsData.length > 0 ? analyticsData.reduce((best, current) => {
+                        const currentTotal = current.businessImpressionsDesktopMaps + current.businessImpressionsMobileMaps + current.businessImpressionsDesktopSearch + current.businessImpressionsMobileSearch;
+                        const bestTotal = best.businessImpressionsDesktopMaps + best.businessImpressionsMobileMaps + best.businessImpressionsDesktopSearch + best.businessImpressionsMobileSearch;
+                        return currentTotal > bestTotal ? current : best;
+                      }).date : 'N/A'}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {analyticsData.length > 0 ? `${analyticsData.reduce((best, current) => {
+                        const currentTotal = current.businessImpressionsDesktopMaps + current.businessImpressionsMobileMaps + current.businessImpressionsDesktopSearch + current.businessImpressionsMobileSearch;
+                        const bestTotal = best.businessImpressionsDesktopMaps + best.businessImpressionsMobileMaps + best.businessImpressionsDesktopSearch + best.businessImpressionsMobileSearch;
+                        return currentTotal > bestTotal ? current : best;
+                      }, analyticsData[0]).businessImpressionsDesktopMaps + analyticsData.reduce((best, current) => {
+                        const currentTotal = current.businessImpressionsDesktopMaps + current.businessImpressionsMobileMaps + current.businessImpressionsDesktopSearch + current.businessImpressionsMobileSearch;
+                        const bestTotal = best.businessImpressionsDesktopMaps + best.businessImpressionsMobileMaps + best.businessImpressionsDesktopSearch + best.businessImpressionsMobileSearch;
+                        return currentTotal > bestTotal ? current : best;
+                      }, analyticsData[0]).businessImpressionsMobileMaps + analyticsData.reduce((best, current) => {
+                        const currentTotal = current.businessImpressionsDesktopMaps + current.businessImpressionsMobileMaps + current.businessImpressionsDesktopSearch + current.businessImpressionsMobileSearch;
+                        const bestTotal = best.businessImpressionsDesktopMaps + best.businessImpressionsMobileMaps + best.businessImpressionsDesktopSearch + best.businessImpressionsMobileSearch;
+                        return currentTotal > bestTotal ? current : best;
+                      }, analyticsData[0]).businessImpressionsDesktopSearch + analyticsData.reduce((best, current) => {
+                        const currentTotal = current.businessImpressionsDesktopMaps + current.businessImpressionsMobileMaps + current.businessImpressionsDesktopSearch + current.businessImpressionsMobileSearch;
+                        const bestTotal = best.businessImpressionsDesktopMaps + best.businessImpressionsMobileMaps + best.businessImpressionsDesktopSearch + best.businessImpressionsMobileSearch;
+                        return currentTotal > bestTotal ? current : best;
+                      }, analyticsData[0]).businessImpressionsMobileSearch} impressions` : 'No data'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Average Daily CTR</CardTitle>
+                      <CardDescription>Overall click-through rate</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Average Daily CTR"
+                      description="Shows your overall click-through rate across the selected time period."
+                      details={[
+                        "Calculated as total clicks divided by total impressions",
+                        "Higher CTR indicates better listing optimization",
+                        "Industry benchmarks: 2-5% is typical",
+                        "Above 5% is considered excellent performance",
+                        "Use this to measure your listing's effectiveness"
+                      ]}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-blue-600">
+                      {getTotalImpressions() > 0 ? ((getTotalClicks() / getTotalImpressions()) * 100).toFixed(2) : 0}%
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {getTotalClicks().toLocaleString()} clicks from {getTotalImpressions().toLocaleString()} impressions
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Conversion Rate</CardTitle>
+                      <CardDescription>Clicks to bookings ratio</CardDescription>
+                    </div>
+                    <ChartHelpPopover
+                      title="Conversion Rate"
+                      description="Shows what percentage of clicks resulted in actual bookings or conversions."
+                      details={[
+                        "Calculated as bookings divided by total clicks",
+                        "Measures how effectively clicks turn into business",
+                        "Higher conversion rate means better customer quality",
+                        "Low conversion rate may indicate targeting issues",
+                        "Focus on improving this metric for better ROI"
+                      ]}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-purple-600">
+                      {getTotalClicks() > 0 ? ((analyticsData.reduce((sum, data) => sum + data.businessBookings, 0) / getTotalClicks()) * 100).toFixed(2) : 0}%
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {analyticsData.reduce((sum, data) => sum + data.businessBookings, 0)} bookings from {getTotalClicks().toLocaleString()} clicks
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>

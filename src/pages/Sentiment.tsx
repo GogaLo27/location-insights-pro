@@ -45,7 +45,7 @@ const Sentiment = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("monthly");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: subMonths(new Date(), 6),
+    from: subYears(new Date(), 1),
     to: new Date()
   });
   const { selectedLocation: ctxSelectedLocation } = useLocationContext();
@@ -82,7 +82,9 @@ const Sentiment = () => {
             return d >= dateRange.from && d <= dateRange.to;
           });
 
+        console.log('Demo reviews found:', filteredReviews.length);
         const processedData = processReviewsIntoSentimentData(filteredReviews);
+        console.log('Demo processed sentiment data:', processedData);
         setSentimentData(processedData);
         return;
       }
@@ -103,10 +105,13 @@ const Sentiment = () => {
       const { data: reviews, error } = await query;
 
       if (!error && reviews) {
+        console.log('Reviews found:', reviews.length);
         // Process reviews into sentiment data by period
         const processedData = processReviewsIntoSentimentData(reviews);
+        console.log('Processed sentiment data:', processedData);
         setSentimentData(processedData);
       } else {
+        console.log('No reviews found or error:', error);
         setSentimentData([]);
       }
     } catch (error) {

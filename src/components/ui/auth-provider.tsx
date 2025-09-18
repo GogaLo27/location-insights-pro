@@ -28,6 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // If demo mode persisted, initialize demo user immediately
     const demoPersisted = localStorage.getItem('lip_demo_mode') === 'true';
+    
     if (demoPersisted) {
       const demoUser = {
         id: 'demo-user-id',

@@ -44,7 +44,7 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute requiresLocation={true}>
+                <ProtectedRoute requiresPlan={true} requiresLocation={true}>
                   <Dashboard />
                 </ProtectedRoute>
               }
@@ -52,7 +52,7 @@ const App = () => (
             <Route
               path="/reviews"
               element={
-                <ProtectedRoute requiresLocation={true}>
+                <ProtectedRoute requiresPlan={true} requiresLocation={true}>
                   <Reviews />
                 </ProtectedRoute>
               }
@@ -60,7 +60,7 @@ const App = () => (
             <Route
               path="/analytics"
               element={
-                <ProtectedRoute requiresLocation={true}>
+                <ProtectedRoute requiresPlan={true} requiresLocation={true}>
                   <Analytics />
                 </ProtectedRoute>
               }
@@ -68,7 +68,7 @@ const App = () => (
             <Route
               path="/sentiment"
               element={
-                <ProtectedRoute requiresLocation={true}>
+                <ProtectedRoute requiresPlan={true} requiresLocation={true}>
                   <Sentiment />
                 </ProtectedRoute>
               }
@@ -76,7 +76,7 @@ const App = () => (
             <Route
               path="/locations"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <Locations />
                 </ProtectedRoute>
               }
@@ -84,7 +84,7 @@ const App = () => (
             <Route
               path="/plan-management"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <PlanManagement />
                 </ProtectedRoute>
               }
@@ -92,7 +92,7 @@ const App = () => (
             <Route
               path="/orders"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <OrderHistory />
                 </ProtectedRoute>
               }
@@ -100,7 +100,7 @@ const App = () => (
             <Route
               path="/settings"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <Settings />
                 </ProtectedRoute>
               }
