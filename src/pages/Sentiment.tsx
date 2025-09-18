@@ -77,7 +77,10 @@ const Sentiment = () => {
     const currentDateRange = getDateRange();
     // Filter sentiment data by the selected date range
     const filteredData = sentimentData.filter(data => {
+      if (!data.analysis_date) return false;
       const dataDate = new Date(data.analysis_date);
+      // Check if date is valid
+      if (isNaN(dataDate.getTime())) return false;
       return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
     });
 
@@ -88,14 +91,17 @@ const Sentiment = () => {
       return dateA.getTime() - dateB.getTime();
     });
 
-    return sortedData.map(data => ({
-      date: format(new Date(data.analysis_date), 'MMM d'),
-      positive: data.positive_count,
-      negative: data.negative_count,
-      neutral: data.neutral_count,
-      rating: data.average_rating,
-      sentiment: data.sentiment_score
-    }));
+    return sortedData.map(data => {
+      const dataDate = new Date(data.analysis_date);
+      return {
+        date: format(dataDate, 'MMM d, yyyy'),
+        positive: data.positive_count || 0,
+        negative: data.negative_count || 0,
+        neutral: data.neutral_count || 0,
+        rating: data.average_rating || 0,
+        sentiment: data.sentiment_score || 0
+      };
+    });
   };
 
   const getSentimentPieData = () => {
@@ -587,10 +593,21 @@ const Sentiment = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-2 block">Date Range Presets</label>
-                    <Select onValueChange={(value) => {
-                      const preset = getDatePresets()[parseInt(value)];
-                      setDateRange(preset);
-                    }}>
+                    <Select 
+                      value={(() => {
+                        if (!dateRange) return undefined;
+                        const presets = getDatePresets();
+                        const currentPreset = presets.find(preset => 
+                          preset.from.getTime() === dateRange.from.getTime() && 
+                          preset.to.getTime() === dateRange.to.getTime()
+                        );
+                        return currentPreset ? presets.indexOf(currentPreset).toString() : undefined;
+                      })()}
+                      onValueChange={(value) => {
+                        const preset = getDatePresets()[parseInt(value)];
+                        setDateRange(preset);
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select preset" />
                       </SelectTrigger>
@@ -837,7 +854,7 @@ const Sentiment = () => {
                 </Card>
 
                 {/* Rating Trend - Simple Line Chart */}
-                {getSentimentTrendData().length > 1 && (
+                {getSentimentTrendData().length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -850,7 +867,13 @@ const Sentiment = () => {
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={getSentimentTrendData()}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
+                          <XAxis 
+                            dataKey="date" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                            interval={0}
+                          />
                           <YAxis domain={[0, 5]} />
                           <Tooltip 
                             formatter={(value: any) => [value.toFixed(1), 'Rating']}
