@@ -22,7 +22,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, locationId, query, startDate, endDate, replyText, review_id } = body || {};
+    const { action, locationId, query, startDate, endDate, replyText, review_id, url, location, address, placeId } = body || {};
 
     // ---- Auth: Supabase user (JWT from client)
     const authHeader = req.headers.get("Authorization");
@@ -33,9 +33,21 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(supabaseJwt);
     if (authError || !user) return jsonError("Unauthorized", 401);
 
-    // ---- Google access token (from client)
+    // ---- Google access token (from client) - only required for certain actions
     const googleAccessToken = req.headers.get("X-Google-Token");
-    if (!googleAccessToken) {
+    
+    // Actions that require Google access token
+    const actionsRequiringGoogleToken = [
+      "get_user_locations",
+      "fetch_user_locations", 
+      "search_locations",
+      "fetch_location_analytics",
+      "fetch_location_reviews",
+      "reply_to_review",
+      "fetch_competitor_data"
+    ];
+    
+    if (actionsRequiringGoogleToken.includes(action) && !googleAccessToken) {
       return jsonError(
         "Missing Google access token. Send Supabase session.provider_token in 'X-Google-Token' header.",
         400
@@ -64,6 +76,22 @@ serve(async (req) => {
         if (!review_id) return jsonError("Missing 'review_id' (Google reviewId) for reply_to_review", 400);
         if (!replyText) return jsonError("Missing 'replyText' for reply_to_review", 400);
         return await replyToReview(locationId, review_id, replyText, googleAccessToken, user.id);
+
+      case "search_competitors":
+        if (!query) return jsonError("Missing 'query' for search_competitors", 400);
+        return await searchCompetitors(query, googleAccessToken);
+
+      case "fetch_competitor_data":
+        if (!placeId) return jsonError("Missing 'placeId' for fetch_competitor_data", 400);
+        return await fetchCompetitorData(placeId, googleAccessToken);
+
+        case "find_nearby_competitors":
+          if (!location) return jsonError("Missing 'location' for find_nearby_competitors", 400);
+          return await findNearbyCompetitors(location, address);
+
+        case "extract_competitor_from_url":
+          if (!url) return jsonError("Missing 'url' for extract_competitor_from_url", 400);
+          return await extractCompetitorFromUrl(url);
 
       default:
         return jsonError("Invalid action", 400);
@@ -419,5 +447,292 @@ async function fetchLocationAnalytics(
   } catch (error) {
     console.error('Error fetching analytics:', error);
     return json({ analytics: {} });
+  }
+}
+
+/** Search for competitors using Google Places API */
+async function searchCompetitors(query: string, accessToken: string) {
+  try {
+    // Note: This would require Google Places API key
+    // For now, return mock data to demonstrate the functionality
+    console.log(`Searching for competitors with query: ${query}`);
+    
+    // Mock competitor search results
+    const mockResults = [
+      {
+        place_id: "ChIJMockCompetitor1",
+        name: "Competitor Restaurant A",
+        rating: 4.6,
+        user_ratings_total: 89,
+        formatted_address: "123 Main St, San Francisco, CA 94102",
+        formatted_phone_number: "+1 (555) 123-4567",
+        website: "https://competitor-a.com",
+        business_status: "OPERATIONAL"
+      },
+      {
+        place_id: "ChIJMockCompetitor2", 
+        name: "Competitor Restaurant B",
+        rating: 4.1,
+        user_ratings_total: 203,
+        formatted_address: "456 Oak Ave, San Francisco, CA 94110",
+        formatted_phone_number: "+1 (555) 987-6543",
+        website: "https://competitor-b.com",
+        business_status: "OPERATIONAL"
+      }
+    ];
+
+    return json({ competitors: mockResults });
+  } catch (error) {
+    console.error('Error searching competitors:', error);
+    return json({ competitors: [] });
+  }
+}
+
+/** Fetch competitor data using Google Places API */
+async function fetchCompetitorData(placeId: string, accessToken: string) {
+  try {
+    console.log(`Fetching competitor data for place ID: ${placeId}`);
+    
+    // Note: This would require Google Places API key and billing setup
+    // For now, return mock data to demonstrate the functionality
+    const mockCompetitorData = {
+      place_id: placeId,
+      name: "Competitor Business",
+      rating: 4.3,
+      user_ratings_total: 156,
+      formatted_address: "789 Business St, San Francisco, CA 94105",
+      formatted_phone_number: "+1 (555) 456-7890",
+      website: "https://competitor-business.com",
+      business_status: "OPERATIONAL",
+      reviews: [
+        {
+          author_name: "John Doe",
+          rating: 5,
+          text: "Great service and food quality!",
+          time: 1640995200,
+          relative_time_description: "2 months ago"
+        },
+        {
+          author_name: "Jane Smith", 
+          rating: 4,
+          text: "Good experience overall, could improve on wait times.",
+          time: 1640908800,
+          relative_time_description: "2 months ago"
+        }
+      ]
+    };
+
+    return json({ competitor: mockCompetitorData });
+  } catch (error) {
+    console.error('Error fetching competitor data:', error);
+    return json({ competitor: null });
+  }
+}
+
+/** Find nearby competitors based on location using Google Places API */
+async function findNearbyCompetitors(locationName: string, address: string) {
+  try {
+    console.log(`Finding nearby competitors for location: ${locationName}`);
+    
+    // Get Google Places API key from environment
+    const placesApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+    
+    if (!placesApiKey) {
+      console.log('No Google Places API key found, using mock data');
+      // Fallback to mock data if no API key
+      const mockNearbyCompetitors = [
+        {
+          place_id: "ChIJMockCompetitor1",
+          name: "Nearby Restaurant A",
+          rating: 4.6,
+          user_ratings_total: 89,
+          formatted_address: "123 Main St, Same City",
+          formatted_phone_number: "+1 (555) 123-4567",
+          website: "https://competitor-a.com",
+          business_status: "OPERATIONAL",
+          distance: "0.3 miles",
+          category: "restaurant"
+        },
+        {
+          place_id: "ChIJMockCompetitor2", 
+          name: "Nearby Restaurant B",
+          rating: 4.1,
+          user_ratings_total: 203,
+          formatted_address: "456 Oak Ave, Same City",
+          formatted_phone_number: "+1 (555) 987-6543",
+          website: "https://competitor-b.com",
+          business_status: "OPERATIONAL",
+          distance: "0.5 miles",
+          category: "restaurant"
+        },
+        {
+          place_id: "ChIJMockCompetitor3",
+          name: "Nearby Restaurant C", 
+          rating: 4.3,
+          user_ratings_total: 156,
+          formatted_address: "789 Business St, Same City",
+          formatted_phone_number: "+1 (555) 456-7890",
+          website: "https://competitor-c.com",
+          business_status: "OPERATIONAL",
+          distance: "0.7 miles",
+          category: "restaurant"
+        }
+      ];
+      return json({ competitors: mockNearbyCompetitors });
+    }
+
+    // Use Google Places API to find nearby businesses
+    // First, get the coordinates of the user's location
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${placesApiKey}`;
+    const geocodeResponse = await fetch(geocodeUrl);
+    const geocodeData = await geocodeResponse.json();
+    
+    if (!geocodeData.results || geocodeData.results.length === 0) {
+      throw new Error('Could not geocode the address');
+    }
+    
+    const location = geocodeData.results[0].geometry.location;
+    const lat = location.lat;
+    const lng = location.lng;
+    
+    // Search for nearby restaurants/businesses
+    const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=5000&type=restaurant&key=${placesApiKey}`;
+    const placesResponse = await fetch(placesUrl);
+    const placesData = await placesResponse.json();
+    
+    if (!placesData.results || placesData.results.length === 0) {
+      return json({ competitors: [] });
+    }
+    
+    // Process the results and get detailed information for each place
+    const competitors = await Promise.all(
+      placesData.results.slice(0, 5).map(async (place: any) => {
+        try {
+          // Get detailed information for each place
+          const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,rating,user_ratings_total,formatted_address,formatted_phone_number,website,business_status,reviews&key=${placesApiKey}`;
+          const detailsResponse = await fetch(detailsUrl);
+          const detailsData = await detailsResponse.json();
+          
+          if (detailsData.result) {
+            const result = detailsData.result;
+            return {
+              place_id: place.place_id,
+              name: result.name,
+              rating: result.rating || 0,
+              user_ratings_total: result.user_ratings_total || 0,
+              formatted_address: result.formatted_address,
+              formatted_phone_number: result.formatted_phone_number,
+              website: result.website,
+              business_status: result.business_status || "OPERATIONAL",
+              distance: calculateDistance(lat, lng, place.geometry.location.lat, place.geometry.location.lng),
+              category: "restaurant"
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error fetching details for place ${place.place_id}:`, error);
+          return null;
+        }
+      })
+    );
+    
+    // Filter out null results
+    const validCompetitors = competitors.filter(competitor => competitor !== null);
+    
+    return json({ competitors: validCompetitors });
+  } catch (error) {
+    console.error('Error finding nearby competitors:', error);
+    return json({ competitors: [] });
+  }
+}
+
+/** Calculate distance between two coordinates in miles */
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
+  const R = 3959; // Radius of the Earth in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  return `${distance.toFixed(1)} miles`;
+}
+
+/** Extract competitor data from Google Maps/Business Profile URL */
+async function extractCompetitorFromUrl(url: string) {
+  try {
+    console.log(`Extracting competitor data from URL: ${url}`);
+    
+    // Extract place ID from various Google URLs
+    let placeId = '';
+    
+    // Handle different URL formats
+    if (url.includes('place_id=')) {
+      placeId = url.split('place_id=')[1].split('&')[0];
+    } else if (url.includes('/place/')) {
+      // Extract from /place/ChIJ... format
+      const match = url.match(/\/place\/([^\/]+)/);
+      if (match) {
+        placeId = match[1];
+      }
+    } else if (url.includes('maps.google.com')) {
+      // Try to extract from maps URL
+      const match = url.match(/@[^\/]+\/data=([^&]+)/);
+      if (match) {
+        placeId = match[1];
+      }
+    }
+    
+    if (!placeId) {
+      return jsonError("Could not extract place ID from URL", 400);
+    }
+    
+    // Get Google Places API key
+    const placesApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+    
+    if (!placesApiKey) {
+      return jsonError("Google Places API key not configured", 500);
+    }
+    
+    // Fetch detailed information from Google Places API
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,formatted_address,formatted_phone_number,website,business_status,reviews,geometry&key=${placesApiKey}`;
+    
+    const response = await fetch(detailsUrl);
+    const data = await response.json();
+    
+    if (data.status !== 'OK' || !data.result) {
+      return jsonError(`Google Places API error: ${data.status}`, 400);
+    }
+    
+    const result = data.result;
+    
+    // Extract reviews data
+    const reviews = result.reviews ? result.reviews.map((review: any) => ({
+      author_name: review.author_name,
+      rating: review.rating,
+      text: review.text,
+      time: review.time,
+      relative_time_description: review.relative_time_description
+    })) : [];
+    
+    const competitorData = {
+      place_id: placeId,
+      name: result.name,
+      rating: result.rating || 0,
+      user_ratings_total: result.user_ratings_total || 0,
+      formatted_address: result.formatted_address,
+      formatted_phone_number: result.formatted_phone_number,
+      website: result.website,
+      business_status: result.business_status || "OPERATIONAL",
+      reviews: reviews,
+      geometry: result.geometry
+    };
+    
+    return json({ competitor: competitorData });
+    
+  } catch (error) {
+    console.error('Error extracting competitor from URL:', error);
+    return jsonError("Failed to extract competitor data from URL", 500);
   }
 }
