@@ -71,12 +71,14 @@ useEffect(() => {
     setIsAnalyzing(false);
     setProgress(100);
 
-  setTimeout(() => {
-    setProgress(0);
-    setCompleted(0);
-    setTotal(0);
+    // Clear localStorage immediately to prevent state restoration issues
     localStorage.removeItem(storageKey);
-  }, 2000);
+
+    setTimeout(() => {
+      setProgress(0);
+      setCompleted(0);
+      setTotal(0);
+    }, 2000);
   };
 
   return {

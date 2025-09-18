@@ -114,6 +114,14 @@ const Reviews = () => {
     resetProgress: resetFetchProgress
   } = useAnalysisProgress(`fetch_${userKey}_${locKey}`);
 
+  // Auto-reset stuck progress states
+  useEffect(() => {
+    if (isFetching && fetchProgressValue >= 100) {
+      console.log('Auto-resetting stuck progress state');
+      resetFetchProgress();
+    }
+  }, [isFetching, fetchProgressValue, resetFetchProgress]);
+
   useEffect(() => {
     console.log('useEffect triggered:', {
       user: !!user,
@@ -215,6 +223,18 @@ const Reviews = () => {
   const fetchReviews = async (forceRefresh = false) => {
     const locationId = resolveLocationId();
     if (!locationId) return;
+
+    // Validate and reset progress state if it's in an inconsistent state
+    if (isFetching && fetchProgressValue >= 100) {
+      console.log('Detected stuck progress state, resetting...');
+      resetFetchProgress();
+    }
+    
+    // Also reset if we're not actually fetching but the state says we are
+    if (isFetching && !forceRefresh) {
+      console.log('Detected inconsistent isFetching state, resetting...');
+      resetFetchProgress();
+    }
 
     if (forceRefresh) {
       setLoading(true);
@@ -340,6 +360,10 @@ const Reviews = () => {
 
     } catch (error) {
       console.error("Error fetching reviews:", error);
+      
+      // Always reset progress state on error to prevent stuck progress bar
+      resetFetchProgress();
+      
       if (forceRefresh) {
         toast({
           title: "Error",
@@ -350,7 +374,10 @@ const Reviews = () => {
     } finally {
       if (forceRefresh) {
         setLoading(false);
-        finishFetch();
+        // Only finish if we're not already reset (to avoid double state changes)
+        if (fetchProgressValue > 0) {
+          finishFetch();
+        }
       }
     }
   };
@@ -364,6 +391,8 @@ const Reviews = () => {
 
   const total = googleReviews.length;
   onProgress?.(0, total);
+
+  try {
 
   // Fetch existing rows for comparison, not just IDs
   const { data: existingRows, error: existingErr } = await supabase
@@ -434,12 +463,21 @@ const Reviews = () => {
     }
   }
 
-  // Batch insert new rows
-  const chunkSize = 100;
-  for (let i = 0; i < newRecords.length; i += chunkSize) {
-    const chunk = newRecords.slice(i, i + chunkSize);
-    const { error } = await supabase.from("saved_reviews").insert(chunk);
-    if (error) console.error("Insert error for chunk:", error);
+    // Batch insert new rows
+    const chunkSize = 100;
+    for (let i = 0; i < newRecords.length; i += chunkSize) {
+      const chunk = newRecords.slice(i, i + chunkSize);
+      const { error } = await supabase.from("saved_reviews").insert(chunk);
+      if (error) {
+        console.error("Insert error for chunk:", error);
+        throw error; // Re-throw to trigger error handling
+      }
+    }
+  } catch (error) {
+    console.error("Error in saveReviewsToDatabase:", error);
+    // Reset progress to prevent stuck progress bar
+    onProgress?.(0, total);
+    throw error; // Re-throw to let caller handle the error
   }
 };
 
@@ -588,13 +626,10 @@ const Reviews = () => {
       setReviewsDeleted(true); // Mark that reviews were intentionally deleted
       setDeletedFlag(true); // Persist deletion flag in localStorage
       console.log('Reviews deleted - setting reviewsDeleted flag to true');
+      
+      // Reset progress states immediately (no timeout needed)
       resetProgress();
       resetFetchProgress();
-      
-      // Force reset the fetch progress to ensure UI updates
-      setTimeout(() => {
-        resetFetchProgress();
-      }, 100);
 
       toast({
         title: "Success",
@@ -950,7 +985,7 @@ Keep the response under 150 words.`;
                 setReviewsDeleted(false); // Reset deletion flag when manually refreshing
                 setDeletedFlag(false); // Clear localStorage deletion flag
                 fetchReviews(true);
-              }} size="sm" disabled={isAnalyzing || isFetching}>
+              }} size="sm" disabled={isAnalyzing}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
@@ -960,7 +995,7 @@ Keep the response under 150 words.`;
                     <Button 
                       size="sm" 
                       variant="destructive" 
-                      disabled={isDeleting || isAnalyzing || isFetching}
+                      disabled={isDeleting || isAnalyzing}
                       onClick={() => {
                         console.log('Delete button clicked');
                         console.log('Current state:', {
@@ -1024,7 +1059,7 @@ Keep the response under 150 words.`;
 
           <div className="flex-1 space-y-6 p-8 pt-6">
             {/* Fetch Progress Bar */}
-            {(isFetching || (fetchProgressValue > 0 && fetchProgressValue < 100 && !allReviewsLoaded)) && (
+            {(isFetching && fetchProgressValue < 100) && (
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-2">
@@ -1042,26 +1077,29 @@ Keep the response under 150 words.`;
             )}
 
             {/* Stuck Progress Bar - Emergency Reset */}
-            {fetchProgressValue >= 100 && isFetching && (
+            {(fetchProgressValue >= 100 && isFetching && allReviewsLoaded) && (
               <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-orange-800 dark:text-orange-200">Progress Bar Stuck</p>
+                      <p className="font-medium text-orange-800 dark:text-orange-200">Progress Bar Issue Detected</p>
                       <p className="text-sm text-orange-600 dark:text-orange-300">
-                        The progress bar appears to be stuck. Click reset to continue.
+                        The progress bar appears to be stuck or in an inconsistent state. Click reset to fix this.
                       </p>
                     </div>
                     <Button 
                       size="sm" 
                       variant="outline"
                       onClick={() => {
+                        console.log('Emergency progress reset triggered');
                         resetFetchProgress();
                         setLoading(false);
                         setIsDeleting(false);
+                        setAllReviewsLoaded(true);
+                        setReviewsDeleted(false);
                       }}
                     >
-                      Reset
+                      Reset Progress
                     </Button>
                   </div>
                 </CardContent>

@@ -20,6 +20,30 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Add overall timeout for the entire request
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Function timeout')), 120000) // 2 minute timeout
+  );
+
+  try {
+    const result = await Promise.race([
+      handleRequest(req),
+      timeoutPromise
+    ]);
+    return result;
+  } catch (error) {
+    console.error("Function error:", error);
+    return new Response(JSON.stringify({ 
+      error: error.message || "Internal server error",
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
+
+async function handleRequest(req: Request) {
   try {
     const body = await req.json();
     const { action, locationId, query, startDate, endDate, replyText, review_id, url, location, address, placeId } = body || {};
@@ -103,7 +127,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
 
 // ---------- Helpers
 
@@ -276,15 +300,49 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
   try {
     const accountIds = await getAllAccountIds(accessToken);
     let allReviews: any[] = [];
+    const maxReviews = 1000; // Limit to prevent memory issues
+    const maxPages = 50; // Prevent infinite loops
 
     for (const accountId of accountIds) {
       try {
         let nextPageToken: string | null = null;
+        let pageCount = 0;
+        const seenTokens = new Set<string>(); // Prevent infinite loops
+        
         do {
+          // Safety checks
+          if (pageCount >= maxPages) {
+            console.log(`Reached maximum page limit (${maxPages}) for location ${locationId}`);
+            break;
+          }
+          
+          if (allReviews.length >= maxReviews) {
+            console.log(`Reached maximum review limit (${maxReviews}) for location ${locationId}`);
+            break;
+          }
+
+          // Check for infinite loop
+          if (nextPageToken && seenTokens.has(nextPageToken)) {
+            console.log(`Detected infinite loop with token: ${nextPageToken}`);
+            break;
+          }
+          
+          if (nextPageToken) {
+            seenTokens.add(nextPageToken);
+          }
+
           const url = `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}/reviews${
             nextPageToken ? `?pageToken=${nextPageToken}` : ""
           }`;
-          const data = await googleApiRequest(url, accessToken);
+          
+          // Add timeout and rate limiting
+          const data = await Promise.race([
+            googleApiRequest(url, accessToken),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Request timeout')), 30000) // 30 second timeout
+            )
+          ]) as any;
+          
           const raw = data.reviews || [];
           const formatted = raw.map((r: any) => ({
             id: r.reviewId,
@@ -300,21 +358,31 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
             ai_tags: [],
             location_id: locationId,
           }));
+          
           allReviews.push(...formatted);
           nextPageToken = data.nextPageToken ?? null;
+          pageCount++;
+          
+          // Rate limiting - small delay between requests
+          if (nextPageToken) {
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+          }
+          
         } while (nextPageToken);
 
         break; // owning account found
-      } catch (_e) {
-        console.log(`No reviews for location ${locationId} in ${accountId}`);
+      } catch (error) {
+        console.log(`Error fetching reviews for location ${locationId} in ${accountId}:`, error);
+        // Continue to next account instead of breaking
         continue;
       }
     }
 
+    console.log(`Successfully fetched ${allReviews.length} reviews for location ${locationId}`);
     return json({ reviews: allReviews });
   } catch (error) {
     console.error("Error fetching reviews:", error);
-    return json({ reviews: [] });
+    return json({ reviews: [], error: error.message });
   }
 }
 
