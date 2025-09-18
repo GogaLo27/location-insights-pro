@@ -12,6 +12,7 @@ import { MapPin, BarChart3, MessageSquare, Settings, LogOut, TrendingUp, Users, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { format } from "date-fns";
 import { DEMO_EMAIL, getDemoReviewsForLocation, mockLocations } from "@/utils/mockData";
 
@@ -34,7 +35,8 @@ interface DashboardStats {
 const Dashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
-  const { selectedLocation } = useLocation();
+  const { selectedLocation, locations } = useLocation();
+  const { maxLocations } = usePlanFeatures();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentReviews, setRecentReviews] = useState<any[]>([]);
@@ -49,18 +51,18 @@ const Dashboard = () => {
       fetchDashboardStats();
       fetchRecentReviews();
     }
-  }, [user, selectedLocation]);
+  }, [user, selectedLocation, maxLocations, locations]);
 
 
   const fetchProfile = async () => {
     try {
-      // Use mock data until database migration is executed
+      // Use dynamic location limits based on current plan
       setProfile({
         id: user?.id || '',
         email: user?.email || '',
         full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || null,
         subscription_plan: 'free',
-        locations_limit: 2,
+        locations_limit: maxLocations,
         reviews_limit: 100,
       });
     } catch (error) {
@@ -280,16 +282,26 @@ const Dashboard = () => {
 
         {/* Quick Stats */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className={maxLocations !== -1 && locations && locations.length >= maxLocations * 0.8 ? 'border-orange-200 bg-orange-50/50' : ''}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Locations</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalLocations || 0}</div>
+              <div className="text-2xl font-bold">{locations?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
-                of {profile?.locations_limit} allowed
+                of {maxLocations === -1 ? '∞' : maxLocations} allowed
               </p>
+              {maxLocations !== -1 && locations && locations.length >= maxLocations * 0.8 && locations.length < maxLocations && (
+                <p className="text-xs text-orange-600 mt-1">
+                  ⚠️ Approaching limit
+                </p>
+              )}
+              {maxLocations !== -1 && locations && locations.length >= maxLocations && (
+                <p className="text-xs text-red-600 mt-1">
+                  🚫 Limit reached
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -371,7 +383,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        {stats?.totalLocations === 0 ? (
+        {(!locations || locations.length === 0) ? (
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Getting Started</CardTitle>

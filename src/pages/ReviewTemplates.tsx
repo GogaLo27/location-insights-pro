@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Plus, Edit, Trash2, Copy, FileText, Star, Heart, MessageSquare, ThumbsUp, AlertCircle, CheckCircle } from "lucide-react";
+import { Plus, Edit, Trash2, Copy, FileText, Star, Heart, MessageSquare, ThumbsUp, AlertCircle, CheckCircle, CheckSquare, Square, Trash, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
@@ -64,6 +64,10 @@ const ReviewTemplates = () => {
     category: "positive" as ReviewTemplate['category'],
     content: "",
   });
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<ReviewTemplate | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (user && canUseReviewTemplates) {
@@ -97,14 +101,47 @@ const ReviewTemplates = () => {
   const handleCreateTemplate = async () => {
     if (!user) return;
 
+    // Check template limit for non-Enterprise users
+    if (maxCustomTemplates !== -1 && customTemplates.length >= maxCustomTemplates) {
+      toast({
+        title: "Template Limit Reached",
+        description: `You can only create ${maxCustomTemplates} custom templates. Upgrade to Enterprise for unlimited templates.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate template content
+    if (!newTemplate.name.trim() || !newTemplate.content.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Template name and content are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for duplicate names
+    const duplicateName = templates.some(t => 
+      t.name.toLowerCase() === newTemplate.name.toLowerCase() && !t.is_prebuilt
+    );
+    if (duplicateName) {
+      toast({
+        title: "Duplicate Name",
+        description: "A template with this name already exists",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('review_templates')
         .insert({
           user_id: user.id,
-          name: newTemplate.name,
+          name: newTemplate.name.trim(),
           category: newTemplate.category,
-          content: newTemplate.content,
+          content: newTemplate.content.trim(),
           variables: extractVariables(newTemplate.content),
           is_prebuilt: false,
         })
@@ -134,13 +171,38 @@ const ReviewTemplates = () => {
   const handleUpdateTemplate = async () => {
     if (!editingTemplate) return;
 
+    // Validate template content
+    if (!editingTemplate.name.trim() || !editingTemplate.content.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Template name and content are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for duplicate names (excluding current template)
+    const duplicateName = templates.some(t => 
+      t.id !== editingTemplate.id &&
+      t.name.toLowerCase() === editingTemplate.name.toLowerCase() && 
+      !t.is_prebuilt
+    );
+    if (duplicateName) {
+      toast({
+        title: "Duplicate Name",
+        description: "A template with this name already exists",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('review_templates')
         .update({
-          name: editingTemplate.name,
+          name: editingTemplate.name.trim(),
           category: editingTemplate.category,
-          content: editingTemplate.content,
+          content: editingTemplate.content.trim(),
           variables: extractVariables(editingTemplate.content),
         })
         .eq('id', editingTemplate.id)
@@ -232,6 +294,79 @@ const ReviewTemplates = () => {
     return matches ? [...new Set(matches.map(match => match.slice(1, -1)))] : [];
   };
 
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplates(prev => 
+      prev.includes(templateId) 
+        ? prev.filter(id => id !== templateId)
+        : [...prev, templateId]
+    );
+  };
+
+  const handleSelectAllCustomTemplates = () => {
+    const customTemplateIds = customTemplates.map(t => t.id);
+    setSelectedTemplates(prev => 
+      prev.length === customTemplateIds.length 
+        ? [] 
+        : customTemplateIds
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTemplates.length === 0) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('review_templates')
+        .delete()
+        .in('id', selectedTemplates);
+
+      if (error) throw error;
+
+      setTemplates(prev => prev.filter(t => !selectedTemplates.includes(t.id)));
+      setSelectedTemplates([]);
+      
+      toast({
+        title: "Success",
+        description: `${selectedTemplates.length} template(s) deleted successfully`,
+      });
+    } catch (error) {
+      console.error('Error bulk deleting templates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete selected templates",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handlePreviewTemplate = (template: ReviewTemplate) => {
+    setPreviewTemplate(template);
+    setIsPreviewOpen(true);
+  };
+
+  const processTemplatePreview = (template: ReviewTemplate): string => {
+    let processedContent = template.content;
+    
+    // Replace variables with sample values for preview
+    const sampleVariables = {
+      customer_name: 'John Doe',
+      business_name: 'Your Business',
+      rating: '5',
+      sentiment: 'positive',
+    };
+
+    // Replace all variables in the template
+    Object.entries(sampleVariables).forEach(([key, value]) => {
+      const regex = new RegExp(`\\{${key}\\}`, 'g');
+      processedContent = processedContent.replace(regex, value);
+    });
+
+    return processedContent;
+  };
+
   const filteredTemplates = templates.filter(template => {
     const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
     const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -269,9 +404,17 @@ const ReviewTemplates = () => {
             </div>
             <div className="flex items-center space-x-4 ml-auto">
               <FeatureGate feature="Review Templates" variant="inline">
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Button 
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  disabled={maxCustomTemplates !== -1 && customTemplates.length >= maxCustomTemplates}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Template
+                  {maxCustomTemplates !== -1 && (
+                    <span className="ml-2 text-xs opacity-75">
+                      ({customTemplates.length}/{maxCustomTemplates})
+                    </span>
+                  )}
                 </Button>
               </FeatureGate>
             </div>
@@ -314,7 +457,93 @@ const ReviewTemplates = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">Your Custom Templates</h2>
-                    <Badge variant="outline">{customTemplates.length} templates</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{customTemplates.length} templates</Badge>
+                      {maxCustomTemplates !== -1 && (
+                        <Badge variant="secondary">
+                          {customTemplates.length}/{maxCustomTemplates} used
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Bulk Operations */}
+                  {selectedTemplates.length > 0 && (
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {selectedTemplates.length} template(s) selected
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedTemplates([])}
+                            >
+                              Clear Selection
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  disabled={isBulkDeleting}
+                                >
+                                  {isBulkDeleting ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash className="h-3 w-3 mr-1" />
+                                      Delete Selected
+                                    </>
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Selected Templates</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {selectedTemplates.length} template(s)? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={handleBulkDelete}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete {selectedTemplates.length} Template(s)
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {/* Select All Header */}
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSelectAllCustomTemplates}
+                      className="flex items-center gap-2"
+                    >
+                      {selectedTemplates.length === customTemplates.length ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                      {selectedTemplates.length === customTemplates.length ? 'Deselect All' : 'Select All'}
+                    </Button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {customTemplates
@@ -327,10 +556,25 @@ const ReviewTemplates = () => {
                       .map((template) => {
                         const IconComponent = categoryIcons[template.category];
                         return (
-                          <Card key={template.id} className="relative">
+                          <Card 
+                            key={template.id} 
+                            className={`relative ${selectedTemplates.includes(template.id) ? 'ring-2 ring-primary' : ''}`}
+                          >
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleSelectTemplate(template.id)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    {selectedTemplates.includes(template.id) ? (
+                                      <CheckSquare className="h-4 w-4" />
+                                    ) : (
+                                      <Square className="h-4 w-4" />
+                                    )}
+                                  </Button>
                                   <IconComponent className="h-4 w-4" />
                                   <CardTitle className="text-sm">{template.name}</CardTitle>
                                 </div>
@@ -357,16 +601,25 @@ const ReviewTemplates = () => {
                                   <Button
                                     size="sm"
                                     variant="ghost"
+                                    onClick={() => handlePreviewTemplate(template)}
+                                    title="Preview template"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
                                     onClick={() => {
                                       setEditingTemplate(template);
                                       setIsEditDialogOpen(true);
                                     }}
+                                    title="Edit template"
                                   >
                                     <Edit className="h-3 w-3" />
                                   </Button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button size="sm" variant="ghost">
+                                      <Button size="sm" variant="ghost" title="Delete template">
                                         <Trash2 className="h-3 w-3" />
                                       </Button>
                                     </AlertDialogTrigger>
@@ -451,14 +704,24 @@ const ReviewTemplates = () => {
                               </div>
                             )}
                             <div className="flex items-center justify-between">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleCopyTemplate(template)}
-                              >
-                                <Copy className="h-3 w-3 mr-1" />
-                                Copy
-                              </Button>
+                              <div className="flex space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handlePreviewTemplate(template)}
+                                  title="Preview template"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCopyTemplate(template)}
+                                >
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Copy
+                                </Button>
+                              </div>
                               <span className="text-xs text-muted-foreground">
                                 Pre-built
                               </span>
@@ -642,6 +905,89 @@ const ReviewTemplates = () => {
             >
               Update Template
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Template Preview
+            </DialogTitle>
+            <DialogDescription>
+              Preview how this template will look with sample data
+            </DialogDescription>
+          </DialogHeader>
+          {previewTemplate && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{previewTemplate.name}</h3>
+                  <Badge className={categoryColors[previewTemplate.category]}>
+                    {previewTemplate.category.replace('_', ' ')}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  {previewTemplate.is_prebuilt && (
+                    <Badge variant="outline">Pre-built</Badge>
+                  )}
+                  {previewTemplate.is_default && (
+                    <Badge variant="secondary">Default</Badge>
+                  )}
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <Label>Original Template</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-sm whitespace-pre-wrap">{previewTemplate.content}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label>Preview with Sample Data</Label>
+                  <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <p className="text-sm whitespace-pre-wrap">
+                      {processTemplatePreview(previewTemplate)}
+                    </p>
+                  </div>
+                </div>
+                
+                {previewTemplate.variables.length > 0 && (
+                  <div>
+                    <Label>Available Variables</Label>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {previewTemplate.variables.map((variable) => (
+                        <Badge key={variable} variant="secondary" className="text-xs">
+                          {`{${variable}}`}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
+              Close
+            </Button>
+            {previewTemplate && !previewTemplate.is_prebuilt && (
+              <Button
+                onClick={() => {
+                  setIsPreviewOpen(false);
+                  setEditingTemplate(previewTemplate);
+                  setIsEditDialogOpen(true);
+                }}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Template
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

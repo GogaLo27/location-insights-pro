@@ -14,6 +14,7 @@ import Analytics from './pages/Analytics';
 import Sentiment from './pages/Sentiment';
 import PlanSelection from './pages/PlanSelection';
 import PlanManagement from './pages/PlanManagement';
+import Upgrade from './pages/Upgrade';
 import LocationSelection from './pages/LocationSelection';
 import BillingSuccess from './pages/BillingSuccess';
 import BillingCancel from './pages/BillingCancel';
@@ -95,6 +96,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <PlanManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/upgrade"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <Upgrade />
                 </ProtectedRoute>
               }
             />
