@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 interface Location {
   id: string;
@@ -44,6 +46,7 @@ const Locations = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { setSelectedLocation } = useLocationContext();
+  const { maxLocations, canAddMoreLocations, planType } = usePlanFeatures();
   const [locations, setLocations] = useState<Location[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -229,10 +232,11 @@ const Locations = () => {
       toast({ title: "Success", description: `Found ${(filtered.length > 0 ? filtered : mockLocations).length} locations` });
       return;
     }
-    if (profile && locations.length >= profile.locations_limit) {
+    // Check location limits based on plan
+    if (!canAddMoreLocations(locations.length)) {
       toast({
-        title: "Limit Reached",
-        description: `You've reached your limit of ${profile.locations_limit} locations. Upgrade your plan to add more.`,
+        title: "Location Limit Reached",
+        description: `You've reached your limit of ${maxLocations === -1 ? 'unlimited' : maxLocations} locations. Upgrade your plan to add more.`,
         variant: "destructive",
       });
       return;
@@ -306,10 +310,10 @@ const Locations = () => {
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-auto">
               <Badge variant="secondary" className="capitalize">
-                {profile?.subscription_plan || 'free'} Plan
+                {planType || 'starter'} Plan
               </Badge>
               <span className="text-sm text-muted-foreground">
-                {locations.length} of {profile?.locations_limit || 2} locations used
+                {locations.length} of {maxLocations === -1 ? '∞' : maxLocations} locations used
               </span>
             </div>
           </header>
@@ -452,6 +456,18 @@ const Locations = () => {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            )}
+            
+            {/* Show upgrade prompt when location limit is reached */}
+            {!canAddMoreLocations(locations.length) && locations.length > 0 && (
+              <div className="mt-8">
+                <UpgradePrompt 
+                  feature="Multiple Locations"
+                  title="Location Limit Reached"
+                  description={`You've reached your limit of ${maxLocations} locations. Upgrade to add more locations and unlock advanced features.`}
+                  variant="card"
+                />
               </div>
             )}
           </div>

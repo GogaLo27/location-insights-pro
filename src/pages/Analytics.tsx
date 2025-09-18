@@ -50,6 +50,8 @@ import { useToast } from "@/hooks/use-toast";
 import { format, subDays, subMonths, subYears } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { FeatureGate } from "@/components/UpgradePrompt";
 
 interface AnalyticsData {
   date: string;
@@ -83,6 +85,7 @@ interface ComparisonMetrics {
 const Analytics = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { maxAnalyticsDays, canUseCustomDateRanges, canUseComparisonMode, canExportPDF } = usePlanFeatures();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
   const [previousAnalyticsData, setPreviousAnalyticsData] = useState<AnalyticsData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -701,6 +704,24 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
     });
   };
 
+  const exportToPDF = () => {
+    if (!canExportPDF) {
+      toast({
+        title: "Feature Not Available",
+        description: "PDF export is only available in Professional and Enterprise plans.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For now, just show a message that PDF export is coming soon
+    // In a real implementation, you would use a library like jsPDF or puppeteer
+    toast({
+      title: "PDF Export Coming Soon",
+      description: "PDF export functionality will be available in the next update.",
+    });
+  };
+
   // Handle loading and authentication redirects
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -772,10 +793,27 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                       value={isCustomRange ? "custom" : dateRange} 
                       onValueChange={(value) => {
                         if (value === "custom") {
-                          setIsCustomRange(true);
+                          if (canUseCustomDateRanges) {
+                            setIsCustomRange(true);
+                          } else {
+                            toast({
+                              title: "Feature Not Available",
+                              description: "Custom date ranges are only available in Professional and Enterprise plans.",
+                              variant: "destructive",
+                            });
+                          }
                         } else {
-                          setIsCustomRange(false);
-                          setDateRange(value);
+                          const days = parseInt(value);
+                          if (days <= maxAnalyticsDays) {
+                            setIsCustomRange(false);
+                            setDateRange(value);
+                          } else {
+                            toast({
+                              title: "Date Range Limit",
+                              description: `Your plan allows up to ${maxAnalyticsDays} days of analytics data.`,
+                              variant: "destructive",
+                            });
+                          }
                         }
                       }}
                     >
@@ -785,16 +823,17 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                       <SelectContent>
                         <SelectItem value="7">Last 7 days</SelectItem>
                         <SelectItem value="30">Last 30 days</SelectItem>
-                        <SelectItem value="90">Last 90 days</SelectItem>
-                        <SelectItem value="180">Last 6 months</SelectItem>
-                        <SelectItem value="365">Last year</SelectItem>
-                        <SelectItem value="custom">Custom Range</SelectItem>
+                        {maxAnalyticsDays > 30 && <SelectItem value="90">Last 90 days</SelectItem>}
+                        {maxAnalyticsDays > 90 && <SelectItem value="180">Last 6 months</SelectItem>}
+                        {maxAnalyticsDays > 180 && <SelectItem value="365">Last year</SelectItem>}
+                        {canUseCustomDateRanges && <SelectItem value="custom">Custom Range</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Custom Date Range */}
                   {isCustomRange && (
+                    <FeatureGate feature="Custom Date Ranges" variant="inline">
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium whitespace-nowrap">Date Range:</label>
                       <Popover>
@@ -830,20 +869,23 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                         </PopoverContent>
                       </Popover>
                     </div>
+                    </FeatureGate>
                   )}
 
                   {/* Comparison Toggle */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium whitespace-nowrap">Comparison:</label>
-                    <Button
-                      variant={showComparison ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setShowComparison(!showComparison)}
-                      className="min-w-[140px]"
-                    >
-                      {showComparison ? "Hide Comparison" : "Show Comparison"}
-                    </Button>
-                  </div>
+                  <FeatureGate feature="Comparison Mode" variant="inline">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium whitespace-nowrap">Comparison:</label>
+                      <Button
+                        variant={showComparison ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowComparison(!showComparison)}
+                        className="min-w-[140px]"
+                      >
+                        {showComparison ? "Hide Comparison" : "Show Comparison"}
+                      </Button>
+                    </div>
+                  </FeatureGate>
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 ml-auto">
@@ -851,6 +893,12 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                       <Download className="w-4 h-4 mr-2" />
                       Export CSV
                     </Button>
+                    <FeatureGate feature="PDF Export" variant="inline">
+                      <Button onClick={exportToPDF} variant="outline" size="sm">
+                        <Download className="w-4 h-4 mr-2" />
+                        Export PDF
+                      </Button>
+                    </FeatureGate>
                     <Button onClick={fetchAnalytics} size="sm">
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Refresh Data

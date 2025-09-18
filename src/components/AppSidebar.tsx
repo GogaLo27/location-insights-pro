@@ -24,13 +24,15 @@ import {
   TrendingUp,
   Settings,
   LogOut,
-  ReceiptText
+  ReceiptText,
+  FileText
 } from "lucide-react";
 
 const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
   { title: "Locations", url: "/locations", icon: MapPin },
   { title: "Reviews", url: "/reviews", icon: MessageSquare },
+  { title: "Templates", url: "/templates", icon: FileText },
   { title: "Analytics", url: "/analytics", icon: TrendingUp },
   { title: "Sentiment", url: "/sentiment", icon: TrendingUp },
   { title: "Orders", url: "/orders", icon: ReceiptText },

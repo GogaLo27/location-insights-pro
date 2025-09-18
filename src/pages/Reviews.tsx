@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2, Trash2 } from "lucide-react";
+import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2, Trash2, CheckSquare, Square, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -18,6 +18,8 @@ import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import ReplyDialog from "@/components/ReplyDialog";
 import LocationSelector from "@/components/LocationSelector";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { FeatureGate } from "@/components/UpgradePrompt";
 
 interface Review {
   id: string;
@@ -41,6 +43,7 @@ const Reviews = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedLocation } = useLocation();
   const { toast } = useToast();
+  const { canUseAIAnalysis, canUseAIReplyGeneration, canBulkOperate, canBulkAnalyze, canBulkReply } = usePlanFeatures();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -50,6 +53,13 @@ const Reviews = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [reviewsDeleted, setReviewsDeleted] = useState(false);
+  
+  // Bulk operations state
+  const [selectedReviews, setSelectedReviews] = useState<string[]>([]);
+  const [isBulkAnalyzing, setIsBulkAnalyzing] = useState(false);
+  const [isBulkReplying, setIsBulkReplying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
   
   // Check if reviews were deleted for this location
   const getDeletedFlag = () => {
@@ -603,6 +613,182 @@ const Reviews = () => {
     }
   };
 
+  // Bulk operations functions
+  const handleSelectReview = (reviewId: string) => {
+    setSelectedReviews(prev => 
+      prev.includes(reviewId) 
+        ? prev.filter(id => id !== reviewId)
+        : [...prev, reviewId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedReviews.length === filteredReviews.length) {
+      setSelectedReviews([]);
+    } else {
+      setSelectedReviews(filteredReviews.map(review => review.id));
+    }
+  };
+
+  const bulkAnalyzeReviews = async () => {
+    if (!user || selectedReviews.length === 0 || isBulkAnalyzing) return;
+
+    try {
+      setIsBulkAnalyzing(true);
+      setBulkProgress(0);
+      setBulkTotal(selectedReviews.length);
+
+      const reviewsToAnalyze = reviews.filter(review => 
+        selectedReviews.includes(review.id) && !review.ai_analyzed_at
+      );
+
+      if (reviewsToAnalyze.length === 0) {
+        toast({
+          title: "No Reviews to Analyze",
+          description: "Selected reviews are already analyzed or have no text to analyze.",
+        });
+        return;
+      }
+
+      // Process reviews in batches
+      const batchSize = 5;
+      let processedCount = 0;
+
+      for (let i = 0; i < reviewsToAnalyze.length; i += batchSize) {
+        const batch = reviewsToAnalyze.slice(i, i + batchSize);
+
+        const { supabaseJwt } = await getSessionTokens();
+        const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+          body: { reviews: batch },
+          headers: {
+            Authorization: `Bearer ${supabaseJwt}`,
+          },
+        });
+
+        if (!analysisError && analysisData?.reviews) {
+          // Update database with AI analysis
+          for (const analyzedReview of analysisData.reviews) {
+            await supabase
+              .from('saved_reviews')
+              .update({
+                ai_sentiment: analyzedReview.ai_sentiment,
+                ai_tags: analyzedReview.ai_tags,
+                ai_issues: analyzedReview.ai_issues,
+                ai_suggestions: analyzedReview.ai_suggestions,
+                ai_analyzed_at: new Date().toISOString(),
+              })
+              .eq('google_review_id', analyzedReview.google_review_id);
+          }
+
+          processedCount += batch.length;
+          setBulkProgress(processedCount);
+        }
+      }
+
+      toast({
+        title: "Bulk Analysis Complete",
+        description: `Successfully analyzed ${processedCount} reviews`,
+      });
+
+      setSelectedReviews([]);
+      fetchReviews(false);
+    } catch (error) {
+      console.error('Error in bulk analysis:', error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze selected reviews",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkAnalyzing(false);
+      setBulkProgress(0);
+      setBulkTotal(0);
+    }
+  };
+
+  const bulkGenerateReplies = async () => {
+    if (!user || selectedReviews.length === 0 || isBulkReplying) return;
+
+    try {
+      setIsBulkReplying(true);
+      setBulkProgress(0);
+      setBulkTotal(selectedReviews.length);
+
+      const reviewsToReply = reviews.filter(review => 
+        selectedReviews.includes(review.id) && !review.reply_text
+      );
+
+      if (reviewsToReply.length === 0) {
+        toast({
+          title: "No Reviews to Reply To",
+          description: "Selected reviews already have replies or have no text to reply to.",
+        });
+        return;
+      }
+
+      let processedCount = 0;
+
+      for (const review of reviewsToReply) {
+        try {
+          const prompt = `Generate a professional business response to this ${review.rating}-star review:
+
+Review: "${review.text || 'No text provided'}"
+Reviewer: ${review.author_name}
+Rating: ${review.rating}/5 stars
+Sentiment: ${review.ai_sentiment || 'neutral'}
+
+Please write a thoughtful, professional response that:
+- Thanks the customer for their feedback
+- Addresses their specific concerns if it's a negative review
+- Maintains a positive, professional tone
+- Is concise but personal
+- Reflects well on the business
+
+Keep the response under 150 words.`;
+
+          const { data, error } = await supabase.functions.invoke("generate-ai-reply", {
+            body: { prompt },
+          });
+
+          if (!error && data?.reply) {
+            // Store the generated reply (user can edit before sending)
+            await supabase
+              .from('saved_reviews')
+              .update({
+                reply_text: data.reply,
+                reply_date: new Date().toISOString(),
+              })
+              .eq('id', review.id);
+
+            processedCount++;
+            setBulkProgress(processedCount);
+          }
+        } catch (error) {
+          console.error(`Error generating reply for review ${review.id}:`, error);
+        }
+      }
+
+      toast({
+        title: "Bulk Reply Generation Complete",
+        description: `Generated ${processedCount} AI replies. You can edit them before sending.`,
+      });
+
+      setSelectedReviews([]);
+      fetchReviews(false);
+    } catch (error) {
+      console.error('Error in bulk reply generation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate replies for selected reviews",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkReplying(false);
+      setBulkProgress(0);
+      setBulkTotal(0);
+    }
+  };
+
   const getSentimentColor = (sentiment: string | null) => {
     switch (sentiment) {
       case "positive": return "text-success border-success";
@@ -688,21 +874,78 @@ const Reviews = () => {
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Reviews</h1>
               <LocationSelector />
+              {/* Plan Indicator - for debugging */}
+              <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                {canBulkOperate ? 'Professional/Enterprise' : 'Starter'} Plan
+              </div>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
-              <Button
-                onClick={runAIAnalysis}
-                size="sm"
-                variant="outline"
-                disabled={isAnalyzing}
-              >
-                {isAnalyzing ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Bot className="w-4 h-4 mr-2" />
-                )}
-                {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
-              </Button>
+              {/* Bulk Operations */}
+              {selectedReviews.length > 0 && (
+                <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1 rounded-lg">
+                  <span className="text-sm font-medium">{selectedReviews.length} selected</span>
+                  <FeatureGate feature="Bulk Operations" variant="inline">
+                    <Button
+                      onClick={bulkAnalyzeReviews}
+                      size="sm"
+                      variant="outline"
+                      disabled={isBulkAnalyzing}
+                    >
+                      {isBulkAnalyzing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4 mr-2" />
+                      )}
+                      Bulk Analyze
+                    </Button>
+                  </FeatureGate>
+                  <FeatureGate feature="Bulk Operations" variant="inline">
+                    <Button
+                      onClick={bulkGenerateReplies}
+                      size="sm"
+                      variant="outline"
+                      disabled={isBulkReplying}
+                    >
+                      {isBulkReplying ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                      )}
+                      Bulk Reply
+                    </Button>
+                  </FeatureGate>
+                  <Button
+                    onClick={() => setSelectedReviews([])}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+              
+              {/* Bulk Operations Info */}
+              {canBulkOperate && selectedReviews.length === 0 && reviews.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  Select reviews to use bulk operations
+                </div>
+              )}
+              
+              <FeatureGate feature="AI Analysis" variant="inline">
+                <Button
+                  onClick={runAIAnalysis}
+                  size="sm"
+                  variant="outline"
+                  disabled={isAnalyzing}
+                >
+                  {isAnalyzing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Bot className="w-4 h-4 mr-2" />
+                  )}
+                  {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
+                </Button>
+              </FeatureGate>
               <Button onClick={() => {
                 setReviewsDeleted(false); // Reset deletion flag when manually refreshing
                 setDeletedFlag(false); // Clear localStorage deletion flag
@@ -837,6 +1080,41 @@ const Reviews = () => {
                     <Progress value={progress} className="w-full" />
                     <p className="text-xs text-muted-foreground">
                       {isAnalyzing ? `Processing review ${completed} of ${total}...` : 'Analysis complete!'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Bulk Operations Progress Bars */}
+            {(isBulkAnalyzing || (bulkProgress > 0 && bulkProgress < bulkTotal)) && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Bulk Analysis Progress</span>
+                      <span>{Math.round((bulkProgress / bulkTotal) * 100)}%</span>
+                    </div>
+                    <Progress value={(bulkProgress / bulkTotal) * 100} className="w-full" />
+                    <p className="text-xs text-muted-foreground">
+                      {isBulkAnalyzing ? `Analyzing ${bulkProgress} of ${bulkTotal} reviews...` : 'Bulk analysis complete!'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(isBulkReplying || (bulkProgress > 0 && bulkProgress < bulkTotal)) && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Bulk Reply Generation Progress</span>
+                      <span>{Math.round((bulkProgress / bulkTotal) * 100)}%</span>
+                    </div>
+                    <Progress value={(bulkProgress / bulkTotal) * 100} className="w-full" />
+                    <p className="text-xs text-muted-foreground">
+                      {isBulkReplying ? `Generating replies for ${bulkProgress} of ${bulkTotal} reviews...` : 'Bulk reply generation complete!'}
                     </p>
                   </div>
                 </CardContent>
@@ -1036,28 +1314,84 @@ const Reviews = () => {
                       </CardContent>
                     </Card>
                   )}
+                  
+                  {/* Bulk Selection Header */}
+                  {canBulkOperate && filteredReviews.length > 0 && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={handleSelectAll}
+                              className="p-1 hover:bg-muted rounded-sm transition-colors"
+                            >
+                              {selectedReviews.length === filteredReviews.length ? (
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Square className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                            <span className="text-sm font-medium">
+                              {selectedReviews.length === filteredReviews.length 
+                                ? "Deselect All" 
+                                : "Select All"} ({filteredReviews.length} reviews)
+                            </span>
+                          </div>
+                          {selectedReviews.length > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-muted-foreground">
+                                {selectedReviews.length} selected
+                              </span>
+                              <Button
+                                onClick={() => setSelectedReviews([])}
+                                size="sm"
+                                variant="ghost"
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                   {pagedReviews.map((review) => (
-                  <Card key={review.id}>
+                  <Card key={review.id} className={selectedReviews.includes(review.id) ? "ring-2 ring-primary" : ""}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg">{review.author_name}</CardTitle>
-                          <div className="flex items-center space-x-2">
-                            <div className="flex items-center">
-                              {[...Array(5)].map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`h-4 w-4 ${
-                                    i < review.rating
-                                      ? "text-yellow-400 fill-current"
-                                      : "text-gray-300"
-                                  }`}
-                                />
-                              ))}
+                        <div className="flex items-start space-x-3">
+                          {/* Bulk Selection Checkbox */}
+                          {canBulkOperate && (
+                            <button
+                              onClick={() => handleSelectReview(review.id)}
+                              className="mt-1 p-1 hover:bg-muted rounded-sm transition-colors"
+                            >
+                              {selectedReviews.includes(review.id) ? (
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Square className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          )}
+                          <div className="space-y-1">
+                            <CardTitle className="text-lg">{review.author_name}</CardTitle>
+                            <div className="flex items-center space-x-2">
+                              <div className="flex items-center">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-4 w-4 ${
+                                      i < review.rating
+                                        ? "text-yellow-400 fill-current"
+                                        : "text-gray-300"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-sm text-muted-foreground">
+                                {format(new Date(review.review_date), "MMM d, yyyy")}
+                              </span>
                             </div>
-                            <span className="text-sm text-muted-foreground">
-                              {format(new Date(review.review_date), "MMM d, yyyy")}
-                            </span>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">

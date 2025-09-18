@@ -1,14 +1,17 @@
 // /src/components/ReplyDialog.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Reply, Bot, User, Star, Sparkles } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Reply, Bot, User, Star, Sparkles, FileText, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { FeatureGate } from "@/components/UpgradePrompt";
 
 interface Review {
   id: string;
@@ -20,6 +23,16 @@ interface Review {
   location_id: string;
 }
 
+interface ReviewTemplate {
+  id: string;
+  name: string;
+  category: 'positive' | 'negative' | 'neutral' | 'thank_you' | 'apology' | 'follow_up';
+  content: string;
+  variables: string[];
+  is_default: boolean;
+  is_prebuilt: boolean;
+}
+
 interface ReplyDialogProps {
   review: Review;
   onReplySubmitted: () => void; // will call with fetchReviews(true) in the parent
@@ -27,11 +40,74 @@ interface ReplyDialogProps {
 
 const ReplyDialog = ({ review, onReplySubmitted }: ReplyDialogProps) => {
   const { toast } = useToast();
+  const { canUseAIReplyGeneration, canUseReviewTemplates } = usePlanFeatures();
   const [open, setOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
-  const [mode, setMode] = useState<"manual" | "ai">("manual");
+  const [mode, setMode] = useState<"manual" | "ai" | "template">("manual");
   const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [templates, setTemplates] = useState<ReviewTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Fetch templates when dialog opens and user has access
+  useEffect(() => {
+    if (open && canUseReviewTemplates) {
+      fetchTemplates();
+    }
+  }, [open, canUseReviewTemplates]);
+
+  const fetchTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const { data, error } = await supabase
+        .from('review_templates')
+        .select('*')
+        .order('is_prebuilt', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load templates",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const processTemplate = (template: ReviewTemplate): string => {
+    let processedContent = template.content;
+    
+    // Replace variables with actual values
+    const variables = {
+      customer_name: review.author_name || 'Valued Customer',
+      business_name: 'Our Business', // You might want to get this from location data
+      rating: review.rating?.toString() || '5',
+      sentiment: review.ai_sentiment || 'neutral',
+    };
+
+    // Replace all variables in the template
+    Object.entries(variables).forEach(([key, value]) => {
+      const regex = new RegExp(`\\{${key}\\}`, 'g');
+      processedContent = processedContent.replace(regex, value);
+    });
+
+    return processedContent;
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      const processedContent = processTemplate(template);
+      setReplyText(processedContent);
+    }
+  };
 
   // Prefer prop text; if empty, try DB (saved_reviews then reviews)
   const fetchReviewTextIfMissing = async (): Promise<string> => {
@@ -152,6 +228,7 @@ Keep the response under 150 words.`.trim();
       setOpen(false);
       setReplyText("");
       setMode("manual");
+      setSelectedTemplate("");
       onReplySubmitted(); // parent will force a fresh fetch
     } catch (error) {
       console.error("Error sending reply:", error);
@@ -174,8 +251,18 @@ Keep the response under 150 words.`.trim();
     }
   };
 
+  const handleDialogClose = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      // Reset state when dialog closes
+      setReplyText("");
+      setMode("manual");
+      setSelectedTemplate("");
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="hover-scale">
           <Reply className="w-4 h-4 mr-2" />
@@ -225,41 +312,124 @@ Keep the response under 150 words.`.trim();
             <Bot className="w-4 h-4 mr-2" />
             AI Generated
           </Button>
+          <FeatureGate feature="Review Templates" variant="inline">
+            <Button variant={mode === "template" ? "default" : "outline"} onClick={() => setMode("template")} className="flex-1">
+              <FileText className="w-4 h-4 mr-2" />
+              Templates
+            </Button>
+          </FeatureGate>
         </div>
 
         {/* AI Generation */}
         {mode === "ai" && !replyText && (
-          <div className="text-center py-6">
-            <div className="mb-4">
-              <Sparkles className="w-12 h-12 mx-auto text-accent mb-2" />
-              <p className="text-muted-foreground">Generate a professional response using AI</p>
+          <FeatureGate feature="AI Reply Generation" variant="modal">
+            <div className="text-center py-6">
+              <div className="mb-4">
+                <Sparkles className="w-12 h-12 mx-auto text-accent mb-2" />
+                <p className="text-muted-foreground">Generate a professional response using AI</p>
+              </div>
+              <Button
+                onClick={generateAIReply}
+                disabled={generating}
+                className="bg-gradient-to-r from-primary to-accent text-primary-foreground hover:from-primary/90 hover:to-accent/90"
+              >
+                {generating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate AI Reply
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={generateAIReply}
-              disabled={generating}
-              className="bg-gradient-to-r from-primary to-accent text-primary-foreground hover:from-primary/90 hover:to-accent/90"
-            >
-              {generating ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Generating...
-                </>
+          </FeatureGate>
+        )}
+
+        {/* Template Selection */}
+        {mode === "template" && (
+          <FeatureGate feature="Review Templates" variant="modal">
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <FileText className="w-12 h-12 mx-auto text-accent mb-2" />
+                <p className="text-muted-foreground">Choose a professional response template</p>
+              </div>
+              
+              {loadingTemplates ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Loading templates...</p>
+                </div>
               ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Generate AI Reply
-                </>
+                <div className="space-y-3">
+                  <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{template.name}</span>
+                            <div className="flex items-center gap-2 ml-2">
+                              <Badge variant="outline" className="text-xs">
+                                {template.category.replace('_', ' ')}
+                              </Badge>
+                              {template.is_default && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Default
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {selectedTemplate && (
+                    <div className="bg-muted/50 p-3 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Template Preview:</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            const template = templates.find(t => t.id === selectedTemplate);
+                            if (template) {
+                              const processedContent = processTemplate(template);
+                              setReplyText(processedContent);
+                            }
+                          }}
+                        >
+                          <Copy className="w-3 h-3 mr-1" />
+                          Use Template
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {templates.find(t => t.id === selectedTemplate)?.content}
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
-            </Button>
-          </div>
+            </div>
+          </FeatureGate>
         )}
 
         {/* Reply Input */}
-        {(mode === "manual" || replyText) && (
+        {(mode === "manual" || mode === "template" || replyText) && (
           <div className="space-y-3">
             <label className="text-sm font-medium">Your Reply</label>
             <Textarea
-              placeholder="Write your professional response..."
+              placeholder={
+                mode === "template" 
+                  ? "Select a template above or write your own response..." 
+                  : "Write your professional response..."
+              }
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               className="min-h-32 border-accent/20 focus:border-accent"
@@ -268,10 +438,12 @@ Keep the response under 150 words.`.trim();
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">{replyText.length}/500 characters</span>
               {mode === "ai" && replyText && (
-                <Button variant="ghost" size="sm" onClick={generateAIReply} disabled={generating}>
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  Regenerate
-                </Button>
+                <FeatureGate feature="AI Reply Generation" variant="inline">
+                  <Button variant="ghost" size="sm" onClick={generateAIReply} disabled={generating}>
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    Regenerate
+                  </Button>
+                </FeatureGate>
               )}
             </div>
           </div>
