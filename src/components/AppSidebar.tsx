@@ -28,7 +28,8 @@ import {
   FileText,
   Lock,
   Crown,
-  ArrowUpRight
+  ArrowUpRight,
+  Target
 } from "lucide-react";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
@@ -39,6 +40,7 @@ const navigationItems = [
   { title: "Templates", url: "/templates", icon: FileText, requiresPlan: "enterprise", locked: true },
   { title: "Analytics", url: "/analytics", icon: TrendingUp, requiresPlan: true },
   { title: "Sentiment", url: "/sentiment", icon: TrendingUp, requiresPlan: true },
+  { title: "Competitors", url: "/competitors", icon: Target, requiresPlan: "professional", locked: true },
   { title: "Orders", url: "/orders", icon: ReceiptText, requiresPlan: true },
 ];
 
@@ -46,7 +48,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { user, signOut } = useAuth();
   const { plan } = usePlan();
-  const { canUseReviewTemplates } = usePlanFeatures();
+  const { canUseReviewTemplates, canUseCompetitorAnalysis } = usePlanFeatures();
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";

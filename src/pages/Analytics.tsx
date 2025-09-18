@@ -44,11 +44,12 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
-import { TrendingUp, Eye, MousePointer, Calendar, RefreshCw, Download, Filter, TrendingDown, ArrowUpRight, ArrowDownRight, CalendarIcon, HelpCircle } from "lucide-react";
+import { TrendingUp, Eye, MousePointer, RefreshCw, Download, Filter, TrendingDown, ArrowUpRight, ArrowDownRight, CalendarIcon, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, subMonths, subYears } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { FeatureGate } from "@/components/UpgradePrompt";
@@ -435,6 +436,20 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
     );
   };
 
+  const getCTR = () => {
+    const impressions = getTotalImpressions();
+    const clicks = getTotalClicks();
+    return impressions > 0 ? (clicks / impressions) * 100 : 0;
+  };
+
+  const getTotalBookings = () => {
+    return analyticsData.reduce(
+      (sum, data) =>
+        sum + data.businessConversations + data.businessBookings + data.businessFoodOrders,
+      0
+    );
+  };
+
   const getImpressionsPieData = () => {
     const total = analyticsData.reduce(
       (acc, data) => ({
@@ -525,10 +540,12 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
   };
 
   const handleCustomDateChange = (from: Date | undefined, to: Date | undefined) => {
+    console.log('Date range changed:', { from, to });
     setCustomDateRange({ from, to });
     if (from && to) {
       setIsCustomRange(true);
       setDateRange("custom");
+      console.log('Custom range set:', { from, to });
     }
   };
 
@@ -555,6 +572,9 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
   const getDateRangeLabel = () => {
     if (isCustomRange && customDateRange.from && customDateRange.to) {
       return `${format(customDateRange.from, "MMM d")} - ${format(customDateRange.to, "MMM d, yyyy")}`;
+    }
+    if (dateRange === "custom") {
+      return "Custom Range";
     }
     return `Last ${dateRange} days`;
   };
@@ -705,7 +725,13 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
   };
 
   const exportToPDF = () => {
+    console.log('=== PDF EXPORT BUTTON CLICKED ===');
+    console.log('PDF Export clicked, canExportPDF:', canExportPDF);
+    console.log('Analytics data length:', analyticsData.length);
+    console.log('User plan features:', { canExportPDF, maxAnalyticsDays, canUseCustomDateRanges });
+    
     if (!canExportPDF) {
+      console.log('PDF export not available for this plan');
       toast({
         title: "Feature Not Available",
         description: "PDF export is only available in Professional and Enterprise plans.",
@@ -714,12 +740,169 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
       return;
     }
 
-    // For now, just show a message that PDF export is coming soon
-    // In a real implementation, you would use a library like jsPDF or puppeteer
-    toast({
-      title: "PDF Export Coming Soon",
-      description: "PDF export functionality will be available in the next update.",
-    });
+    if (analyticsData.length === 0) {
+      console.log('No analytics data to export');
+      toast({
+        title: "No Data to Export",
+        description: "Please load analytics data first before exporting to PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Starting PDF export process...');
+    
+    try {
+      // Generate HTML content for the PDF
+      const locationName = ctxSelectedLocation?.location_name || 'Unknown Location';
+      const dateRangeLabel = getDateRangeLabel();
+      console.log('Location name:', locationName, 'Date range label:', dateRangeLabel);
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Analytics Report - ${locationName}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+            .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
+            .metric-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
+            .metric-value { font-size: 24px; font-weight: bold; margin: 10px 0; }
+            .metric-label { color: #666; font-size: 14px; }
+            .comparison { background: #e8f5e8; padding: 10px; border-radius: 5px; margin: 5px 0; }
+            .comparison.negative { background: #ffeaea; }
+            .comparison.neutral { background: #f0f0f0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Analytics Report</h1>
+            <h2>${locationName}</h2>
+            <p>Generated on ${format(new Date(), 'MMM d, yyyy HH:mm')}</p>
+          </div>
+          
+          <div class="summary">
+            <h3>Report Summary</h3>
+            <p><strong>Date Range:</strong> ${dateRangeLabel}</p>
+            <p><strong>Total Records:</strong> ${analyticsData.length}</p>
+            ${showComparison ? '<p><strong>Mode:</strong> Comparison Analysis</p>' : ''}
+          </div>
+
+          <div class="metrics">
+            <div class="metric-card">
+              <div class="metric-label">Total Impressions</div>
+              <div class="metric-value">${getTotalImpressions().toLocaleString()}</div>
+              ${showComparison && previousAnalyticsData.length > 0 ? 
+                `<div class="comparison ${calculateComparison().impressions.changePercent >= 0 ? (calculateComparison().impressions.changePercent > 0 ? '' : 'neutral') : 'negative'}">
+                  ${calculateComparison().impressions.changePercent > 0 ? '+' : ''}${calculateComparison().impressions.changePercent.toFixed(1)}% vs previous period
+                </div>` : ''
+              }
+            </div>
+            
+            <div class="metric-card">
+              <div class="metric-label">Total Clicks</div>
+              <div class="metric-value">${getTotalClicks().toLocaleString()}</div>
+              ${showComparison && previousAnalyticsData.length > 0 ? 
+                `<div class="comparison ${calculateComparison().clicks.changePercent >= 0 ? (calculateComparison().clicks.changePercent > 0 ? '' : 'neutral') : 'negative'}">
+                  ${calculateComparison().clicks.changePercent > 0 ? '+' : ''}${calculateComparison().clicks.changePercent.toFixed(1)}% vs previous period
+                </div>` : ''
+              }
+            </div>
+            
+            <div class="metric-card">
+              <div class="metric-label">Click-Through Rate</div>
+              <div class="metric-value">${getCTR().toFixed(1)}%</div>
+              ${showComparison && previousAnalyticsData.length > 0 ? 
+                `<div class="comparison ${calculateComparison().ctr.changePercent >= 0 ? (calculateComparison().ctr.changePercent > 0 ? '' : 'neutral') : 'negative'}">
+                  ${calculateComparison().ctr.changePercent > 0 ? '+' : ''}${calculateComparison().ctr.changePercent.toFixed(1)}% vs previous period
+                </div>` : ''
+              }
+            </div>
+            
+            <div class="metric-card">
+              <div class="metric-label">Total Bookings</div>
+              <div class="metric-value">${getTotalBookings().toLocaleString()}</div>
+              ${showComparison && previousAnalyticsData.length > 0 ? 
+                `<div class="comparison ${calculateComparison().bookings.changePercent >= 0 ? (calculateComparison().bookings.changePercent > 0 ? '' : 'neutral') : 'negative'}">
+                  ${calculateComparison().bookings.changePercent > 0 ? '+' : ''}${calculateComparison().bookings.changePercent.toFixed(1)}% vs previous period
+                </div>` : ''
+              }
+            </div>
+          </div>
+
+          <h3>Daily Data</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Desktop Maps</th>
+                <th>Mobile Maps</th>
+                <th>Desktop Search</th>
+                <th>Mobile Search</th>
+                <th>Website Clicks</th>
+                <th>Call Clicks</th>
+                <th>Direction Requests</th>
+                <th>Conversations</th>
+                <th>Bookings</th>
+                <th>Food Orders</th>
+                <th>Menu Clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${analyticsData.map(data => `
+                <tr>
+                  <td>${data.date}</td>
+                  <td>${data.businessImpressionsDesktopMaps}</td>
+                  <td>${data.businessImpressionsMobileMaps}</td>
+                  <td>${data.businessImpressionsDesktopSearch}</td>
+                  <td>${data.businessImpressionsMobileSearch}</td>
+                  <td>${data.websiteClicks}</td>
+                  <td>${data.callClicks}</td>
+                  <td>${data.businessDirectionRequests}</td>
+                  <td>${data.businessConversations}</td>
+                  <td>${data.businessBookings}</td>
+                  <td>${data.businessFoodOrders}</td>
+                  <td>${data.businessFoodMenuClicks}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Create a blob and download it as HTML, then user can print to PDF
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    
+    console.log('Creating download link...');
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics-report-${locationName.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+      console.log('PDF export process initiated');
+      toast({
+        title: "Report Downloaded",
+        description: "Analytics report has been downloaded as HTML. Open the file in your browser and use Ctrl+P to print as PDF.",
+      });
+    } catch (error) {
+      console.error('Error during PDF export:', error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while generating the report. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle loading and authentication redirects
@@ -795,6 +978,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                         if (value === "custom") {
                           if (canUseCustomDateRanges) {
                             setIsCustomRange(true);
+                            setDateRange("custom");
                           } else {
                             toast({
                               title: "Feature Not Available",

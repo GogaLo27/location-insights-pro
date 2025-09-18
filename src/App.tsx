@@ -12,6 +12,8 @@ import Reviews from './pages/Reviews';
 import ReviewTemplates from './pages/ReviewTemplates';
 import Analytics from './pages/Analytics';
 import Sentiment from './pages/Sentiment';
+import Competitors from './pages/Competitors';
+import CompetitorAnalysis from './pages/CompetitorAnalysis';
 import PlanSelection from './pages/PlanSelection';
 import PlanManagement from './pages/PlanManagement';
 import Upgrade from './pages/Upgrade';
@@ -80,6 +82,22 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
                   <Sentiment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/competitors"
+              element={
+                <ProtectedRoute requiresPlan="professional" requiresLocation={false}>
+                  <Competitors />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/competitors/analysis"
+              element={
+                <ProtectedRoute requiresPlan="professional" requiresLocation={true}>
+                  <CompetitorAnalysis />
                 </ProtectedRoute>
               }
             />

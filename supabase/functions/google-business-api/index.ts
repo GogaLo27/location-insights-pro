@@ -170,8 +170,23 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
             const meta = await getV4LocationMetadata(accountId, id!, accessToken);
             averageRating = meta.averageRating;
             totalReviewCount = meta.totalReviewCount;
-          } catch (_e) {
-            console.log(`v4 metadata not available for ${accountId}/locations/${id}`);
+            console.log(`Location ${id} metadata:`, { averageRating, totalReviewCount });
+          } catch (e) {
+            console.log(`v4 metadata not available for ${accountId}/locations/${id}:`, e.message);
+            // Try to get review count from reviews API as fallback
+            try {
+              const reviewsData = await fetchLocationReviews(id!, accessToken);
+              const reviews = await reviewsData.json();
+              totalReviewCount = reviews.reviews?.length || 0;
+              if (totalReviewCount > 0) {
+                // Calculate average rating from reviews
+                const totalRating = reviews.reviews.reduce((sum: number, review: any) => sum + review.rating, 0);
+                averageRating = totalRating / totalReviewCount;
+              }
+              console.log(`Fallback data for ${id}:`, { averageRating, totalReviewCount });
+            } catch (fallbackError) {
+              console.log(`Fallback also failed for ${id}:`, fallbackError.message);
+            }
           }
 
           allLocations.push({

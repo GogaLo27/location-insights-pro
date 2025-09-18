@@ -29,6 +29,10 @@ export interface PlanFeatures {
   canUseReviewTemplates: boolean;
   maxCustomTemplates: number;
   
+  // Competitor analysis
+  canUseCompetitorAnalysis: boolean;
+  maxCompetitors: number;
+  
   // Support features
   supportLevel: 'email' | 'priority' | 'dedicated';
   has24_7Support: boolean;
@@ -82,6 +86,10 @@ export const usePlanFeatures = (): PlanFeatures => {
     canUseReviewTemplates: isEnterprise, // Enterprise only
     maxCustomTemplates: isEnterprise ? -1 : 0, // -1 = unlimited for Enterprise
     
+    // Competitor analysis
+    canUseCompetitorAnalysis: !isStarter, // Available for Professional and Enterprise
+    maxCompetitors: isProfessional ? 5 : isEnterprise ? -1 : 0, // -1 = unlimited for Enterprise
+    
     // Support features
     supportLevel: isStarter ? 'email' : isProfessional ? 'priority' : 'dedicated',
     has24_7Support: isEnterprise,
@@ -123,6 +131,10 @@ export const useUpgradePrompt = () => {
       'Review Templates': {
         starter: 'Upgrade to Enterprise for pre-built and custom review response templates.',
         professional: 'Upgrade to Enterprise for pre-built and custom review response templates.'
+      },
+      'Competitor Analysis': {
+        starter: 'Upgrade to Professional to monitor competitor performance and gain market insights.',
+        professional: 'Upgrade to Enterprise for unlimited competitor monitoring and advanced analytics.'
       }
     };
     

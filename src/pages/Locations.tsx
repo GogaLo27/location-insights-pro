@@ -45,13 +45,35 @@ const Locations = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { setSelectedLocation } = useLocationContext();
+  const { setSelectedLocation, refreshLocations } = useLocationContext();
   const { maxLocations, canAddMoreLocations, planType } = usePlanFeatures();
   const [locations, setLocations] = useState<Location[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefreshLocations = async () => {
+    try {
+      setIsRefreshing(true);
+      await refreshLocations();
+      await fetchLocations(); // Also refresh the local locations state
+      toast({
+        title: "Locations Refreshed",
+        description: "Location data has been updated from Google Business Profile",
+      });
+    } catch (error) {
+      console.error('Error refreshing locations:', error);
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh location data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -80,23 +102,34 @@ const Locations = () => {
       setLoading(true);
       // Demo: use mock locations without calling Google
       if (user?.email === DEMO_EMAIL) {
-        const demo: Location[] = mockLocations.map((m) => ({
-          id: m.id,
-          google_place_id: m.google_place_id,
-          name: m.name,
-          address: m.address ?? null,
-          phone: null,
-          website: null,
-          rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
-          total_reviews: 50,
-          latitude: null,
-          longitude: null,
-          status: 'active',
-          last_fetched_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
-        setLocations(demo);
+        // Get actual review counts for demo locations
+        const demoLocationsWithCounts = await Promise.all(
+          mockLocations.map(async (m) => {
+            // Count reviews for this location
+            const { count } = await supabase
+              .from('saved_reviews')
+              .select('*', { count: 'exact', head: true })
+              .eq('location_id', m.id);
+            
+            return {
+              id: m.id,
+              google_place_id: m.google_place_id,
+              name: m.name,
+              address: m.address ?? null,
+              phone: null,
+              website: null,
+              rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+              total_reviews: count || 0,
+              latitude: null,
+              longitude: null,
+              status: 'active',
+              last_fetched_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+          })
+        );
+        setLocations(demoLocationsWithCounts);
         return;
       }
       let { data: { session } } = await supabase.auth.getSession();
@@ -127,7 +160,64 @@ const Locations = () => {
         console.log('Error fetching locations:', error);
         setLocations([]);
       } else {
-        setLocations(data?.locations || []);
+        // For real users, use the data directly from Google API
+        // Google API already provides rating and total_reviews
+        console.log('Google API locations data:', data?.locations);
+        if (data?.locations) {
+          data.locations.forEach((location: any, index: number) => {
+            console.log(`Location ${index + 1}:`, {
+              name: location.name,
+              rating: location.rating,
+              total_reviews: location.total_reviews,
+              id: location.id
+            });
+          });
+        }
+        
+        // If Google API doesn't provide rating/review data, try to get it from our database
+        const locationsWithFallbackData = await Promise.all(
+          (data?.locations || []).map(async (location: any) => {
+            // If Google API didn't provide rating/review data, try database fallback
+            if (!location.rating && !location.total_reviews) {
+              try {
+                const { count } = await supabase
+                  .from('saved_reviews')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('location_id', location.id);
+                
+                if (count && count > 0) {
+                  // Get reviews to calculate average rating
+                  const { data: reviews } = await supabase
+                    .from('saved_reviews')
+                    .select('rating')
+                    .eq('location_id', location.id);
+                  
+                  if (reviews && reviews.length > 0) {
+                    const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+                    const averageRating = totalRating / reviews.length;
+                    
+                    console.log(`Database fallback for ${location.name}:`, {
+                      rating: averageRating,
+                      total_reviews: count
+                    });
+                    
+                    return {
+                      ...location,
+                      rating: averageRating,
+                      total_reviews: count
+                    };
+                  }
+                }
+              } catch (error) {
+                console.log(`Database fallback failed for ${location.name}:`, error);
+              }
+            }
+            
+            return location;
+          })
+        );
+        
+        setLocations(locationsWithFallbackData);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
@@ -325,6 +415,23 @@ const Locations = () => {
                 <p className="text-muted-foreground">
                   Manage your Google Business locations and track their performance
                 </p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleRefreshLocations}
+                  disabled={isRefreshing || loading}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh Locations
+                </Button>
+                {canAddMoreLocations(locations.length) && (
+                  <Button onClick={() => navigate('/location-selection')} size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Location
+                  </Button>
+                )}
               </div>
             </div>
 
