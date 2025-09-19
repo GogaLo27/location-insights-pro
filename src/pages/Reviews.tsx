@@ -43,7 +43,7 @@ const Reviews = () => {
   const { user, loading: authLoading } = useAuth();
   const { selectedLocation } = useLocation();
   const { toast } = useToast();
-  const { canUseAIAnalysis, canUseAIReplyGeneration, canBulkOperate, canBulkAnalyze, canBulkReply } = usePlanFeatures();
+  const { canUseAIAnalysis, canUseAIReplyGeneration, canBulkOperate, canBulkAnalyze, canBulkReply, planType, isProfessional, isEnterprise } = usePlanFeatures();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -911,7 +911,7 @@ Keep the response under 150 words.`;
               <LocationSelector />
               {/* Plan Indicator - for debugging */}
               <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                {canBulkOperate ? 'Professional/Enterprise' : 'Starter'} Plan
+                {planType ? planType.charAt(0).toUpperCase() + planType.slice(1) : 'Starter'} Plan
               </div>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
