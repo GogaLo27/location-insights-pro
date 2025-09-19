@@ -37,7 +37,7 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [selectedLocation, setSelectedLocationState] = useState<SelectedLocation | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshLocations = async () => {
+  const refreshLocations = async (forceRefresh = false) => {
     if (!user) return;
 
     // DEMO: return mock locations
@@ -56,6 +56,30 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     try {
       setLoading(true);
+
+      // Always fetch from database first (unless forcing refresh)
+      if (!forceRefresh) {
+        const { data: dbLocations, error: dbError } = await supabase
+          .from('user_locations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (!dbError && dbLocations && dbLocations.length > 0) {
+          console.log(`Loaded ${dbLocations.length} locations from database`);
+          setLocations(dbLocations.map(loc => ({
+            id: loc.id,
+            google_place_id: loc.google_place_id,
+            name: loc.name,
+            address: loc.address,
+          })));
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Only call Google API if forcing refresh or no data in database
+      console.log('Fetching locations from Google API...');
       const { data: { session } } = await supabase.auth.getSession();
       let googleAccessToken = session?.provider_token;
       if (!googleAccessToken) {
@@ -68,7 +92,38 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
           "X-Google-Token": googleAccessToken || "",
         },
       });
+      
       if (!error && data?.locations) {
+        // Save locations to database
+        const locationsToSave = data.locations.map((location: any) => ({
+          user_id: user.id,
+          google_place_id: location.google_place_id,
+          name: location.name,
+          address: location.address,
+          phone: location.phone,
+          website: location.website,
+          rating: location.rating,
+          total_reviews: location.total_reviews,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          status: location.status || 'active',
+          last_fetched_at: new Date().toISOString(),
+        }));
+
+        // Upsert locations to database
+        const { error: saveError } = await supabase
+          .from('user_locations')
+          .upsert(locationsToSave, { 
+            onConflict: 'user_id,google_place_id',
+            ignoreDuplicates: false 
+          });
+
+        if (saveError) {
+          console.error('Error saving locations to database:', saveError);
+        } else {
+          console.log(`Saved ${locationsToSave.length} locations to database`);
+        }
+
         setLocations(data.locations);
       } else {
         setLocations([]);
@@ -140,7 +195,7 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   useEffect(() => {
     if (user) {
-      refreshLocations();
+      refreshLocations(false); // Load from cache first
       fetchSelectedLocation();
     } else {
       setLocations([]);

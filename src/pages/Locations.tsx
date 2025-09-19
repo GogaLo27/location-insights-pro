@@ -53,16 +53,156 @@ const Locations = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleRefreshLocations = async () => {
     try {
       setIsRefreshing(true);
-      await refreshLocations();
-      await fetchLocations(); // Also refresh the local locations state
-      toast({
-        title: "Locations Refreshed",
-        description: "Location data has been updated from Google Business Profile",
+      
+      // Call Google API directly and update database
+      let { data: { session } } = await supabase.auth.getSession();
+      let googleAccessToken = session?.provider_token;
+      if (!googleAccessToken) {
+        await supabase.auth.refreshSession();
+        ({ data: { session } } = await supabase.auth.getSession());
+        googleAccessToken = session?.provider_token;
+      }
+      const supabaseJwt = session?.access_token;
+      
+      if (!supabaseJwt || !googleAccessToken) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign out and sign in with Google again to access your business data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-business-api', {
+        body: { action: 'fetch_user_locations' },
+        headers: {
+          'Authorization': `Bearer ${supabaseJwt}`,
+          'X-Google-Token': googleAccessToken
+        }
       });
+
+      if (error) {
+        console.error('Error fetching locations from Google:', error);
+        toast({
+          title: "Refresh Failed",
+          description: "Failed to fetch location data from Google. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data?.locations) {
+        // Get existing locations to check for duplicates
+        const { data: existingLocations } = await supabase
+          .from('user_locations')
+          .select('google_place_id')
+          .eq('user_id', user.id);
+
+        // Normalize existing place IDs (remove 'locations/' prefix if present)
+        const existingPlaceIds = new Set(
+          existingLocations?.map(loc => 
+            loc.google_place_id.replace(/^locations\//, '')
+          ) || []
+        );
+
+        // Filter out locations that already exist (normalize the incoming place IDs too)
+        const newLocations = data.locations.filter((location: any) => {
+          const normalizedPlaceId = location.google_place_id.replace(/^locations\//, '');
+          return !existingPlaceIds.has(normalizedPlaceId);
+        });
+
+        console.log(`Found ${data.locations.length} locations from Google, ${newLocations.length} are new`);
+
+        if (newLocations.length > 0) {
+          // Only save new locations
+          const locationsToSave = newLocations.map((location: any) => ({
+            user_id: user.id,
+            google_place_id: location.google_place_id.replace(/^locations\//, ''), // Remove 'locations/' prefix
+            name: location.name,
+            address: location.address,
+            phone: location.phone,
+            website: location.website,
+            rating: location.rating,
+            total_reviews: location.total_reviews,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            status: location.status || 'active',
+            last_fetched_at: new Date().toISOString(),
+          }));
+
+          const { error: saveError } = await supabase
+            .from('user_locations')
+            .insert(locationsToSave);
+
+          if (saveError) {
+            console.error('Error saving new locations to database:', saveError);
+            toast({
+              title: "Refresh Failed",
+              description: "Failed to save new location data. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          console.log(`Saved ${locationsToSave.length} new locations to database`);
+        }
+
+        // Update existing locations with fresh data
+        const updatePromises = data.locations
+          .filter((location: any) => {
+            const normalizedPlaceId = location.google_place_id.replace(/^locations\//, '');
+            return existingPlaceIds.has(normalizedPlaceId);
+          })
+          .map(async (location: any) => {
+            const normalizedPlaceId = location.google_place_id.replace(/^locations\//, '');
+            const { error: updateError } = await supabase
+              .from('user_locations')
+              .update({
+                name: location.name,
+                address: location.address,
+                phone: location.phone,
+                website: location.website,
+                rating: location.rating,
+                total_reviews: location.total_reviews,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                status: location.status || 'active',
+                last_fetched_at: new Date().toISOString(),
+              })
+              .eq('user_id', user.id)
+              .eq('google_place_id', normalizedPlaceId);
+
+            if (updateError) {
+              console.error(`Error updating location ${location.name}:`, updateError);
+            }
+          });
+
+        await Promise.all(updatePromises);
+
+        // Reload locations from database
+        await fetchLocations();
+        
+        const updatedCount = data.locations.length - newLocations.length;
+        let message = "Location data has been updated from Google Business Profile";
+        if (newLocations.length > 0 && updatedCount > 0) {
+          message = `Added ${newLocations.length} new location(s) and updated ${updatedCount} existing location(s)`;
+        } else if (newLocations.length > 0) {
+          message = `Added ${newLocations.length} new location(s)`;
+        } else if (updatedCount > 0) {
+          message = `Updated ${updatedCount} existing location(s)`;
+        }
+        
+        toast({
+          title: "Locations Refreshed",
+          description: message,
+        });
+      }
     } catch (error) {
       console.error('Error refreshing locations:', error);
       toast({
@@ -75,10 +215,75 @@ const Locations = () => {
     }
   };
 
+  const handleDeleteLocations = async () => {
+    if (selectedLocations.length === 0) {
+      toast({
+        title: "No Locations Selected",
+        description: "Please select locations to delete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      
+      // Delete selected locations from database
+      const { error } = await supabase
+        .from('user_locations')
+        .delete()
+        .in('id', selectedLocations);
+
+      if (error) {
+        console.error('Error deleting locations:', error);
+        toast({
+          title: "Delete Failed",
+          description: "Failed to delete locations. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Remove deleted locations from state
+      setLocations(prev => prev.filter(loc => !selectedLocations.includes(loc.id)));
+      setSelectedLocations([]);
+      
+      toast({
+        title: "Locations Deleted",
+        description: `Successfully deleted ${selectedLocations.length} location(s)`,
+      });
+    } catch (error) {
+      console.error('Error deleting locations:', error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete locations. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleLocationSelect = (locationId: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(locationId) 
+        ? prev.filter(id => id !== locationId)
+        : [...prev, locationId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedLocations.length === locations.length) {
+      setSelectedLocations([]);
+    } else {
+      setSelectedLocations(locations.map(loc => loc.id));
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchProfile();
-      fetchLocations();
+      fetchLocations(); // Load from database
     }
   }, [user]);
 
@@ -100,6 +305,7 @@ const Locations = () => {
   const fetchLocations = async () => {
     try {
       setLoading(true);
+      
       // Demo: use mock locations without calling Google
       if (user?.email === DEMO_EMAIL) {
         // Get actual review counts for demo locations
@@ -132,92 +338,20 @@ const Locations = () => {
         setLocations(demoLocationsWithCounts);
         return;
       }
-      let { data: { session } } = await supabase.auth.getSession();
-      let googleAccessToken = session?.provider_token;
-      if (!googleAccessToken) {
-        await supabase.auth.refreshSession();
-        ({ data: { session } } = await supabase.auth.getSession());
-        googleAccessToken = session?.provider_token;
-      }
-      const supabaseJwt = session?.access_token;
-      if (!supabaseJwt || !googleAccessToken) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign out and sign in with Google again to access your business data",
-          variant: "destructive",
-        });
-        setLocations([]);
-        return;
-      }
-      const { data, error } = await supabase.functions.invoke('google-business-api', {
-        body: { action: 'fetch_user_locations' },
-        headers: {
-          'Authorization': `Bearer ${supabaseJwt}`,
-          'X-Google-Token': googleAccessToken
-        }
-      });
-      if (error) {
-        console.log('Error fetching locations:', error);
-        setLocations([]);
+
+      // For real users, fetch from database
+      const { data: dbLocations, error: dbError } = await supabase
+        .from('user_locations')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!dbError && dbLocations) {
+        console.log(`Loaded ${dbLocations.length} locations from database`);
+        setLocations(dbLocations);
       } else {
-        // For real users, use the data directly from Google API
-        // Google API already provides rating and total_reviews
-        console.log('Google API locations data:', data?.locations);
-        if (data?.locations) {
-          data.locations.forEach((location: any, index: number) => {
-            console.log(`Location ${index + 1}:`, {
-              name: location.name,
-              rating: location.rating,
-              total_reviews: location.total_reviews,
-              id: location.id
-            });
-          });
-        }
-        
-        // If Google API doesn't provide rating/review data, try to get it from our database
-        const locationsWithFallbackData = await Promise.all(
-          (data?.locations || []).map(async (location: any) => {
-            // If Google API didn't provide rating/review data, try database fallback
-            if (!location.rating && !location.total_reviews) {
-              try {
-                const { count } = await supabase
-                  .from('saved_reviews')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('location_id', location.id);
-                
-                if (count && count > 0) {
-                  // Get reviews to calculate average rating
-                  const { data: reviews } = await supabase
-                    .from('saved_reviews')
-                    .select('rating')
-                    .eq('location_id', location.id);
-                  
-                  if (reviews && reviews.length > 0) {
-                    const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-                    const averageRating = totalRating / reviews.length;
-                    
-                    console.log(`Database fallback for ${location.name}:`, {
-                      rating: averageRating,
-                      total_reviews: count
-                    });
-                    
-                    return {
-                      ...location,
-                      rating: averageRating,
-                      total_reviews: count
-                    };
-                  }
-                }
-              } catch (error) {
-                console.log(`Database fallback failed for ${location.name}:`, error);
-              }
-            }
-            
-            return location;
-          })
-        );
-        
-        setLocations(locationsWithFallbackData);
+        console.error('Error loading locations from database:', dbError);
+        setLocations([]);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
@@ -478,7 +612,38 @@ const Locations = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <>
+                {/* Delete Controls */}
+                {locations.length > 0 && (
+                  <div className="flex items-center justify-between mb-6 p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="select-all"
+                          checked={selectedLocations.length === locations.length && locations.length > 0}
+                          onChange={handleSelectAll}
+                          className="rounded border-gray-300"
+                        />
+                        <label htmlFor="select-all" className="text-sm font-medium">
+                          Select All ({selectedLocations.length}/{locations.length})
+                        </label>
+                      </div>
+                    </div>
+                    {selectedLocations.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteLocations}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? "Deleting..." : `Delete ${selectedLocations.length} Location(s)`}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {locations
                   .filter((l) => {
                     const q = searchTerm.trim().toLowerCase();
@@ -492,11 +657,19 @@ const Locations = () => {
                   <Card key={location.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
                       <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{location.name}</CardTitle>
-                          <CardDescription className="mt-1">
-                            {location.address}
-                          </CardDescription>
+                        <div className="flex items-start space-x-3 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedLocations.includes(location.id)}
+                            onChange={() => handleLocationSelect(location.id)}
+                            className="mt-1 rounded border-gray-300"
+                          />
+                          <div className="flex-1">
+                            <CardTitle className="text-lg">{location.name}</CardTitle>
+                            <CardDescription className="mt-1">
+                              {location.address}
+                            </CardDescription>
+                          </div>
                         </div>
                         <Badge
                           variant={location.status === 'active' ? 'default' : 'secondary'}
@@ -563,7 +736,8 @@ const Locations = () => {
                     </CardContent>
                   </Card>
                 ))}
-              </div>
+                </div>
+              </>
             )}
             
             {/* Show upgrade prompt when location limit is reached */}
