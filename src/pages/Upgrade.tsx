@@ -22,7 +22,8 @@ import {
   Filter,
   Settings,
   Lock,
-  Unlock
+  Unlock,
+  Mail
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -61,9 +62,8 @@ const Upgrade = () => {
     { name: "PDF Export", description: "Export reports to PDF", icon: Download },
     { name: "Custom Date Ranges", description: "Custom analytics date ranges", icon: Calendar },
     { name: "Comparison Mode", description: "Compare analytics periods", icon: BarChart3 },
-    { name: "Advanced Filtering", description: "Advanced search and filtering", icon: Filter },
     { name: "White-label Reports", description: "Branded PDF reports", icon: Settings },
-    { name: "API Access", description: "REST API for integrations", icon: Settings },
+    { name: "Brand Management", description: "Multi-brand support and management", icon: Settings },
   ];
 
   const plans: Plan[] = [
@@ -74,9 +74,10 @@ const Upgrade = () => {
       price: 49,
       billing: 'monthly',
       features: [
-        { name: "Locations", description: "Up to 2 locations", icon: Users },
+        { name: "Locations", description: "Up to 1 location", icon: Users },
         { name: "Basic Analytics", description: "30 days of analytics", icon: BarChart3 },
-        { name: "Manual Reviews", description: "Manual review management", icon: FileText },
+        { name: "CSV Export", description: "Export data to CSV", icon: Download },
+        { name: "Email Support", description: "Email support", icon: Mail },
       ],
       current: plan?.plan_type === 'starter',
     },
@@ -87,13 +88,15 @@ const Upgrade = () => {
       price: 99,
       billing: 'monthly',
       features: [
-        { name: "Locations", description: "Up to 10 locations", icon: Users },
+        { name: "Locations", description: "Up to 5 locations", icon: Users },
         { name: "AI Analysis", description: "AI sentiment analysis", icon: Bot },
         { name: "AI Reply Generation", description: "AI response suggestions", icon: Bot },
         { name: "Bulk Operations", description: "Bulk analyze and reply", icon: Zap },
-        { name: "Analytics", description: "90 days of analytics", icon: BarChart3 },
+        { name: "Analytics", description: "Extended analytics data", icon: BarChart3 },
         { name: "Custom Date Ranges", description: "Custom analytics periods", icon: Calendar },
         { name: "Comparison Mode", description: "Compare analytics periods", icon: BarChart3 },
+        { name: "PDF Export", description: "Export reports to PDF", icon: Download },
+        { name: "Priority Support", description: "Priority email support", icon: Mail },
       ],
       popular: true,
       current: plan?.plan_type === 'professional',
@@ -110,13 +113,13 @@ const Upgrade = () => {
         { name: "AI Reply Generation", description: "AI response suggestions", icon: Bot },
         { name: "Review Templates", description: "Custom response templates", icon: FileText },
         { name: "Bulk Operations", description: "Bulk analyze and reply", icon: Zap },
-        { name: "Analytics", description: "Unlimited analytics", icon: BarChart3 },
+        { name: "Analytics", description: "Extended analytics data", icon: BarChart3 },
         { name: "PDF Export", description: "Export reports to PDF", icon: Download },
         { name: "Custom Date Ranges", description: "Custom analytics periods", icon: Calendar },
         { name: "Comparison Mode", description: "Compare analytics periods", icon: BarChart3 },
-        { name: "Advanced Filtering", description: "Advanced search and filtering", icon: Filter },
         { name: "White-label Reports", description: "Branded PDF reports", icon: Settings },
-        { name: "API Access", description: "REST API for integrations", icon: Settings },
+        { name: "Brand Management", description: "Multi-brand support", icon: Settings },
+        { name: "24/7 Support", description: "Dedicated 24/7 support", icon: Mail },
       ],
       current: plan?.plan_type === 'enterprise',
     },

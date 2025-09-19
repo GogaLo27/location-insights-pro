@@ -41,7 +41,7 @@ const CookiePolicy = () => {
             Cookie Policy
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Learn how we use cookies to enhance your experience
+            Learn how Dibiex uses cookies to enhance your experience
           </p>
         </div>
       </section>
@@ -50,38 +50,32 @@ const CookiePolicy = () => {
       <main className="flex-1 py-8 px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="grid gap-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            {/* Header Info */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardContent className="prose prose-sm max-w-none text-gray-600 pt-6">
+                <p><strong>Effective Date:</strong> January 23, 2025</p>
+                <p><strong>Last Updated:</strong> January 23, 2025</p>
+                <p className="mt-4">
+                  This Cookie Policy explains how Dibiex ("Company," "we," "our," or "us") uses cookies and similar technologies when you visit our website or use our SaaS platform ("Service").
+                </p>
+              </CardContent>
+            </Card>
+
             {/* What Are Cookies */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Cookie className="w-5 h-5 text-blue-600" />
-                  <span>What Are Cookies?</span>
+                  <span>1. What Are Cookies?</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
                 <p>
-                  Cookies are small text files that are placed on your device when you visit our website. 
-                  They help us provide you with a better experience by remembering your preferences, 
-                  analyzing how you use our site, and personalizing content. Cookies cannot access 
-                  personal information stored on your device or any files on your computer.
+                  Cookies are small text files stored on your device by your browser when you visit a website. 
+                  They are widely used to make websites work, improve efficiency, and provide analytics and personalization.
                 </p>
-              </CardContent>
-            </Card>
-
-            {/* How We Use Cookies */}
-            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5 text-purple-600" />
-                  <span>How We Use Cookies</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="prose prose-sm max-w-none text-gray-600">
                 <p>
-                  We use cookies to enhance your browsing experience, analyze site traffic, and 
-                  personalize content. This includes remembering your login status, preferences, 
-                  and providing analytics about how our services are used. We also use cookies 
-                  to improve our services and develop new features based on user behavior.
+                  We also use related technologies such as pixels, local storage, and SDKs, which operate similarly.
                 </p>
               </CardContent>
             </Card>
@@ -91,78 +85,94 @@ const CookiePolicy = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Shield className="w-5 h-5 text-blue-600" />
-                  <span>Types of Cookies We Use</span>
+                  <span>2. Types of Cookies We Use</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
-                    <h4 className="font-semibold text-foreground mb-2">Essential Cookies</h4>
+                    <h4 className="font-semibold text-foreground mb-2">a. Strictly Necessary Cookies</h4>
+                    <p className="text-sm mb-2">
+                      Essential for secure login, authentication (e.g., Google Auth), and core functionality.
+                    </p>
+                    <p className="text-sm mb-2">
+                      Without these cookies, the Service cannot function properly.
+                    </p>
                     <p className="text-sm">
-                      These cookies are necessary for the website to function properly. They enable basic 
-                      functions like page navigation, access to secure areas, and user authentication.
+                      <strong>Example:</strong> Session tokens, user authentication state.
                     </p>
                   </div>
+                  
                   <div>
-                    <h4 className="font-semibold text-foreground mb-2">Analytics Cookies</h4>
+                    <h4 className="font-semibold text-foreground mb-2">b. Performance & Analytics Cookies</h4>
+                    <p className="text-sm mb-2">
+                      Help us understand how users interact with the Service.
+                    </p>
+                    <p className="text-sm mb-2">
+                      Collect anonymized or aggregated data (e.g., page views, feature usage).
+                    </p>
                     <p className="text-sm">
-                      These cookies help us understand how visitors interact with our website by collecting 
-                      and reporting information anonymously. This helps us improve our services.
+                      <strong>Example:</strong> Internal analytics, Google Analytics (if implemented).
                     </p>
                   </div>
+                  
                   <div>
-                    <h4 className="font-semibold text-foreground mb-2">Preference Cookies</h4>
+                    <h4 className="font-semibold text-foreground mb-2">c. Functional Cookies</h4>
+                    <p className="text-sm mb-2">
+                      Enhance user experience by remembering preferences.
+                    </p>
                     <p className="text-sm">
-                      These cookies allow our website to remember information that changes the way it 
-                      behaves or looks, such as your preferred language or region.
+                      <strong>Example:</strong> Language settings, dashboard layout choices.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-2">d. Third-Party Cookies</h4>
+                    <p className="text-sm mb-2">
+                      Some cookies may come from third-party services (e.g., Google APIs, cloud providers, support chat tools).
+                    </p>
+                    <p className="text-sm">
+                      <strong>Example:</strong> Google authentication tokens, security validation.
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Cookie Duration */}
+            {/* Legal Basis */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-purple-600" />
-                  <span>Cookie Duration</span>
+                  <Settings className="w-5 h-5 text-purple-600" />
+                  <span>3. Legal Basis for Use</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-2">Session Cookies</h4>
-                    <p className="text-sm">
-                      These cookies are temporary and are deleted when you close your browser. They are 
-                      used to maintain your session while you browse our website.
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-2">Persistent Cookies</h4>
-                    <p className="text-sm">
-                      These cookies remain on your device for a set period or until you delete them. 
-                      They help us remember your preferences and provide a personalized experience.
-                    </p>
-                  </div>
-                </div>
+                <p>We rely on:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Consent (GDPR Art. 6(1)(a))</strong> for non-essential cookies (e.g., analytics, personalization).</li>
+                  <li><strong>Legitimate Interest / Contract (GDPR Art. 6(1)(b), (f))</strong> for strictly necessary cookies that enable login, account security, and Service provision.</li>
+                </ul>
               </CardContent>
             </Card>
 
-            {/* Third-Party Cookies */}
+            {/* How We Use Cookies */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Eye className="w-5 h-5 text-blue-600" />
-                  <span>Third-Party Cookies</span>
+                  <Settings className="w-5 h-5 text-purple-600" />
+                  <span>4. How We Use Cookies</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  We may use third-party services that place cookies on your device. These services 
-                  help us with analytics, payment processing, and customer support. These third parties 
-                  have their own privacy policies and cookie practices, which we encourage you to review.
-                </p>
+                <p>We use cookies to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Authenticate users securely via Google OAuth.</li>
+                  <li>Maintain session continuity.</li>
+                  <li>Improve Service performance and reliability.</li>
+                  <li>Generate aggregated usage reports to improve features.</li>
+                  <li>Prevent fraud, enhance security, and detect technical issues.</li>
+                </ul>
               </CardContent>
             </Card>
 
@@ -171,15 +181,80 @@ const CookiePolicy = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Settings className="w-5 h-5 text-purple-600" />
-                  <span>Managing Your Cookie Preferences</span>
+                  <span>5. Managing Cookies</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <p>You can control cookies through your browser settings:</p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>Block or delete cookies.</li>
+                  <li>Set preferences for which cookies are allowed.</li>
+                </ul>
+                <p className="mb-4">
+                  However, blocking essential cookies may impact your ability to log in or use the Service.
+                </p>
+                <p className="mb-2">For more details on managing cookies:</p>
+                <ul className="list-disc pl-6 space-y-1 text-sm">
+                  <li>Chrome: <a href="https://support.google.com/chrome/answer/95647" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.google.com/chrome/answer/95647</a></li>
+                  <li>Firefox: <a href="https://support.mozilla.org/en-US/kb/enable-and-disable-cookies-website-preferences" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.mozilla.org/en-US/kb/enable-and-disable-cookies-website-preferences</a></li>
+                  <li>Safari: <a href="https://support.apple.com/guide/safari/manage-cookies-and-website-data-sfri11471/mac" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.apple.com/guide/safari/manage-cookies-and-website-data-sfri11471/mac</a></li>
+                  <li>Edge: <a href="https://support.microsoft.com/help/4027947/microsoft-edge-delete-cookies" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.microsoft.com/help/4027947/microsoft-edge-delete-cookies</a></li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Third-Party Services */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Eye className="w-5 h-5 text-blue-600" />
+                  <span>6. Third-Party Services</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <p>Our Service integrates with third-party providers that may place cookies:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Google Authentication (OAuth):</strong> Session and security cookies.</li>
+                  <li><strong>Google APIs (Business Profile):</strong> Tokens to fetch reviews.</li>
+                  <li><strong>Hosting / Cloud Providers (e.g., AWS):</strong> Load balancing and security cookies.</li>
+                  <li><strong>Analytics tools (optional):</strong> Usage tracking and performance monitoring.</li>
+                </ul>
+                <p className="mt-4">
+                  We have no control over third-party cookie practices but require them to comply with privacy laws.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Your Rights */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5 text-blue-600" />
+                  <span>7. Your Rights</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <p>Depending on your jurisdiction (GDPR, CCPA/CPRA, LGPD):</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>You may have the right to opt-in or opt-out of non-essential cookies.</li>
+                  <li>You may request details on the categories of cookies we use.</li>
+                  <li>You may withdraw consent at any time through our cookie banner or browser settings.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Updates */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Clock className="w-5 h-5 text-purple-600" />
+                  <span>8. Updates to This Policy</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
                 <p>
-                  You can control and manage cookies through your browser settings. Most browsers allow 
-                  you to view, delete, and block cookies. However, disabling certain cookies may affect 
-                  the functionality of our website. You can also use our cookie consent banner to manage 
-                  your preferences.
+                  We may update this Cookie Policy to reflect changes in technology, laws, or our practices. 
+                  The latest version will always be posted here with the "Last Updated" date.
                 </p>
               </CardContent>
             </Card>
@@ -189,33 +264,27 @@ const CookiePolicy = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Mail className="w-5 h-5 text-blue-600" />
-                  <span>Contact Us</span>
+                  <span>9. Contact Us</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none">
-                <p className="text-gray-600">
-                  If you have any questions about our cookie policy, 
-                  please contact us at:
+                <p className="text-gray-600 mb-4">
+                  If you have questions about our Cookie Policy, please contact us:
                 </p>
-                <div className="not-prose mt-4 space-y-2">
+                <div className="not-prose space-y-2">
+                  <div className="text-sm">
+                    <strong>Dibiex</strong>
+                  </div>
                   <div className="flex items-center space-x-2 text-sm">
                     <Mail className="w-4 h-4 text-blue-600" />
-                    <span className="font-medium">privacy@reviewlip.com</span>
+                    <span className="font-medium">privacy@dibiex.com</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    We typically respond within 24-48 hours.
+                    Address: [Insert Company Address]
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Effective Date */}
-            <div className="text-center py-6 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
-                <strong>Effective Date:</strong> January 20, 2025 | 
-                <strong className="ml-2">Last Updated:</strong> January 20, 2025
-              </p>
-            </div>
           </div>
         </div>
       </main>

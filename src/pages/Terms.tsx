@@ -41,7 +41,7 @@ const Terms = () => {
             Terms and Conditions
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Please read these terms carefully before using our services
+            Please read these terms carefully before using Dibiex services
           </p>
         </div>
       </section>
@@ -50,94 +50,176 @@ const Terms = () => {
       <main className="flex-1 py-8 px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="grid gap-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            {/* Acceptance of Terms */}
+            {/* Header Info */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <span>Acceptance of Terms</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  By accessing and using ReviewLip's services, you accept and agree to be bound by the terms 
-                  and provision of this agreement. If you do not agree to abide by the above, please do not 
-                  use this service. These terms apply to all users of the site, including without limitation 
-                  users who are browsers, vendors, customers, merchants, and contributors of content.
+              <CardContent className="prose prose-sm max-w-none text-gray-600 pt-6">
+                <p><strong>Effective Date:</strong> January 23, 2025</p>
+                <p><strong>Last Updated:</strong> January 23, 2025</p>
+                <p className="mt-4">
+                  These Terms and Conditions ("Terms") govern your use of the SaaS platform provided by Dibiex ("Company," "we," "our," or "us"). By accessing or using our platform ("Service"), you agree to be bound by these Terms. If you do not agree, you must not use the Service.
                 </p>
               </CardContent>
             </Card>
 
-            {/* Use License */}
-            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-purple-600" />
-                  <span>Use License</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  Permission is granted to temporarily download one copy of the materials (information or software) 
-                  on ReviewLip's website for personal, non-commercial transitory viewing only. This is the grant 
-                  of a license, not a transfer of title, and under this license you may not modify or copy the 
-                  materials, use the materials for any commercial purpose or for any public display, or transfer 
-                  the materials to another person.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Service Description */}
+            {/* Eligibility */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="w-5 h-5 text-blue-600" />
-                  <span>Service Description</span>
+                  <span>1. Eligibility</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  ReviewLip provides AI-powered review management and sentiment analysis services for businesses. 
-                  Our services include automated review monitoring, sentiment analysis, response generation, and 
-                  analytics reporting. We integrate with Google Business Profile to access and analyze your 
-                  business reviews and provide actionable insights.
-                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>You must be at least 18 years old and have the legal authority to enter into these Terms.</li>
+                  <li>By using the Service on behalf of a business or organization, you represent that you have the authority to bind that entity.</li>
+                </ul>
               </CardContent>
             </Card>
 
-            {/* User Responsibilities */}
+            {/* Account Registration and Security */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-purple-600" />
-                  <span>User Responsibilities</span>
+                  <Shield className="w-5 h-5 text-purple-600" />
+                  <span>2. Account Registration and Security</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  You are responsible for maintaining the confidentiality of your account and password. 
-                  You agree to accept responsibility for all activities that occur under your account or password. 
-                  You must not use our services for any illegal or unauthorized purpose, and you must not violate 
-                  any laws in your jurisdiction when using our services.
-                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>You must sign in using Google Authentication (OAuth).</li>
+                  <li>You agree to provide accurate and complete information during registration.</li>
+                  <li>You are responsible for maintaining the confidentiality of your login credentials and for all activities under your account.</li>
+                  <li>We are not liable for any loss or damage arising from unauthorized access to your account.</li>
+                </ul>
               </CardContent>
             </Card>
 
-            {/* Payment Terms */}
+            {/* Use of the Service */}
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Scale className="w-5 h-5 text-blue-600" />
-                  <span>Payment Terms</span>
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <span>3. Use of the Service</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  Subscription fees are billed in advance on a monthly or annual basis. All fees are non-refundable 
-                  except as expressly stated in these terms. We reserve the right to change our pricing with 30 days 
-                  notice. You may cancel your subscription at any time, and you will continue to have access to the 
-                  service until the end of your current billing period.
+                <p className="mb-4">
+                  The Service integrates with the Google Business Profile API to fetch business data and reviews, and applies AI analysis to generate insights.
                 </p>
+                <p className="mb-4">
+                  You grant us permission to access and process data from your connected Google Business accounts, strictly as necessary to provide the Service.
+                </p>
+                <p className="mb-2">You agree not to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Misuse the Service for unlawful purposes.</li>
+                  <li>Copy, distribute, or reverse-engineer any part of the Service.</li>
+                  <li>Interfere with or disrupt the operation of the Service.</li>
+                  <li>Use the Service to infringe on others' rights, including intellectual property.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Subscription, Fees, and Payment */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Scale className="w-5 h-5 text-purple-600" />
+                  <span>4. Subscription, Fees, and Payment</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Access to the Service may require a subscription or one-time payment.</li>
+                  <li>Fees, billing cycles, and payment methods will be disclosed at the time of purchase.</li>
+                  <li>We reserve the right to change subscription fees with prior notice.</li>
+                  <li>All payments are non-refundable except as required by law.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Intellectual Property */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5 text-blue-600" />
+                  <span>5. Intellectual Property</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>The Service, including its software, design, trademarks, logos, and AI models, are owned by Dibiex and are protected by intellectual property laws.</li>
+                  <li>You are granted a limited, non-exclusive, non-transferable license to use the Service in accordance with these Terms.</li>
+                  <li>You retain ownership of your business data and reviews. We claim no ownership rights over content retrieved from Google APIs on your behalf.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Data Protection and Privacy */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5 text-purple-600" />
+                  <span>6. Data Protection and Privacy</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Your use of the Service is also governed by our Privacy Policy and Data Processing Agreement (DPA).</li>
+                  <li>We comply with the Google API Services User Data Policy, including the Limited Use requirements.</li>
+                  <li>We do not sell or use your Google data for advertising purposes.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Third-Party Services */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+                  <span>7. Third-Party Services</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>The Service relies on third-party providers such as Google APIs and cloud hosting (e.g., AWS).</li>
+                  <li>We are not responsible for the availability or performance of third-party services.</li>
+                  <li>Your use of Google APIs is subject to Google's Terms of Service and Privacy Policy.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Service Availability and Updates */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  <span>8. Service Availability and Updates</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>We strive to provide reliable access but do not guarantee uninterrupted availability.</li>
+                  <li>We may modify, suspend, or discontinue the Service at any time, with or without notice.</li>
+                  <li>We may release updates or new features which are subject to these Terms.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Disclaimer of Warranties */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+                  <span>9. Disclaimer of Warranties</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>The Service is provided "as is" and "as available" without warranties of any kind, express or implied.</li>
+                  <li>We do not guarantee that the AI analysis will be 100% accurate or free of errors.</li>
+                  <li>To the maximum extent permitted by law, we disclaim all warranties, including merchantability, fitness for a particular purpose, and non-infringement.</li>
+                </ul>
               </CardContent>
             </Card>
 
@@ -146,16 +228,81 @@ const Terms = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <AlertTriangle className="w-5 h-5 text-purple-600" />
-                  <span>Limitation of Liability</span>
+                  <span>10. Limitation of Liability</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none text-gray-600">
-                <p>
-                  In no event shall ReviewLip, nor its directors, employees, partners, agents, suppliers, or affiliates, 
-                  be liable for any indirect, incidental, special, consequential, or punitive damages, including without 
-                  limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use 
-                  of the service.
-                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>To the fullest extent permitted by law, we are not liable for any indirect, incidental, consequential, or punitive damages.</li>
+                  <li>Our total liability under these Terms shall not exceed the amount you paid for the Service in the past 12 months.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Indemnification */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5 text-blue-600" />
+                  <span>11. Indemnification</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <p>You agree to indemnify and hold harmless Dibiex, its affiliates, and employees from any claims, damages, or expenses arising out of:</p>
+                <ul className="list-disc pl-6 space-y-2 mt-2">
+                  <li>Your use of the Service.</li>
+                  <li>Your violation of these Terms.</li>
+                  <li>Your violation of any applicable law or third-party rights.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Termination */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-purple-600" />
+                  <span>12. Termination</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>We may suspend or terminate your account if you violate these Terms.</li>
+                  <li>You may stop using the Service at any time.</li>
+                  <li>Upon termination, your access will cease, but certain provisions (e.g., liability, indemnity, intellectual property) will survive.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Governing Law and Dispute Resolution */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Scale className="w-5 h-5 text-blue-600" />
+                  <span>13. Governing Law and Dispute Resolution</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>These Terms shall be governed by the laws of [Insert Jurisdiction, e.g., Delaware, USA or Ireland for GDPR compliance].</li>
+                  <li>Any disputes shall be resolved exclusively in the courts of [Insert Location].</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Changes to These Terms */}
+            <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  <span>14. Changes to These Terms</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="prose prose-sm max-w-none text-gray-600">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>We may update these Terms from time to time.</li>
+                  <li>Continued use of the Service after updates constitutes your acceptance of the revised Terms.</li>
+                </ul>
               </CardContent>
             </Card>
 
@@ -164,33 +311,27 @@ const Terms = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Mail className="w-5 h-5 text-blue-600" />
-                  <span>Contact Us</span>
+                  <span>15. Contact Information</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="prose prose-sm max-w-none">
-                <p className="text-gray-600">
-                  If you have any questions about these terms and conditions, 
-                  please contact us at:
+                <p className="text-gray-600 mb-4">
+                  For questions about these Terms, please contact us at:
                 </p>
-                <div className="not-prose mt-4 space-y-2">
+                <div className="not-prose space-y-2">
+                  <div className="text-sm">
+                    <strong>Dibiex</strong>
+                  </div>
                   <div className="flex items-center space-x-2 text-sm">
                     <Mail className="w-4 h-4 text-blue-600" />
-                    <span className="font-medium">legal@reviewlip.com</span>
+                    <span className="font-medium">legal@dibiex.com</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    We typically respond within 24-48 hours.
+                    Address: [Insert Address]
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Effective Date */}
-            <div className="text-center py-6 border-t border-gray-200">
-              <p className="text-sm text-gray-600">
-                <strong>Effective Date:</strong> January 20, 2025 | 
-                <strong className="ml-2">Last Updated:</strong> January 20, 2025
-              </p>
-            </div>
           </div>
         </div>
       </main>

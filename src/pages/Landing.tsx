@@ -79,10 +79,9 @@ const Landing = () => {
       price: "$49",
       description: "Perfect for small businesses getting started",
       features: [
-        "Up to 2 locations",
+        "Up to 1 location",
         "30 days of analytics",
-        "Manual review management",
-        "Basic sentiment analysis",
+        "CSV export",
         "Email support"
       ],
       popular: false,
@@ -93,13 +92,14 @@ const Landing = () => {
       price: "$99",
       description: "Advanced features for growing businesses",
       features: [
-        "Up to 10 locations",
+        "Up to 5 locations",
         "AI sentiment analysis",
         "AI reply generation",
         "Bulk operations",
-        "90 days of analytics",
+        "Extended analytics data",
         "Custom date ranges",
         "Comparison mode",
+        "PDF export",
         "Priority support"
       ],
       popular: true,
@@ -113,10 +113,8 @@ const Landing = () => {
         "Unlimited locations",
         "All Professional features",
         "Review templates",
-        "PDF export",
-        "Advanced filtering",
         "White-label reports",
-        "API access",
+        "Brand management",
         "24/7 dedicated support"
       ],
       popular: false,
