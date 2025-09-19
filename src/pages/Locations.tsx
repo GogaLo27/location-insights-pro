@@ -5,9 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe } from "lucide-react";
+import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe, Palette, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
@@ -30,6 +33,24 @@ interface Location {
   last_fetched_at: string | null;
   created_at: string;
   updated_at: string;
+  brand_id?: string | null;
+  brand_name?: string | null;
+}
+
+interface BrandProfile {
+  id: string;
+  brand_name: string;
+  logo_url?: string;
+  primary_color: string;
+  secondary_color: string;
+  font_family: string;
+  contact_email?: string;
+  contact_phone?: string;
+  website?: string;
+  address?: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Profile {
@@ -46,15 +67,70 @@ const Locations = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { setSelectedLocation, refreshLocations } = useLocationContext();
-  const { maxLocations, canAddMoreLocations, planType } = usePlanFeatures();
+  const { maxLocations, canAddMoreLocations, planType, canUseReviewTemplates } = usePlanFeatures();
   const [locations, setLocations] = useState<Location[]>([]);
+  const [brands, setBrands] = useState<BrandProfile[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [isSearching, setIsSearching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [assigningLocation, setAssigningLocation] = useState<Location | null>(null);
+
+  // Fetch brands
+  const fetchBrands = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('brand_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      console.log('Fetched brands:', data);
+      setBrands(data || []);
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+    }
+  };
+
+  // Assign brand to location
+  const handleAssignBrand = async (locationId: string, brandId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from('user_locations')
+        .update({ brand_id: brandId })
+        .eq('user_id', user?.id)
+        .eq('id', locationId);
+
+      if (error) throw error;
+
+      // Update local state
+      setLocations(locations.map(loc => 
+        loc.id === locationId 
+          ? { ...loc, brand_id: brandId, brand_name: brandId ? brands.find(b => b.id === brandId)?.brand_name : null }
+          : loc
+      ));
+
+      toast({
+        title: "Success",
+        description: brandId ? "Brand assigned successfully" : "Brand removed successfully",
+      });
+    } catch (error) {
+      console.error('Error assigning brand:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign brand",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleRefreshLocations = async () => {
     try {
@@ -284,6 +360,7 @@ const Locations = () => {
     if (user) {
       fetchProfile();
       fetchLocations(); // Load from database
+      fetchBrands(); // Load brands for Enterprise users
     }
   }, [user]);
 
@@ -339,16 +416,31 @@ const Locations = () => {
         return;
       }
 
-      // For real users, fetch from database
+      // For real users, fetch from database with brand information
       const { data: dbLocations, error: dbError } = await supabase
         .from('user_locations')
-        .select('*')
+        .select(`
+          *,
+          brand_profiles!user_locations_brand_id_fkey (
+            id,
+            brand_name,
+            logo_url,
+            primary_color,
+            secondary_color
+          )
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (!dbError && dbLocations) {
         console.log(`Loaded ${dbLocations.length} locations from database`);
-        setLocations(dbLocations);
+        // Transform the data to include brand information
+        const locationsWithBrands = dbLocations.map((loc: any) => ({
+          ...loc,
+          brand_id: loc.brand_profiles?.id || null,
+          brand_name: loc.brand_profiles?.brand_name || null,
+        }));
+        setLocations(locationsWithBrands);
       } else {
         console.error('Error loading locations from database:', dbError);
         setLocations([]);
@@ -586,6 +678,22 @@ const Locations = () => {
                       onKeyPress={(e) => e.key === 'Enter' && handleSearchLocations()}
                     />
                   </div>
+                  {canUseReviewTemplates && brands.length > 0 && (
+                    <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filter by brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Brands</SelectItem>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {brands.map(brand => (
+                          <SelectItem key={brand.id} value={brand.id}>
+                            {brand.brand_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Button
                     onClick={handleSearchLocations}
                     disabled={!searchTerm.trim() || isSearching}
@@ -647,11 +755,16 @@ const Locations = () => {
                 {locations
                   .filter((l) => {
                     const q = searchTerm.trim().toLowerCase();
-                    if (!q) return true;
-                    return (
+                    const matchesSearch = !q || (
                       l.name.toLowerCase().includes(q) ||
                       (l.address || '').toLowerCase().includes(q)
                     );
+                    
+                    const matchesBrand = selectedBrand === "all" || 
+                      (selectedBrand === "unassigned" && !l.brand_id) ||
+                      l.brand_id === selectedBrand;
+                    
+                    return matchesSearch && matchesBrand;
                   })
                   .map((location) => (
                   <Card key={location.id} className="hover:shadow-lg transition-shadow">
@@ -700,6 +813,29 @@ const Locations = () => {
                           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                             <Globe className="w-4 h-4" />
                             <span className="truncate">{location.website}</span>
+                          </div>
+                        )}
+                        {canUseReviewTemplates && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Palette className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">Brand:</span>
+                              <span className="font-medium">
+                                {location.brand_name || "Unassigned"}
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                            onClick={() => {
+                              setAssigningLocation(location);
+                              setIsAssignDialogOpen(true);
+                              // Refresh brands when opening dialog
+                              fetchBrands();
+                            }}
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2">
@@ -751,6 +887,57 @@ const Locations = () => {
                 />
               </div>
             )}
+
+            {/* Brand Assignment Dialog */}
+            <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Assign Brand to Location</DialogTitle>
+                  <DialogDescription>
+                    Choose a brand profile for {assigningLocation?.name}
+                    {brands.length === 0 && " (No brands available - create brands first)"}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Select Brand</Label>
+                    <Select
+                      value={assigningLocation?.brand_id || "none"}
+                      onValueChange={(value) => {
+                        if (assigningLocation) {
+                          const brandId = value === "none" ? null : value;
+                          handleAssignBrand(assigningLocation.id, brandId);
+                          setIsAssignDialogOpen(false);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Brand (Unassigned)</SelectItem>
+                        {brands.length > 0 ? (
+                          brands.map(brand => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              {brand.brand_name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-brands" disabled>
+                            No brands available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </SidebarInset>
       </div>

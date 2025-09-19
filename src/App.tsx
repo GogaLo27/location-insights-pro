@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Locations from './pages/Locations';
 import Reviews from './pages/Reviews';
 import ReviewTemplates from './pages/ReviewTemplates';
+import BrandManagement from './pages/BrandManagement';
 import Analytics from './pages/Analytics';
 import Sentiment from './pages/Sentiment';
 import Competitors from './pages/Competitors';
@@ -66,6 +67,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <ReviewTemplates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/brands"
+              element={
+                <ProtectedRoute requiresPlan="enterprise" requiresLocation={false}>
+                  <BrandManagement />
                 </ProtectedRoute>
               }
             />

@@ -724,7 +724,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
     });
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     console.log('=== PDF EXPORT BUTTON CLICKED ===');
     console.log('PDF Export clicked, canExportPDF:', canExportPDF);
     console.log('Analytics data length:', analyticsData.length);
@@ -753,6 +753,40 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
     console.log('Starting PDF export process...');
     
     try {
+      // Fetch brand information for the current location
+      let brandInfo = null;
+      if (user && ctxSelectedLocation) {
+        const { data: locationData } = await supabase
+          .from('user_locations')
+          .select(`
+            *,
+            brand_profiles!user_locations_brand_id_fkey (
+              id,
+              brand_name,
+              logo_url,
+              primary_color,
+              secondary_color,
+              font_family,
+              contact_email,
+              contact_phone,
+              website,
+              address
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('google_place_id', ctxSelectedLocation.google_place_id)
+          .single();
+
+        if (locationData?.brand_profiles) {
+          brandInfo = locationData.brand_profiles;
+          console.log('Found brand info:', brandInfo);
+          console.log('Logo URL:', brandInfo.logo_url);
+        } else {
+          console.log('No brand found for location:', ctxSelectedLocation.google_place_id);
+          console.log('Location data:', locationData);
+        }
+      }
+
       // Generate HTML content for the PDF
       const locationName = ctxSelectedLocation?.location_name || 'Unknown Location';
       const dateRangeLabel = getDateRangeLabel();
@@ -764,24 +798,94 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
         <head>
           <title>Analytics Report - ${locationName}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-            .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
-            .metric-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align: center; }
-            .metric-value { font-size: 24px; font-weight: bold; margin: 10px 0; }
-            .metric-label { color: #666; font-size: 14px; }
-            .comparison { background: #e8f5e8; padding: 10px; border-radius: 5px; margin: 5px 0; }
+            body { 
+              font-family: ${brandInfo?.font_family || 'Arial, sans-serif'}; 
+              margin: 20px; 
+              color: #333;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              border-bottom: 3px solid ${brandInfo?.primary_color || '#000000'};
+              padding-bottom: 20px;
+            }
+            .brand-logo {
+              max-height: 60px;
+              margin-bottom: 10px;
+            }
+            .header h1 { 
+              color: ${brandInfo?.primary_color || '#000000'}; 
+              margin: 10px 0;
+            }
+            .header h2 { 
+              color: ${brandInfo?.secondary_color || '#666666'}; 
+              margin: 5px 0;
+            }
+            .summary { 
+              background: ${brandInfo?.secondary_color ? brandInfo.secondary_color + '20' : '#f5f5f5'}; 
+              padding: 15px; 
+              border-radius: 5px; 
+              margin-bottom: 20px; 
+              border-left: 4px solid ${brandInfo?.primary_color || '#000000'};
+            }
+            .metrics { 
+              display: grid; 
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+              gap: 15px; 
+              margin-bottom: 30px; 
+            }
+            .metric-card { 
+              border: 2px solid ${brandInfo?.primary_color || '#ddd'}; 
+              padding: 15px; 
+              border-radius: 5px; 
+              text-align: center; 
+              background: white;
+            }
+            .metric-value { 
+              font-size: 24px; 
+              font-weight: bold; 
+              margin: 10px 0; 
+              color: ${brandInfo?.primary_color || '#000000'};
+            }
+            .metric-label { 
+              color: ${brandInfo?.secondary_color || '#666'}; 
+              font-size: 14px; 
+            }
+            .comparison { 
+              background: #e8f5e8; 
+              padding: 10px; 
+              border-radius: 5px; 
+              margin: 5px 0; 
+            }
             .comparison.negative { background: #ffeaea; }
             .comparison.neutral { background: #f0f0f0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 20px; 
+            }
+            th, td { 
+              border: 1px solid ${brandInfo?.secondary_color || '#ddd'}; 
+              padding: 8px; 
+              text-align: left; 
+            }
+            th { 
+              background-color: ${brandInfo?.primary_color || '#f2f2f2'}; 
+              color: white;
+            }
+            .footer {
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid ${brandInfo?.secondary_color || '#ddd'};
+              font-size: 12px;
+              color: ${brandInfo?.secondary_color || '#666'};
+            }
             @media print { body { margin: 0; } }
           </style>
         </head>
         <body>
           <div class="header">
+            ${brandInfo?.logo_url ? `<img src="${brandInfo.logo_url}" alt="${brandInfo.brand_name}" class="brand-logo">` : ''}
             <h1>Analytics Report</h1>
             <h2>${locationName}</h2>
             <p>Generated on ${format(new Date(), 'MMM d, yyyy HH:mm')}</p>
@@ -873,6 +977,16 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
               `).join('')}
             </tbody>
           </table>
+          
+          ${brandInfo ? `
+          <div class="footer">
+            <h4>${brandInfo.brand_name}</h4>
+            ${brandInfo.contact_email ? `<p><strong>Email:</strong> ${brandInfo.contact_email}</p>` : ''}
+            ${brandInfo.contact_phone ? `<p><strong>Phone:</strong> ${brandInfo.contact_phone}</p>` : ''}
+            ${brandInfo.website ? `<p><strong>Website:</strong> ${brandInfo.website}</p>` : ''}
+            ${brandInfo.address ? `<p><strong>Address:</strong> ${brandInfo.address}</p>` : ''}
+          </div>
+          ` : ''}
         </body>
       </html>
     `;

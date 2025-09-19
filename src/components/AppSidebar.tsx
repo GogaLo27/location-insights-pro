@@ -29,7 +29,8 @@ import {
   Lock,
   Crown,
   ArrowUpRight,
-  Target
+  Target,
+  Palette
 } from "lucide-react";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
@@ -38,6 +39,7 @@ const navigationItems = [
   { title: "Locations", url: "/locations", icon: MapPin, requiresPlan: true },
   { title: "Reviews", url: "/reviews", icon: MessageSquare, requiresPlan: true },
   { title: "Templates", url: "/templates", icon: FileText, requiresPlan: "enterprise", locked: true },
+  { title: "Brand Management", url: "/brands", icon: Palette, requiresPlan: "enterprise", locked: true },
   { title: "Analytics", url: "/analytics", icon: TrendingUp, requiresPlan: true },
   { title: "Sentiment", url: "/sentiment", icon: TrendingUp, requiresPlan: true },
   { title: "Competitors", url: "/competitors", icon: Target, requiresPlan: "professional", locked: true },
