@@ -573,6 +573,24 @@ const Sentiment = () => {
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle>Analysis Parameters</CardTitle>
+                <CardDescription>
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-2">
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-medium mt-0.5 flex-shrink-0">
+                        i
+                      </div>
+                      <div className="text-sm">
+                        <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">How Filters Work:</p>
+                        <ul className="text-blue-700 dark:text-blue-300 space-y-1 text-xs">
+                          <li>• <strong>Date Range:</strong> Select which time period to analyze (e.g., "Last 6 months")</li>
+                          <li>• <strong>Time Period:</strong> Choose how to group the data (daily, weekly, monthly, or yearly)</li>
+                          <li>• <strong>Example:</strong> "Last 6 months" + "Monthly" = 6 separate monthly analyses</li>
+                          <li>• <strong>Example:</strong> "Last 3 months" + "Weekly" = 12 separate weekly analyses</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
