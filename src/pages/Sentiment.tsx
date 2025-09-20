@@ -58,17 +58,17 @@ const Sentiment = () => {
   const { toast } = useToast();
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(() => {
-    const now = new Date();
-    return { from: new Date('2020-01-01'), to: now }; // Default to "All Time"
-  });
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<string>("3"); // Default to "Last 3 months"
   const { selectedLocation: ctxSelectedLocation } = useLocationContext();
 
-  // Get date range to use - custom if set, otherwise default to all time
+  // Get date range to use - custom if set, otherwise default to last 3 months
   const getDateRange = () => {
     if (dateRange) return dateRange;
     const now = new Date();
-    return { from: new Date('2020-01-01'), to: now };
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    return { from: threeMonthsAgo, to: now };
   };
 
   // Chart data preparation
@@ -219,6 +219,14 @@ const Sentiment = () => {
       description: "Sentiment analysis data has been exported to CSV file.",
     });
   };
+
+  // Initialize default date range on component mount
+  useEffect(() => {
+    if (!dateRange && selectedPreset !== "custom") {
+      const preset = getDatePresets()[parseInt(selectedPreset)];
+      setDateRange(preset);
+    }
+  }, [selectedPreset]);
 
   useEffect(() => {
     if (user) {
@@ -552,12 +560,12 @@ const Sentiment = () => {
                         i
                       </div>
                       <div className="text-sm">
-                        <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">How Date Range Filtering Works:</p>
+                        <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">How to Use Date Range Filters:</p>
                         <ul className="text-blue-700 dark:text-blue-300 space-y-1 text-xs">
-                          <li>• <strong>Date Range Presets:</strong> Quick selection of common time periods (Last 30 days, 6 months, etc.)</li>
-                          <li>• <strong>Custom Date Range:</strong> Pick any specific start and end date you want to analyze</li>
-                          <li>• <strong>Result:</strong> Shows overall sentiment analysis for all reviews within your selected date range</li>
-                          <li>• <strong>Example:</strong> Select "Last 6 months" to see sentiment for all reviews from the past 6 months</li>
+                          <li>• <strong>Quick Select:</strong> Choose from preset ranges like "Last 30 days", "Last 6 months", etc.</li>
+                          <li>• <strong>Custom Range:</strong> Click the calendar button, then click start date, then end date</li>
+                          <li>• <strong>Default:</strong> Shows last 3 months of data when you first load the page</li>
+                          <li>• <strong>Result:</strong> Sentiment analysis grouped by month for your selected time period</li>
                         </ul>
                       </div>
                     </div>
@@ -565,22 +573,20 @@ const Sentiment = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Date Range Presets</label>
                     <Select 
-                      value={(() => {
-                        if (!dateRange) return undefined;
-                        const presets = getDatePresets();
-                        const currentPreset = presets.find(preset => 
-                          preset.from.getTime() === dateRange.from.getTime() && 
-                          preset.to.getTime() === dateRange.to.getTime()
-                        );
-                        return currentPreset ? presets.indexOf(currentPreset).toString() : undefined;
-                      })()}
+                      value={selectedPreset}
                       onValueChange={(value) => {
-                        const preset = getDatePresets()[parseInt(value)];
-                        setDateRange(preset);
+                        setSelectedPreset(value);
+                        if (value === "custom") {
+                          // Don't set dateRange yet, let user select custom dates
+                          setDateRange(null);
+                        } else {
+                          const preset = getDatePresets()[parseInt(value)];
+                          setDateRange(preset);
+                        }
                       }}
                     >
                       <SelectTrigger>
@@ -592,50 +598,68 @@ const Sentiment = () => {
                             {preset.label}
                           </SelectItem>
                         ))}
+                        <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Custom Date Range</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                         <Button variant="outline" className="w-full justify-start text-left">
-                           <CalendarIcon className="mr-2 h-4 w-4" />
-                           {dateRange && dateRange.from && dateRange.to
-                             ? `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-                             : "Pick a date range"
-                           }
-                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="range"
-                          defaultMonth={dateRange?.from || new Date()}
-                          selected={dateRange || { from: undefined, to: undefined }}
-                          onSelect={(range) => {
-                            console.log('Calendar onSelect called with:', range);
-                            if (range?.from && range?.to) {
-                              // Validate that from date is not after to date
-                              if (range.from <= range.to) {
-                                setDateRange({ from: range.from, to: range.to });
-                                console.log('Date range set:', { from: range.from, to: range.to });
-                              } else {
-                                // Swap dates if they're backwards
-                                setDateRange({ from: range.to, to: range.from });
-                                console.log('Date range swapped:', { from: range.to, to: range.from });
-                              }
-                            } else if (range?.from) {
-                              // User is still selecting the end date
-                              setDateRange({ from: range.from, to: undefined });
-                              console.log('Start date set:', range.from);
-                            }
-                          }}
-                          numberOfMonths={2}
-                          disabled={(date) => date > new Date() || date < new Date('2020-01-01')}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  
+                  {selectedPreset === "custom" && (
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Custom Date Range</label>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">Start Date</label>
+                            <input
+                              type="date"
+                              className="w-full h-10 px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                              style={{
+                                colorScheme: 'dark'
+                              }}
+                              value={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const startDate = new Date(e.target.value);
+                                  setDateRange(prev => ({ 
+                                    from: startDate, 
+                                    to: prev?.to || undefined 
+                                  }));
+                                }
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">End Date</label>
+                            <input
+                              type="date"
+                              className="w-full h-10 px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                              style={{
+                                colorScheme: 'dark'
+                              }}
+                              value={dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const endDate = new Date(e.target.value);
+                                  setDateRange(prev => ({ 
+                                    from: prev?.from || undefined, 
+                                    to: endDate 
+                                  }));
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {dateRange?.from && dateRange?.to && (
+                          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-border">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-foreground">
+                              {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
