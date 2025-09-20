@@ -546,6 +546,9 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
       setIsCustomRange(true);
       setDateRange("custom");
       console.log('Custom range set:', { from, to });
+    } else if (from) {
+      // User is still selecting the end date
+      setCustomDateRange({ from, to: undefined });
     }
   };
 
@@ -1081,11 +1084,17 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Filters Section */}
             <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Date Range Selection</CardTitle>
+                <CardDescription>
+                  Choose the time period for your analytics data
+                </CardDescription>
+              </CardHeader>
               <CardContent className="pt-6">
                 <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-                  {/* Time Period */}
+                  {/* Date Range Presets */}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium whitespace-nowrap">Time Period:</label>
+                    <label className="text-sm font-medium whitespace-nowrap">Quick Select:</label>
                     <Select 
                       value={isCustomRange ? "custom" : dateRange} 
                       onValueChange={(value) => {
@@ -1130,10 +1139,9 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   </div>
 
                   {/* Custom Date Range */}
-                  {isCustomRange && (
-                    <FeatureGate feature="Custom Date Ranges" variant="inline">
+                  <FeatureGate feature="Custom Date Ranges" variant="inline">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium whitespace-nowrap">Date Range:</label>
+                      <label className="text-sm font-medium whitespace-nowrap">Custom Range:</label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -1146,7 +1154,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {customDateRange.from ? (
                               customDateRange.to ? (
-                                `${format(customDateRange.from, "MMM d")} - ${format(customDateRange.to, "MMM d, yyyy")}`
+                                `${format(customDateRange.from, "MMM d, yyyy")} - ${format(customDateRange.to, "MMM d, yyyy")}`
                               ) : (
                                 format(customDateRange.from, "MMM d, yyyy")
                               )
@@ -1159,16 +1167,26 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                           <Calendar
                             initialFocus
                             mode="range"
-                            defaultMonth={customDateRange.from}
+                            defaultMonth={customDateRange.from || new Date()}
                             selected={customDateRange}
-                            onSelect={(range) => handleCustomDateChange(range?.from, range?.to)}
+                            onSelect={(range) => {
+                              console.log('Calendar onSelect called with:', range);
+                              if (range?.from && range?.to) {
+                                setCustomDateRange({ from: range.from, to: range.to });
+                                setIsCustomRange(true);
+                                setDateRange("custom");
+                                console.log('Custom range set:', { from: range.from, to: range.to });
+                              } else if (range?.from) {
+                                setCustomDateRange({ from: range.from, to: undefined });
+                              }
+                            }}
                             numberOfMonths={2}
+                            disabled={(date) => date > new Date() || date < new Date('2020-01-01')}
                           />
                         </PopoverContent>
                       </Popover>
                     </div>
-                    </FeatureGate>
-                  )}
+                  </FeatureGate>
 
                   {/* Comparison Toggle */}
                   <FeatureGate feature="Comparison Mode" variant="inline">

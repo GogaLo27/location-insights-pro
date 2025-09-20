@@ -58,7 +58,6 @@ const Sentiment = () => {
   const { toast } = useToast();
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("monthly");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(() => {
     const now = new Date();
     return { from: new Date('2020-01-01'), to: now }; // Default to "All Time"
@@ -225,7 +224,7 @@ const Sentiment = () => {
     if (user) {
       fetchSentimentData();
     }
-  }, [user, ctxSelectedLocation?.google_place_id, selectedPeriod, dateRange]);
+  }, [user, ctxSelectedLocation?.google_place_id, dateRange]);
 
 
   const fetchSentimentData = async () => {
@@ -245,20 +244,8 @@ const Sentiment = () => {
           filteredReviews = getDemoReviewsForLocation(demoLocationId);
         }
 
-        // Apply date range filter
-        const currentDateRange = getDateRange();
-        filteredReviews = filteredReviews
-          .filter((r) => r.ai_sentiment !== null)
-          .filter((r) => {
-            const d = new Date(r.review_date);
-            return d >= currentDateRange.from && d <= currentDateRange.to;
-          });
-
-        console.log('Date range filter applied:', {
-          from: currentDateRange.from,
-          to: currentDateRange.to,
-          filteredCount: filteredReviews.length
-        });
+        // Filter out reviews without sentiment
+        filteredReviews = filteredReviews.filter((r) => r.ai_sentiment !== null);
 
         console.log('Demo reviews found:', filteredReviews.length);
         const processedData = processReviewsIntoSentimentData(filteredReviews);
@@ -268,12 +255,9 @@ const Sentiment = () => {
       }
 
       // Get sentiment data from saved reviews
-      const currentDateRange = getDateRange();
       let query = supabase
         .from('saved_reviews')
         .select('*')
-        .gte('review_date', format(currentDateRange.from, 'yyyy-MM-dd'))
-        .lte('review_date', format(currentDateRange.to, 'yyyy-MM-dd'))
         .not('ai_sentiment', 'is', null);
 
       const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
@@ -286,9 +270,8 @@ const Sentiment = () => {
       if (!error && reviews) {
         console.log('Reviews found:', reviews.length);
         console.log('Date range for processing:', {
-          from: currentDateRange.from,
-          to: currentDateRange.to,
-          period: selectedPeriod
+          from: getDateRange().from,
+          to: getDateRange().to
         });
         // Process reviews into sentiment data by period
         const processedData = processReviewsIntoSentimentData(reviews);
@@ -307,8 +290,6 @@ const Sentiment = () => {
   };
 
   const processReviewsIntoSentimentData = (reviews: any[]): SentimentData[] => {
-    const groupedData: { [key: string]: any } = {};
-
     // Filter reviews by the selected date range
     const currentDateRange = getDateRange();
     const filteredReviews = reviews.filter(review => {
@@ -316,32 +297,24 @@ const Sentiment = () => {
       return reviewDate >= currentDateRange.from && reviewDate <= currentDateRange.to;
     });
 
-    filteredReviews.forEach(review => {
-      let key = '';
-      const reviewDate = new Date(review.review_date);
+    console.log('Processing reviews:', {
+      totalReviews: reviews.length,
+      filteredReviews: filteredReviews.length,
+      dateRange: currentDateRange
+    });
 
-      switch (selectedPeriod) {
-        case 'daily':
-          key = format(reviewDate, 'yyyy-MM-dd');
-          break;
-        case 'weekly':
-          const weekStart = new Date(reviewDate);
-          weekStart.setDate(reviewDate.getDate() - reviewDate.getDay());
-          key = format(weekStart, 'yyyy-MM-dd');
-          break;
-        case 'monthly':
-          key = format(reviewDate, 'yyyy-MM');
-          break;
-        case 'yearly':
-          key = format(reviewDate, 'yyyy');
-          break;
-      }
+    // Group by month for better visualization
+    const groupedData: { [key: string]: any } = {};
+
+    filteredReviews.forEach(review => {
+      const reviewDate = new Date(review.review_date);
+      const key = format(reviewDate, 'yyyy-MM'); // Group by month
 
       if (!groupedData[key]) {
         groupedData[key] = {
           id: key,
           analysis_date: key,
-          period_type: selectedPeriod,
+          period_type: 'monthly',
           positive_count: 0,
           negative_count: 0,
           neutral_count: 0,
@@ -368,7 +341,7 @@ const Sentiment = () => {
         }
       }
 
-      // Collect issues and suggestions - note these are arrays already from AI analysis
+      // Collect issues and suggestions
       if (review.ai_issues && Array.isArray(review.ai_issues)) {
         groupedData[key].all_issues.push(...review.ai_issues);
       }
@@ -378,15 +351,20 @@ const Sentiment = () => {
     });
 
     // Convert to final format
-    return Object.values(groupedData).map((data: any) => ({
+    const result = Object.values(groupedData).map((data: any) => ({
       ...data,
       average_rating: data.ratings.length > 0 ? data.ratings.reduce((a: number, b: number) => a + b, 0) / data.ratings.length : 0,
-      sentiment_score: data.positive_count > 0 ? (data.positive_count / (data.positive_count + data.negative_count + data.neutral_count)) * 100 : 0,
+      sentiment_score: (data.positive_count + data.negative_count + data.neutral_count) > 0 
+        ? (data.positive_count / (data.positive_count + data.negative_count + data.neutral_count)) * 100 
+        : 0,
       top_positive_tags: getTopTags(data.positive_tags),
       top_negative_tags: getTopTags(data.negative_tags),
       top_issues: getTopItems(data.all_issues),
       top_suggestions: getTopItems(data.all_suggestions)
     }));
+
+    console.log('Processed sentiment data:', result);
+    return result;
   };
 
   const getTopTags = (tags: string[]): string[] => {
@@ -420,7 +398,7 @@ const Sentiment = () => {
         body: {
           action: 'generate_sentiment_analysis',
           location_id: ctxSelectedLocation?.google_place_id,
-          period_type: selectedPeriod,
+          period_type: 'overall',
           start_date: format(currentDateRange.from, 'yyyy-MM-dd'),
           end_date: format(currentDateRange.to, 'yyyy-MM-dd')
         }
@@ -444,12 +422,6 @@ const Sentiment = () => {
     }
   };
 
-  const getPeriodOptions = () => [
-    { value: "monthly", label: "Monthly" },
-    { value: "weekly", label: "Weekly" },
-    { value: "daily", label: "Daily" },
-    { value: "yearly", label: "Yearly" }
-  ];
 
   const getDatePresets = () => [
     {
@@ -580,12 +552,12 @@ const Sentiment = () => {
                         i
                       </div>
                       <div className="text-sm">
-                        <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">How Filters Work:</p>
+                        <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">How Date Range Filtering Works:</p>
                         <ul className="text-blue-700 dark:text-blue-300 space-y-1 text-xs">
-                          <li>• <strong>Date Range:</strong> Select which time period to analyze (e.g., "Last 6 months")</li>
-                          <li>• <strong>Time Period:</strong> Choose how to group the data (daily, weekly, monthly, or yearly)</li>
-                          <li>• <strong>Example:</strong> "Last 6 months" + "Monthly" = 6 separate monthly analyses</li>
-                          <li>• <strong>Example:</strong> "Last 3 months" + "Weekly" = 12 separate weekly analyses</li>
+                          <li>• <strong>Date Range Presets:</strong> Quick selection of common time periods (Last 30 days, 6 months, etc.)</li>
+                          <li>• <strong>Custom Date Range:</strong> Pick any specific start and end date you want to analyze</li>
+                          <li>• <strong>Result:</strong> Shows overall sentiment analysis for all reviews within your selected date range</li>
+                          <li>• <strong>Example:</strong> Select "Last 6 months" to see sentiment for all reviews from the past 6 months</li>
                         </ul>
                       </div>
                     </div>
@@ -593,22 +565,7 @@ const Sentiment = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Time Period</label>
-                    <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getPeriodOptions().map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Date Range Presets</label>
                     <Select 
@@ -653,19 +610,28 @@ const Sentiment = () => {
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="range"
+                          defaultMonth={dateRange?.from || new Date()}
                           selected={dateRange || { from: undefined, to: undefined }}
                           onSelect={(range) => {
-                            if (range && range.from && range.to) {
+                            console.log('Calendar onSelect called with:', range);
+                            if (range?.from && range?.to) {
                               // Validate that from date is not after to date
                               if (range.from <= range.to) {
                                 setDateRange({ from: range.from, to: range.to });
+                                console.log('Date range set:', { from: range.from, to: range.to });
                               } else {
                                 // Swap dates if they're backwards
                                 setDateRange({ from: range.to, to: range.from });
+                                console.log('Date range swapped:', { from: range.to, to: range.from });
                               }
+                            } else if (range?.from) {
+                              // User is still selecting the end date
+                              setDateRange({ from: range.from, to: undefined });
+                              console.log('Start date set:', range.from);
                             }
                           }}
                           numberOfMonths={2}
+                          disabled={(date) => date > new Date() || date < new Date('2020-01-01')}
                         />
                       </PopoverContent>
                     </Popover>
