@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Cookie, Settings, Shield, Eye, Clock, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
-import Footer from "@/components/Footer";
+import { EnhancedFooter } from "@/components/EnhancedFooter";
 
 const CookiePolicy = () => {
   return (
@@ -21,7 +21,7 @@ const CookiePolicy = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg animate-pulse">
                 <span className="text-white font-bold text-sm">RL</span>
               </div>
-              <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="font-bold text-xl text-gray-900">
                 ReviewLip
               </span>
             </div>
@@ -289,7 +289,7 @@ const CookiePolicy = () => {
         </div>
       </main>
 
-      <Footer />
+      <EnhancedFooter />
     </div>
   );
 };
