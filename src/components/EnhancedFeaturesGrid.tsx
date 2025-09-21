@@ -159,7 +159,7 @@ export function EnhancedFeaturesGrid() {
             Ready to experience these features?
           </p>
           <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:scale-105">
-            Start Your Free Trial
+            Get Started Now
           </button>
         </div>
       </div>

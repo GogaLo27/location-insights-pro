@@ -26,7 +26,7 @@ export function FAQSection() {
       answer: "We'll notify you when you're approaching your limits and offer upgrade options. We never cut off your service - we work with you to find the right solution."
     },
     {
-      question: "Do you offer a free trial?",
+      question: "Can I try before I buy?",
       answer: "Yes! You can try our demo with sample data to explore all features, or start with our Starter plan and upgrade anytime as your business grows."
     },
     {

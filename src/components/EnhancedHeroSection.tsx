@@ -63,7 +63,7 @@ export function EnhancedHeroSection() {
               </div>
               <div className="flex items-center">
                 <span className="font-medium">✓</span>
-                <span className="ml-1">14-day free trial</span>
+                <span className="ml-1">Instant access</span>
               </div>
             </div>
           </div>

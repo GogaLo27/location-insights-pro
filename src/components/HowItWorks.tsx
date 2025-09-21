@@ -157,7 +157,7 @@ export function HowItWorks() {
               onClick={signInWithGoogle}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg"
             >
-              Start Your Free Trial Now
+              Get Started Now
             </button>
           </div>
         </div>

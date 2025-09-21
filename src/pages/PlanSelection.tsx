@@ -291,7 +291,7 @@ export default function PlanSelection() {
                        >
                          {submittingPlan === p.plan_type
                            ? "Processing..."
-                           : "Activate Plan (Free Demo)"}
+                           : "Activate Plan"}
                        </Button>
                     </CardContent>
                   </Card>

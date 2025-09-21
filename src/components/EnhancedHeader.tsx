@@ -77,7 +77,7 @@ export function EnhancedHeader() {
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               onClick={signInWithGoogle}
             >
-              Start Free Trial
+              Get Started
             </Button>
           </div>
 
@@ -146,7 +146,7 @@ export function EnhancedHeader() {
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={signInWithGoogle}
                 >
-                  Start Free Trial
+                  Get Started
                 </Button>
               </div>
             </nav>

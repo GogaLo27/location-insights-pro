@@ -7,7 +7,7 @@ export function FinalCTASection() {
 
   const benefits = [
     "No credit card required",
-    "14-day free trial",
+    "Instant access",
     "Cancel anytime",
     "Setup in under 5 minutes",
   ];
@@ -50,7 +50,7 @@ export function FinalCTASection() {
               onClick={signInWithGoogle}
               className="bg-blue-500 hover:bg-blue-600 text-white px-12 py-4 text-xl font-semibold rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
             >
-              Start Free Trial Now
+              Get Started Now
               <ArrowRightIcon className="w-6 h-6 ml-2" />
             </Button>
             <Button

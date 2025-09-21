@@ -83,8 +83,7 @@ export function PricingSection() {
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Choose the perfect plan for your business. All plans include a
-            14-day free trial with no credit card required.
+            Choose the perfect plan for your business. Start with any plan and upgrade anytime.
           </p>
         </div>
 
@@ -172,7 +171,7 @@ export function PricingSection() {
                 <p className="text-xs text-gray-500">
                   {plan.name === "Enterprise"
                     ? "Custom pricing available"
-                    : "14-day free trial included"}
+                    : "No setup fees"}
                 </p>
               </div>
             </div>
