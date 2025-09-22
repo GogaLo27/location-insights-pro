@@ -145,10 +145,11 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (saved) {
         setSelectedLocationState(JSON.parse(saved));
       } else if (mockLocations.length > 0) {
-        setSelectedLocationState({
+        const defaultLocation = {
           google_place_id: mockLocations[0].google_place_id,
           location_name: mockLocations[0].name,
-        });
+        };
+        setSelectedLocationState(defaultLocation);
       }
       return;
     }
@@ -159,9 +160,18 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
         .select("google_place_id, location_name")
         .eq("user_id", user.id)
         .maybeSingle();
-      if (!error && data) setSelectedLocationState(data as any);
+      
+      if (error) {
+        console.error("Error fetching selected location:", error);
+      } else if (data) {
+        setSelectedLocationState(data as any);
+      } else {
+        setSelectedLocationState(null);
+      }
     } catch (e) {
       console.error("Error fetching selected location:", e);
+    } finally {
+      // Loading state is handled by the useEffect
     }
   };
 
@@ -195,8 +205,13 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   useEffect(() => {
     if (user) {
-      refreshLocations(false); // Load from cache first
-      fetchSelectedLocation();
+      setLoading(true);
+      Promise.all([
+        refreshLocations(false), // Load from cache first
+        fetchSelectedLocation()
+      ]).finally(() => {
+        setLoading(false);
+      });
     } else {
       setLocations([]);
       setSelectedLocationState(null);

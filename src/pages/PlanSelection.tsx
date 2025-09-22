@@ -51,14 +51,47 @@ export default function PlanSelection() {
       if (!user) return;
       setLoading(true);
       try {
-        // fetch fake plans from DB
-        const { data, error } = await (supabase as any)
-          .from("billing_plans")
-          .select(
-            "id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at"
-          )
-          .eq("provider", "fake")
-          .order("price_cents", { ascending: true });
+        // Use hardcoded plans with correct pricing instead of fetching from DB
+        const hardcodedPlans = [
+          {
+            id: "starter-plan",
+            plan_type: "starter",
+            provider: "fake",
+            provider_plan_id: "fake-starter-plan",
+            price_cents: 4900, // $49
+            currency: "USD",
+            interval: "month",
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: "professional-plan",
+            plan_type: "professional", 
+            provider: "fake",
+            provider_plan_id: "fake-professional-plan",
+            price_cents: 9900, // $99
+            currency: "USD",
+            interval: "month",
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: "enterprise-plan",
+            plan_type: "enterprise",
+            provider: "fake", 
+            provider_plan_id: "fake-enterprise-plan",
+            price_cents: 19900, // $199
+            currency: "USD",
+            interval: "month",
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ];
+        
+        const { data, error } = { data: hardcodedPlans, error: null };
 
         if (error) throw error;
         if (!mounted) return;
@@ -87,24 +120,29 @@ export default function PlanSelection() {
   > = useMemo(
     () => ({
       starter: {
-        locations: 3,
+        locations: 1,
         reviews: 100,
         features: [
-          "Up to 3 locations",
+          "Up to 1 location",
           "Basic analytics",
-          "Review monitoring",
+          "30 days of analytics",
+          "CSV Export",
           "Email support",
         ],
       },
       professional: {
-        locations: 10,
+        locations: 5,
         reviews: 500,
         features: [
-          "Up to 10 locations",
-          "Advanced analytics",
-          "AI review analysis",
-          "Priority support",
-          "Custom reports",
+          "Up to 5 locations",
+          "AI Analysis",
+          "AI Reply Generation",
+          "Bulk Operations",
+          "Analytics",
+          "Custom Date Ranges",
+          "Comparison Mode",
+          "PDF Export",
+          "Priority Support",
         ],
         popular: true,
       },
@@ -113,11 +151,17 @@ export default function PlanSelection() {
         reviews: -1,
         features: [
           "Unlimited locations",
-          "Full analytics suite",
-          "AI-powered insights",
-          "24/7 support",
-          "Custom integrations",
-          "Dedicated account manager",
+          "AI Analysis",
+          "AI Reply Generation",
+          "Review Templates",
+          "Bulk Operations",
+          "Analytics",
+          "PDF Export",
+          "Custom Date Ranges",
+          "Comparison Mode",
+          "White-label Reports",
+          "Brand Management",
+          "24/7 Support",
         ],
       },
     }),
@@ -179,11 +223,11 @@ export default function PlanSelection() {
         description: payload.message || "Your subscription has been activated.",
       });
 
-      // Redirect to dashboard
+      // Redirect to location selection (users need to select a location after choosing a plan)
       if (payload.redirect_url) {
         window.location.href = payload.redirect_url;
       } else {
-        window.location.href = "/dashboard";
+        window.location.href = "/location-selection";
       }
     } catch (e: any) {
       console.error(e);

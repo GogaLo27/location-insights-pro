@@ -114,7 +114,7 @@ serve(async (req) => {
         subscription_id: subscription.id,
         plan_type: plan_type,
         message: 'Payment successful! Your subscription has been activated.',
-        redirect_url: `${req.headers.get('origin') || 'http://localhost:3000'}/dashboard`
+        redirect_url: `${req.headers.get('origin') || 'http://localhost:3000'}/location-selection`
       }),
       { 
         status: 200, 

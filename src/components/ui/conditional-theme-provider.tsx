@@ -1,5 +1,6 @@
 import { ThemeProvider } from 'next-themes';
 import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 interface ConditionalThemeProviderProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export const ConditionalThemeProvider: React.FC<ConditionalThemeProviderProps> =
     '/sentiment',
     '/locations',
     '/plan-management',
+    '/upgrade',
     '/orders',
     '/settings',
     '/location-selection',
@@ -28,6 +30,15 @@ export const ConditionalThemeProvider: React.FC<ConditionalThemeProviderProps> =
   const isDashboardRoute = dashboardRoutes.some(route => 
     location.pathname.startsWith(route)
   );
+  
+  // Force light mode for public pages by removing dark class from document
+  useEffect(() => {
+    if (!isDashboardRoute) {
+      // Remove dark class from document root to ensure light mode
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  }, [isDashboardRoute, location.pathname]);
   
   // If it's a dashboard route, provide theme support
   if (isDashboardRoute) {

@@ -14,7 +14,8 @@ const Landing = () => {
   const { user } = useAuth();
 
   if (user) {
-    window.location.href = '/plan-selection';
+    // Let ProtectedRoute handle the redirect logic
+    window.location.href = '/dashboard';
     return null;
   }
 

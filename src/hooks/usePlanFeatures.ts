@@ -142,9 +142,7 @@ export const useUpgradePrompt = () => {
   };
   
   const getUpgradeUrl = (currentPlan: string) => {
-    if (currentPlan === 'starter') return '/plan-selection?upgrade=professional';
-    if (currentPlan === 'professional') return '/plan-selection?upgrade=enterprise';
-    return '/plan-selection';
+    return '/upgrade';
   };
   
   return {
