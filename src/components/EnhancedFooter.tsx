@@ -1,25 +1,15 @@
 import { Link } from "react-router-dom";
 import {
-  TwitterIcon,
-  LinkedinIcon,
   FacebookIcon,
   InstagramIcon,
 } from "lucide-react";
 
 export function EnhancedFooter() {
   const footerLinks = {
-    product: [
-      { name: "Features", href: "#features" },
-      { name: "Pricing", href: "#pricing" },
-      { name: "Analytics", href: "/analytics" },
-      { name: "Sentiment Analysis", href: "/sentiment" },
-    ],
-
     company: [
-      { name: "About Us", href: "#about" },
-      { name: "Contact", href: "#contact" },
+      { name: "About Us", href: "/about" },
+      { name: "Contact", href: "/contact" },
       { name: "Support", href: "#support" },
-      { name: "Blog", href: "#blog" },
     ],
 
     resources: [
@@ -38,8 +28,6 @@ export function EnhancedFooter() {
   };
 
   const socialLinks = [
-    { name: "Twitter", icon: TwitterIcon, href: "#" },
-    { name: "LinkedIn", icon: LinkedinIcon, href: "#" },
     { name: "Facebook", icon: FacebookIcon, href: "#" },
     { name: "Instagram", icon: InstagramIcon, href: "#" },
   ];
@@ -49,7 +37,7 @@ export function EnhancedFooter() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
             {/* Company Info */}
             <div className="lg:col-span-2">
               <div className="flex items-center mb-6">
@@ -78,23 +66,6 @@ export function EnhancedFooter() {
                   );
                 })}
               </div>
-            </div>
-
-            {/* Product Links */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Product</h3>
-              <ul className="space-y-3">
-                {footerLinks.product.map((link) => (
-                  <li key={link.name}>
-                    <a
-                      href={link.href}
-                      className="text-gray-300 hover:text-[#ecc00c] transition-colors"
-                    >
-                      {link.name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
             </div>
 
             {/* Company Links */}
@@ -155,7 +126,7 @@ export function EnhancedFooter() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             {/* Copyright */}
             <div className="text-gray-300 text-sm">
-              © 2024 Dibiex. All rights reserved.
+              © 2025 Dibiex. All rights reserved.
             </div>
 
             {/* Legal Links */}
@@ -178,12 +149,12 @@ export function EnhancedFooter() {
               >
                 Cookie Policy
               </Link>
-              <a
-                href="#contact"
+              <Link
+                to="/contact"
                 className="text-gray-300 hover:text-[#ecc00c] transition-colors"
               >
                 Contact
-              </a>
+              </Link>
             </div>
           </div>
 

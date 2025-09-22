@@ -20,7 +20,7 @@ const Privacy = () => {
             <div className="flex items-center">
               <img 
                 src="/logo.png" 
-                alt="ReviewLip Logo" 
+                alt="Dibiex Logo" 
                 className="h-10 w-auto object-contain"
               />
             </div>

@@ -25,6 +25,8 @@ import OrderHistory from './pages/OrderHistory';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import CookiePolicy from './pages/CookiePolicy';
+import Contact from './pages/Contact';
+import About from './pages/About';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 
@@ -181,6 +183,8 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/about" element={<About />} />
             
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<NotFound />} />

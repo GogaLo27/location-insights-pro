@@ -4,7 +4,7 @@ export function TestimonialsSection() {
   const testimonials = [
     {
       quote:
-        "We increased customer satisfaction by 32% after using ReviewLip. The sentiment alerts helped us respond faster to negative reviews and turn them into positive experiences.",
+        "We increased customer satisfaction by 32% after using Dibiex. The sentiment alerts helped us respond faster to negative reviews and turn them into positive experiences.",
       author: "Sarah Johnson",
       role: "Marketing Director",
       company: "Bella Vista Restaurant",
@@ -22,7 +22,7 @@ export function TestimonialsSection() {
     },
     {
       quote:
-        "ReviewLip's competitor benchmarking feature showed us exactly where we stood in the market. We've improved our rating from 4.2 to 4.7 in just 3 months.",
+        "Dibiex's competitor benchmarking feature showed us exactly where we stood in the market. We've improved our rating from 4.2 to 4.7 in just 3 months.",
       author: "Emily Rodriguez",
       role: "Business Owner",
       company: "Artisan Bakery Co.",
@@ -43,7 +43,7 @@ export function TestimonialsSection() {
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             See how businesses like yours are transforming their customer
-            experience with ReviewLip
+            experience with Dibiex
           </p>
         </div>
 

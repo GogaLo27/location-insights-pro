@@ -12,7 +12,7 @@ const Footer = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">RL</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">ReviewLip</span>
+              <span className="text-xl font-bold text-gray-900">Dibiex</span>
             </div>
             <p className="text-gray-600 mb-4 max-w-md">
               AI-powered review management and sentiment analysis for businesses. 
@@ -91,7 +91,7 @@ const Footer = () => {
 
         <div className="border-t border-gray-200 mt-8 pt-6 text-center">
           <p className="text-sm text-gray-600">
-            © 2025 ReviewLip. All rights reserved.
+            © 2025 Dibiex. All rights reserved.
           </p>
         </div>
       </div>

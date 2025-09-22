@@ -13,15 +13,12 @@ export function FinalCTASection() {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
+    <section className="py-20 bg-gradient-to-br from-[#2b394c] via-[#2b394c]/90 to-[#ecc00c]/20 relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-4xl mx-auto">
           {/* Main Headline */}
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-            Ready to Unlock the{" "}
-            <span className="bg-gradient-to-r from-[#2b394c] to-[#ecc00c] bg-clip-text text-transparent">
-              Power of Your Reviews?
-            </span>
+            Ready to Unlock the Power of Your Reviews?
           </h2>
 
           {/* Subheadline */}
@@ -37,7 +34,7 @@ export function FinalCTASection() {
                 key={index}
                 className="flex items-center space-x-2 text-gray-200"
               >
-                <CheckIcon className="w-5 h-5 text-green-400" />
+                <CheckIcon className="w-5 h-5 text-[#ecc00c]" />
                 <span className="text-sm sm:text-base">{benefit}</span>
               </div>
             ))}
@@ -57,7 +54,7 @@ export function FinalCTASection() {
               size="lg"
               variant="outline"
               onClick={signInAsDemo}
-              className="border-2 border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300"
+              className="border-2 border-white/30 bg-white text-[#2b394c] hover:bg-gray-100 hover:text-[#2b394c] px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300"
             >
               Try Demo First
             </Button>
@@ -106,8 +103,8 @@ export function FinalCTASection() {
           <div className="mt-12 flex justify-center">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-6 py-3 border border-white/20">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <CheckIcon className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 bg-[#ecc00c] rounded-full flex items-center justify-center">
+                  <CheckIcon className="w-5 h-5 text-[#2b394c]" />
                 </div>
                 <div className="text-left">
                   <div className="text-white font-medium text-sm">
