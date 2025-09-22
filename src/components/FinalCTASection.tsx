@@ -19,13 +19,13 @@ export function FinalCTASection() {
           {/* Main Headline */}
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
             Ready to Unlock the{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#2b394c] to-[#ecc00c] bg-clip-text text-transparent">
               Power of Your Reviews?
             </span>
           </h2>
 
           {/* Subheadline */}
-          <p className="text-xl sm:text-2xl text-blue-100 mb-8 leading-relaxed">
+          <p className="text-xl sm:text-2xl text-gray-200 mb-8 leading-relaxed">
             Join thousands of businesses already using AI-powered insights to
             improve their customer experience and grow their revenue.
           </p>
@@ -35,7 +35,7 @@ export function FinalCTASection() {
             {benefits.map((benefit, index) => (
               <div
                 key={index}
-                className="flex items-center space-x-2 text-blue-100"
+                className="flex items-center space-x-2 text-gray-200"
               >
                 <CheckIcon className="w-5 h-5 text-green-400" />
                 <span className="text-sm sm:text-base">{benefit}</span>
@@ -48,7 +48,7 @@ export function FinalCTASection() {
             <Button
               size="lg"
               onClick={signInWithGoogle}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-12 py-4 text-xl font-semibold rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
+              className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-12 py-4 text-xl font-semibold rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
             >
               Get Started Now
               <ArrowRightIcon className="w-6 h-6 ml-2" />
@@ -65,7 +65,7 @@ export function FinalCTASection() {
 
           {/* Trust Indicators */}
           <div className="text-center">
-            <p className="text-blue-200 text-sm mb-4">
+            <p className="text-gray-300 text-sm mb-4">
               Trusted by 10,000+ businesses worldwide
             </p>
 
@@ -75,7 +75,7 @@ export function FinalCTASection() {
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
                   98%
                 </div>
-                <div className="text-blue-200 text-sm">
+                <div className="text-gray-300 text-sm">
                   Customer Satisfaction
                 </div>
               </div>
@@ -83,13 +83,13 @@ export function FinalCTASection() {
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
                   2.5M+
                 </div>
-                <div className="text-blue-200 text-sm">Reviews Analyzed</div>
+                <div className="text-gray-300 text-sm">Reviews Analyzed</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
                   32%
                 </div>
-                <div className="text-blue-200 text-sm">
+                <div className="text-gray-300 text-sm">
                   Avg. Satisfaction Increase
                 </div>
               </div>
@@ -97,7 +97,7 @@ export function FinalCTASection() {
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
                   24/7
                 </div>
-                <div className="text-blue-200 text-sm">Support Available</div>
+                <div className="text-gray-300 text-sm">Support Available</div>
               </div>
             </div>
           </div>
@@ -113,7 +113,7 @@ export function FinalCTASection() {
                   <div className="text-white font-medium text-sm">
                     Enterprise Security
                   </div>
-                  <div className="text-blue-200 text-xs">
+                  <div className="text-gray-300 text-xs">
                     SOC 2 Compliant • GDPR Ready
                   </div>
                 </div>
@@ -125,9 +125,9 @@ export function FinalCTASection() {
 
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-4000"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#2b394c] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#ecc00c] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#2b394c] rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-4000"></div>
       </div>
 
       {/* Decorative Grid */}

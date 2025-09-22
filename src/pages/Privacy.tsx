@@ -11,19 +11,18 @@ const Privacy = () => {
       <header className="border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" asChild className="hover:bg-gray-100 hover:text-gray-800 transition-colors text-gray-700">
+            <Button variant="ghost" size="sm" asChild className="hover:bg-[#ecc00c]/10 hover:text-[#ecc00c] transition-colors text-[#2b394c]">
               <Link to="/">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Home
               </Link>
             </Button>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg animate-pulse">
-                <span className="text-white font-bold text-sm">RL</span>
-              </div>
-              <span className="font-bold text-xl text-gray-900">
-                ReviewLip
-              </span>
+            <div className="flex items-center">
+              <img 
+                src="/logo.png" 
+                alt="ReviewLip Logo" 
+                className="h-10 w-auto object-contain"
+              />
             </div>
           </div>
         </div>
@@ -31,13 +30,13 @@ const Privacy = () => {
 
       {/* Hero Section */}
       <section className="py-16 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-purple-50"></div>
-        <div className="absolute top-10 left-10 w-32 h-32 bg-blue-100 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2b394c]/5 via-transparent to-[#ecc00c]/10"></div>
+        <div className="absolute top-10 left-10 w-32 h-32 bg-[#2b394c]/20 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute bottom-10 right-10 w-32 h-32 bg-purple-100 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
         
         <div className="container mx-auto text-center relative z-10 animate-fade-in">
-          <Shield className="w-16 h-16 mx-auto mb-4 text-blue-600 animate-scale-in" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
+          <Shield className="w-16 h-16 mx-auto mb-4 text-[#2b394c] animate-scale-in" />
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[#2b394c] via-[#ecc00c] to-[#2b394c] bg-clip-text text-transparent">
             Privacy Policy
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -77,7 +76,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-blue-600" />
+                  <Shield className="w-5 h-5 text-[#2b394c]" />
                   <span>1. Data Controller</span>
                 </CardTitle>
               </CardHeader>
@@ -97,7 +96,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Eye className="w-5 h-5 text-purple-600" />
+                  <Eye className="w-5 h-5 text-[#ecc00c]" />
                   <span>2. Information We Collect</span>
                 </CardTitle>
               </CardHeader>
@@ -141,7 +140,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
+                  <FileText className="w-5 h-5 text-[#2b394c]" />
                   <span>3. Purpose and Legal Basis for Processing</span>
                 </CardTitle>
               </CardHeader>
@@ -160,7 +159,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-purple-600" />
+                  <Users className="w-5 h-5 text-[#ecc00c]" />
                   <span>4. How We Use Your Data</span>
                 </CardTitle>
               </CardHeader>
@@ -182,7 +181,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-blue-600" />
+                  <Shield className="w-5 h-5 text-[#2b394c]" />
                   <span>5. Sharing of Information</span>
                 </CardTitle>
               </CardHeader>
@@ -201,7 +200,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Lock className="w-5 h-5 text-purple-600" />
+                  <Lock className="w-5 h-5 text-[#ecc00c]" />
                   <span>6. Data Retention</span>
                 </CardTitle>
               </CardHeader>
@@ -218,7 +217,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Lock className="w-5 h-5 text-blue-600" />
+                  <Lock className="w-5 h-5 text-[#2b394c]" />
                   <span>7. Data Security</span>
                 </CardTitle>
               </CardHeader>
@@ -234,7 +233,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-purple-600" />
+                  <Shield className="w-5 h-5 text-[#ecc00c]" />
                   <span>8. International Data Transfers</span>
                 </CardTitle>
               </CardHeader>
@@ -251,7 +250,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
+                  <FileText className="w-5 h-5 text-[#2b394c]" />
                   <span>9. Your Privacy Rights</span>
                 </CardTitle>
               </CardHeader>
@@ -287,7 +286,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-purple-600" />
+                  <Users className="w-5 h-5 text-[#ecc00c]" />
                   <span>10. Children's Privacy</span>
                 </CardTitle>
               </CardHeader>
@@ -303,7 +302,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
+                  <FileText className="w-5 h-5 text-[#2b394c]" />
                   <span>11. Changes to This Policy</span>
                 </CardTitle>
               </CardHeader>
@@ -319,7 +318,7 @@ const Privacy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white bg-gradient-to-br from-primary/5 to-accent/5">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5 text-blue-600" />
+                  <Mail className="w-5 h-5 text-[#2b394c]" />
                   <span>12. Contact Information</span>
                 </CardTitle>
               </CardHeader>
@@ -332,7 +331,7 @@ const Privacy = () => {
                     <strong>Dibiex</strong>
                   </div>
                   <div className="flex items-center space-x-2 text-sm">
-                    <Mail className="w-4 h-4 text-blue-600" />
+                    <Mail className="w-4 h-4 text-[#2b394c]" />
                     <span className="font-medium">privacy@dibiex.com</span>
                   </div>
                   <div className="text-sm text-gray-600">

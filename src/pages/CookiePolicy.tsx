@@ -11,19 +11,18 @@ const CookiePolicy = () => {
       <header className="border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" asChild className="hover:bg-gray-100 hover:text-gray-800 transition-colors text-gray-700">
+            <Button variant="ghost" size="sm" asChild className="hover:bg-[#ecc00c]/10 hover:text-[#ecc00c] transition-colors text-[#2b394c]">
               <Link to="/">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Home
               </Link>
             </Button>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg animate-pulse">
-                <span className="text-white font-bold text-sm">RL</span>
-              </div>
-              <span className="font-bold text-xl text-gray-900">
-                ReviewLip
-              </span>
+            <div className="flex items-center">
+              <img 
+                src="/logo.png" 
+                alt="ReviewLip Logo" 
+                className="h-10 w-auto object-contain"
+              />
             </div>
           </div>
         </div>
@@ -31,13 +30,13 @@ const CookiePolicy = () => {
 
       {/* Hero Section */}
       <section className="py-16 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-purple-50"></div>
-        <div className="absolute top-10 left-10 w-32 h-32 bg-blue-100 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2b394c]/5 via-transparent to-[#ecc00c]/10"></div>
+        <div className="absolute top-10 left-10 w-32 h-32 bg-[#2b394c]/20 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute bottom-10 right-10 w-32 h-32 bg-purple-100 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
         
         <div className="container mx-auto text-center relative z-10 animate-fade-in">
-          <Cookie className="w-16 h-16 mx-auto mb-4 text-blue-600 animate-scale-in" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
+          <Cookie className="w-16 h-16 mx-auto mb-4 text-[#2b394c] animate-scale-in" />
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[#2b394c] via-[#ecc00c] to-[#2b394c] bg-clip-text text-transparent">
             Cookie Policy
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -65,7 +64,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Cookie className="w-5 h-5 text-blue-600" />
+                  <Cookie className="w-5 h-5 text-[#2b394c]" />
                   <span>1. What Are Cookies?</span>
                 </CardTitle>
               </CardHeader>
@@ -84,7 +83,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-blue-600" />
+                  <Shield className="w-5 h-5 text-[#2b394c]" />
                   <span>2. Types of Cookies We Use</span>
                 </CardTitle>
               </CardHeader>
@@ -143,7 +142,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5 text-purple-600" />
+                  <Settings className="w-5 h-5 text-[#ecc00c]" />
                   <span>3. Legal Basis for Use</span>
                 </CardTitle>
               </CardHeader>
@@ -160,7 +159,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5 text-purple-600" />
+                  <Settings className="w-5 h-5 text-[#ecc00c]" />
                   <span>4. How We Use Cookies</span>
                 </CardTitle>
               </CardHeader>
@@ -180,7 +179,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5 text-purple-600" />
+                  <Settings className="w-5 h-5 text-[#ecc00c]" />
                   <span>5. Managing Cookies</span>
                 </CardTitle>
               </CardHeader>
@@ -195,10 +194,10 @@ const CookiePolicy = () => {
                 </p>
                 <p className="mb-2">For more details on managing cookies:</p>
                 <ul className="list-disc pl-6 space-y-1 text-sm">
-                  <li>Chrome: <a href="https://support.google.com/chrome/answer/95647" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.google.com/chrome/answer/95647</a></li>
-                  <li>Firefox: <a href="https://support.mozilla.org/en-US/kb/enable-and-disable-cookies-website-preferences" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.mozilla.org/en-US/kb/enable-and-disable-cookies-website-preferences</a></li>
-                  <li>Safari: <a href="https://support.apple.com/guide/safari/manage-cookies-and-website-data-sfri11471/mac" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.apple.com/guide/safari/manage-cookies-and-website-data-sfri11471/mac</a></li>
-                  <li>Edge: <a href="https://support.microsoft.com/help/4027947/microsoft-edge-delete-cookies" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">https://support.microsoft.com/help/4027947/microsoft-edge-delete-cookies</a></li>
+                  <li>Chrome: <a href="https://support.google.com/chrome/answer/95647" className="text-[#2b394c] hover:underline" target="_blank" rel="noopener noreferrer">https://support.google.com/chrome/answer/95647</a></li>
+                  <li>Firefox: <a href="https://support.mozilla.org/en-US/kb/enable-and-disable-cookies-website-preferences" className="text-[#2b394c] hover:underline" target="_blank" rel="noopener noreferrer">https://support.mozilla.org/en-US/kb/enable-and-disable-cookies-website-preferences</a></li>
+                  <li>Safari: <a href="https://support.apple.com/guide/safari/manage-cookies-and-website-data-sfri11471/mac" className="text-[#2b394c] hover:underline" target="_blank" rel="noopener noreferrer">https://support.apple.com/guide/safari/manage-cookies-and-website-data-sfri11471/mac</a></li>
+                  <li>Edge: <a href="https://support.microsoft.com/help/4027947/microsoft-edge-delete-cookies" className="text-[#2b394c] hover:underline" target="_blank" rel="noopener noreferrer">https://support.microsoft.com/help/4027947/microsoft-edge-delete-cookies</a></li>
                 </ul>
               </CardContent>
             </Card>
@@ -207,7 +206,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Eye className="w-5 h-5 text-blue-600" />
+                  <Eye className="w-5 h-5 text-[#2b394c]" />
                   <span>6. Third-Party Services</span>
                 </CardTitle>
               </CardHeader>
@@ -229,7 +228,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-blue-600" />
+                  <Shield className="w-5 h-5 text-[#2b394c]" />
                   <span>7. Your Rights</span>
                 </CardTitle>
               </CardHeader>
@@ -247,7 +246,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-purple-600" />
+                  <Clock className="w-5 h-5 text-[#ecc00c]" />
                   <span>8. Updates to This Policy</span>
                 </CardTitle>
               </CardHeader>
@@ -263,7 +262,7 @@ const CookiePolicy = () => {
             <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200 bg-white bg-gradient-to-br from-primary/5 to-accent/5">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5 text-blue-600" />
+                  <Mail className="w-5 h-5 text-[#2b394c]" />
                   <span>9. Contact Us</span>
                 </CardTitle>
               </CardHeader>
@@ -276,7 +275,7 @@ const CookiePolicy = () => {
                     <strong>Dibiex</strong>
                   </div>
                   <div className="flex items-center space-x-2 text-sm">
-                    <Mail className="w-4 h-4 text-blue-600" />
+                    <Mail className="w-4 h-4 text-[#2b394c]" />
                     <span className="font-medium">privacy@dibiex.com</span>
                   </div>
                   <div className="text-sm text-gray-600">

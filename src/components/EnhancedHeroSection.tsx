@@ -14,19 +14,19 @@ export function EnhancedHeroSection() {
   const { signInWithGoogle, signInAsDemo } = useAuth();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 py-20 sm:py-32">
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#2b394c]/5 via-white to-[#ecc00c]/10 py-20 sm:py-32">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left Side - Text Content */}
           <div className="text-center lg:text-left">
-            <Badge className="mb-6 bg-gradient-to-r from-blue-100 to-purple-100 border border-blue-200 text-blue-800 hover:bg-blue-200">
+            <Badge className="mb-6 bg-gradient-to-r from-[#2b394c]/20 to-[#ecc00c]/30 border border-[#2b394c]/30 text-[#2b394c] hover:bg-[#ecc00c]/30 font-medium">
               <Brain className="w-4 h-4 mr-2" />
               AI-Powered Business Intelligence
             </Badge>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2b394c] leading-tight mb-6">
               Transform Your Google Business{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#ecc00c] to-[#2b394c] bg-clip-text text-transparent">
                 Insights
               </span>
             </h1>
@@ -39,7 +39,7 @@ export function EnhancedHeroSection() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
               <Button
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-8 py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 onClick={signInWithGoogle}
               >
                 <BarChart3 className="w-5 h-5 mr-2" />
@@ -48,7 +48,7 @@ export function EnhancedHeroSection() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-2 border-gray-300 hover:border-gray-400 px-8 py-3 text-lg bg-white text-gray-700 hover:text-gray-900"
+                className="border-2 border-[#2b394c] hover:border-[#ecc00c] px-8 py-3 text-lg bg-white text-[#2b394c] hover:text-[#ecc00c]"
                 onClick={signInAsDemo}
               >
                 <PlayIcon className="w-5 h-5 mr-2" />
@@ -87,14 +87,14 @@ export function EnhancedHeroSection() {
               <div className="p-6 space-y-6">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="bg-[#2b394c]/10 p-4 rounded-lg">
                     <div className="flex items-center space-x-2 mb-2">
-                      <StarIcon className="w-5 h-5 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900">
+                      <StarIcon className="w-5 h-5 text-[#2b394c]" />
+                      <span className="text-sm font-medium text-[#2b394c]">
                         Avg Rating
                       </span>
                     </div>
-                    <div className="text-2xl font-bold text-blue-900">4.7</div>
+                    <div className="text-2xl font-bold text-[#2b394c]">4.7</div>
                     <Badge className="bg-green-100 text-green-700 text-xs">
                       +0.3
                     </Badge>
@@ -115,17 +115,17 @@ export function EnhancedHeroSection() {
                     </Badge>
                   </div>
 
-                  <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="bg-[#ecc00c]/10 p-4 rounded-lg">
                     <div className="flex items-center space-x-2 mb-2">
-                      <MessageSquareIcon className="w-5 h-5 text-purple-600" />
-                      <span className="text-sm font-medium text-purple-900">
+                      <MessageSquareIcon className="w-5 h-5 text-[#ecc00c]" />
+                      <span className="text-sm font-medium text-[#2b394c]">
                         Response
                       </span>
                     </div>
-                    <div className="text-2xl font-bold text-purple-900">
+                    <div className="text-2xl font-bold text-[#2b394c]">
                       85%
                     </div>
-                    <Badge className="bg-purple-100 text-purple-700 text-xs">
+                    <Badge className="bg-[#ecc00c]/20 text-[#2b394c] text-xs">
                       +5%
                     </Badge>
                   </div>
@@ -186,8 +186,8 @@ export function EnhancedHeroSection() {
 
       {/* Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse"></div>
-        <div className="absolute top-40 right-10 w-72 h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse animation-delay-2000"></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-[#2b394c]/20 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse"></div>
+        <div className="absolute top-40 right-10 w-72 h-72 bg-[#ecc00c]/20 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse animation-delay-2000"></div>
       </div>
     </section>
   );

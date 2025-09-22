@@ -3,12 +3,12 @@ import { TrendingUpIcon, TagIcon, AlertTriangleIcon } from "lucide-react";
 
 export function DashboardPreview() {
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50">
+    <section className="py-20 bg-gradient-to-br from-gray-50 to-[#2b394c]/5">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#2b394c] mb-4">
             See Your Business{" "}
-            <span className="text-blue-600">
+            <span className="text-[#2b394c]">
               Analytics in Action
             </span>
           </h2>
@@ -37,11 +37,11 @@ export function DashboardPreview() {
             <div className="p-8 space-y-8">
               {/* Top Stats Row */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
-                  <div className="text-sm text-blue-600 font-medium mb-2">
+                <div className="bg-[#2b394c]/10 p-6 rounded-xl border border-[#2b394c]/20">
+                  <div className="text-sm text-[#2b394c] font-medium mb-2">
                     Total Reviews
                   </div>
-                  <div className="text-3xl font-bold text-blue-900">1,248</div>
+                  <div className="text-3xl font-bold text-[#2b394c]">1,248</div>
                   <div className="text-sm text-green-600 mt-2">
                     ↗ +12% this month
                   </div>
@@ -86,7 +86,7 @@ export function DashboardPreview() {
                     {Array.from({ length: 12 }).map((_, i) => (
                       <div
                         key={i}
-                        className="bg-gradient-to-t from-blue-500 to-green-500 rounded-t"
+                        className="bg-gradient-to-t from-[#2b394c] to-green-500 rounded-t"
                         style={{
                           height: `${Math.random() * 80 + 20}%`,
                           width: "6%",
@@ -191,7 +191,7 @@ export function DashboardPreview() {
           {/* Floating Tooltips */}
           <div className="absolute top-32 -left-4 bg-white rounded-lg shadow-xl border p-4 max-w-xs hidden lg:block animate-pulse">
             <div className="flex items-center space-x-2 mb-2">
-              <TrendingUpIcon className="w-5 h-5 text-blue-600" />
+              <TrendingUpIcon className="w-5 h-5 text-[#2b394c]" />
               <span className="font-medium text-gray-900">
                 Sentiment Trends Over Time
               </span>

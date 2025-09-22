@@ -32,12 +32,12 @@ export function TestimonialsSection() {
   ];
 
   return (
-    <section id="testimonials" className="py-20 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <section id="testimonials" className="py-20 bg-gradient-to-br from-[#2b394c]/5 via-white to-[#ecc00c]/5">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#2b394c] mb-4">
             Trusted by{" "}
-            <span className="text-blue-600">
+            <span className="text-[#2b394c]">
               Thousands of Businesses
             </span>
           </h2>
@@ -55,7 +55,7 @@ export function TestimonialsSection() {
             >
               {/* Quote Icon */}
               <div className="absolute -top-4 left-8">
-                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-full p-3">
+                <div className="bg-gradient-to-r from-[#2b394c] to-[#ecc00c] rounded-full p-3">
                   <QuoteIcon className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -90,14 +90,14 @@ export function TestimonialsSection() {
                   <div className="text-sm text-gray-600">
                     {testimonial.role}
                   </div>
-                  <div className="text-sm text-blue-600 font-medium">
+                  <div className="text-sm text-[#2b394c] font-medium">
                     {testimonial.company}
                   </div>
                 </div>
               </div>
 
               {/* Hover Effect Background */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#2b394c]/10 to-[#ecc00c]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
             </div>
           ))}
         </div>

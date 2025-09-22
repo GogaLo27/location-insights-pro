@@ -46,13 +46,13 @@ export function FAQSection() {
   return (
     <section
       id="faq"
-      className="py-20 bg-gradient-to-br from-gray-50 to-blue-50"
+      className="py-20 bg-gradient-to-br from-gray-50 to-[#2b394c]/5"
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#2b394c] mb-4">
             Frequently Asked{" "}
-            <span className="text-blue-600">
+            <span className="text-[#2b394c]">
               Questions
             </span>
           </h2>
@@ -78,7 +78,7 @@ export function FAQSection() {
                   </h3>
                   <div className="flex-shrink-0">
                     {openIndex === index ? (
-                      <ChevronUpIcon className="w-6 h-6 text-blue-600" />
+                      <ChevronUpIcon className="w-6 h-6 text-[#2b394c]" />
                     ) : (
                       <ChevronDownIcon className="w-6 h-6 text-gray-400" />
                     )}
@@ -111,7 +111,7 @@ export function FAQSection() {
               quickly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300">
+              <button className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300">
                 Contact Support
               </button>
               <button className="border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-6 py-3 rounded-lg font-medium transition-all duration-300">

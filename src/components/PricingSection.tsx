@@ -76,9 +76,9 @@ export function PricingSection() {
     <section id="pricing" className="py-20 bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#2b394c] mb-4">
             Simple, Transparent{" "}
-            <span className="text-blue-600">
+            <span className="text-[#2b394c]">
               Pricing
             </span>
           </h2>
@@ -93,14 +93,14 @@ export function PricingSection() {
               key={index}
               className={`relative rounded-2xl border-2 p-8 ${
                 plan.highlight
-                  ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-xl scale-105"
+                  ? "border-[#2b394c] bg-gradient-to-br from-[#2b394c]/10 to-[#ecc00c]/10 shadow-xl scale-105"
                   : "border-gray-200 bg-white hover:border-gray-300"
               } transition-all duration-300 hover:shadow-lg`}
             >
               {/* Popular Badge */}
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1">
+                  <Badge className="bg-gradient-to-r from-[#2b394c] to-[#ecc00c] text-white px-4 py-1">
                     Most Popular
                   </Badge>
                 </div>
@@ -150,8 +150,8 @@ export function PricingSection() {
                 onClick={signInWithGoogle}
                 className={`w-full py-3 text-lg font-medium ${
                   plan.highlight
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-gray-900 hover:bg-gray-800 text-white"
+                    ? "bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
+                    : "bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
                 }`}
               >
                 {plan.cta}
@@ -180,7 +180,7 @@ export function PricingSection() {
 
         {/* Bottom Section */}
         <div className="mt-16 text-center">
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 border border-blue-100">
+          <div className="bg-gradient-to-r from-[#2b394c]/10 to-[#ecc00c]/10 rounded-2xl p-8 border border-[#2b394c]/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">
               Need a custom solution?
             </h3>
@@ -199,7 +199,7 @@ export function PricingSection() {
               </Button>
               <Button 
                 onClick={signInWithGoogle}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
               >
                 Contact Sales
               </Button>
@@ -213,7 +213,7 @@ export function PricingSection() {
             Have questions about our pricing?{" "}
             <a
               href="#faq"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-[#2b394c] hover:text-[#ecc00c] font-medium"
             >
               Check our FAQ
             </a>

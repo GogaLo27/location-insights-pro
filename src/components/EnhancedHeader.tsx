@@ -26,39 +26,36 @@ export function EnhancedHeader() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-sm">RL</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                ReviewLip
-              </span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="ReviewLip Logo" 
+              className="h-10 w-auto object-contain"
+            />
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <button
               onClick={() => scrollToSection('features')}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               Features
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               Pricing
             </button>
             <button
               onClick={() => scrollToSection('how-it-works')}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               How It Works
             </button>
             <button
               onClick={() => scrollToSection('testimonials')}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               Testimonials
             </button>
@@ -68,13 +65,13 @@ export function EnhancedHeader() {
           <div className="hidden md:flex items-center space-x-4">
             <Button
               variant="ghost"
-              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+              className="text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10"
               onClick={signInAsDemo}
             >
               Try Demo
             </Button>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               onClick={signInWithGoogle}
             >
               Get Started
@@ -84,7 +81,7 @@ export function EnhancedHeader() {
           {/* Mobile Menu Button */}
           <button
             onClick={toggleMenu}
-            className="md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            className="md:hidden p-2 rounded-md text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10"
           >
             {isMenuOpen ? (
               <XIcon className="h-6 w-6" />
@@ -103,7 +100,7 @@ export function EnhancedHeader() {
                   scrollToSection('features');
                   setIsMenuOpen(false);
                 }}
-                className="text-gray-600 hover:text-gray-900 transition-colors text-left"
+                className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
               >
                 Features
               </button>
@@ -112,7 +109,7 @@ export function EnhancedHeader() {
                   scrollToSection('pricing');
                   setIsMenuOpen(false);
                 }}
-                className="text-gray-600 hover:text-gray-900 transition-colors text-left"
+                className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
               >
                 Pricing
               </button>
@@ -121,7 +118,7 @@ export function EnhancedHeader() {
                   scrollToSection('how-it-works');
                   setIsMenuOpen(false);
                 }}
-                className="text-gray-600 hover:text-gray-900 transition-colors text-left"
+                className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
               >
                 How It Works
               </button>
@@ -130,20 +127,20 @@ export function EnhancedHeader() {
                   scrollToSection('testimonials');
                   setIsMenuOpen(false);
                 }}
-                className="text-gray-600 hover:text-gray-900 transition-colors text-left"
+                className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
               >
                 Testimonials
               </button>
               <div className="flex flex-col space-y-2 pt-4">
                 <Button
                   variant="ghost"
-                  className="justify-start text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                  className="justify-start text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10"
                   onClick={signInAsDemo}
                 >
                   Try Demo
                 </Button>
                 <Button 
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
                   onClick={signInWithGoogle}
                 >
                   Get Started

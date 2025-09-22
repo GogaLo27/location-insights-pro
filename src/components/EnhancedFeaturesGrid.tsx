@@ -57,10 +57,10 @@ export function EnhancedFeaturesGrid() {
   const getColorClasses = (color: string) => {
     const colorMap = {
       blue: {
-        bg: "bg-blue-50",
-        icon: "text-blue-600",
-        border: "border-blue-200",
-        hover: "hover:border-blue-300"
+        bg: "bg-[#2b394c]/10",
+        icon: "text-[#2b394c]",
+        border: "border-[#2b394c]/20",
+        hover: "hover:border-[#ecc00c]"
       },
       green: {
         bg: "bg-green-50",
@@ -100,9 +100,9 @@ export function EnhancedFeaturesGrid() {
     <section id="features" className="py-20 bg-gradient-to-b from-white to-gray-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#2b394c] mb-4">
             Everything You Need to{" "}
-            <span className="text-blue-600">
+            <span className="text-[#2b394c]">
               Master Customer Feedback
             </span>
           </h2>
@@ -129,7 +129,7 @@ export function EnhancedFeaturesGrid() {
                 </div>
 
                 {/* Content */}
-                <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-[#2b394c] transition-colors">
                   {feature.title}
                 </h3>
                 <p className="text-gray-600 leading-relaxed mb-4">
@@ -140,14 +140,14 @@ export function EnhancedFeaturesGrid() {
                 <div className="space-y-2">
                   {feature.benefits.map((benefit, benefitIndex) => (
                     <div key={benefitIndex} className="flex items-center space-x-2">
-                      <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-[#2b394c] flex-shrink-0" />
                       <span className="text-sm text-gray-600">{benefit}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Hover Effect */}
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#2b394c]/10 to-[#ecc00c]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
               </div>
             );
           })}
@@ -158,7 +158,7 @@ export function EnhancedFeaturesGrid() {
           <p className="text-gray-600 mb-6">
             Ready to experience these features?
           </p>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:scale-105">
+          <button className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:scale-105">
             Get Started Now
           </button>
         </div>

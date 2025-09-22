@@ -40,9 +40,9 @@ export function HowItWorks() {
     <section id="how-it-works" className="py-20 bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#2b394c] mb-4">
             How It Works -{" "}
-            <span className="text-blue-600">
+            <span className="text-[#2b394c]">
               Simple & Powerful
             </span>
           </h2>
@@ -62,15 +62,15 @@ export function HowItWorks() {
                   <div key={index} className="flex items-center">
                     {/* Step Card */}
                     <div className="relative group">
-                      <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 w-80 hover:border-blue-300 hover:shadow-xl transition-all duration-300">
+                      <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 w-80 hover:border-[#ecc00c] hover:shadow-xl transition-all duration-300">
                         {/* Step Number */}
-                        <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                        <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-r from-[#2b394c] to-[#ecc00c] rounded-full flex items-center justify-center text-white font-bold text-lg">
                           {step.number}
                         </div>
 
                         {/* Icon */}
-                        <div className="bg-blue-50 w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-100 transition-colors">
-                          <Icon className="w-8 h-8 text-blue-600" />
+                        <div className="bg-[#2b394c]/10 w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#ecc00c]/20 transition-colors">
+                          <Icon className="w-8 h-8 text-[#2b394c]" />
                         </div>
 
                         {/* Content */}
@@ -80,7 +80,7 @@ export function HowItWorks() {
                         <p className="text-gray-600 mb-4 leading-relaxed">
                           {step.description}
                         </p>
-                        <p className="text-sm text-blue-600 font-medium">
+                        <p className="text-sm text-[#2b394c] font-medium">
                           {step.details}
                         </p>
                       </div>
@@ -104,16 +104,16 @@ export function HowItWorks() {
               const Icon = step.icon;
               return (
                 <div key={index} className="relative">
-                  <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:border-blue-300 hover:shadow-lg transition-all duration-300">
+                  <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:border-[#ecc00c] hover:shadow-lg transition-all duration-300">
                     {/* Step Number */}
-                    <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-r from-[#2b394c] to-[#ecc00c] rounded-full flex items-center justify-center text-white font-bold text-lg">
                       {step.number}
                     </div>
 
                     <div className="flex items-start space-x-4 ml-4">
                       {/* Icon */}
-                      <div className="bg-blue-50 w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-7 h-7 text-blue-600" />
+                      <div className="bg-[#2b394c]/10 w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-7 h-7 text-[#2b394c]" />
                       </div>
 
                       {/* Content */}
@@ -124,7 +124,7 @@ export function HowItWorks() {
                         <p className="text-gray-600 mb-3 leading-relaxed">
                           {step.description}
                         </p>
-                        <p className="text-sm text-blue-600 font-medium">
+                        <p className="text-sm text-[#2b394c] font-medium">
                           {step.details}
                         </p>
                       </div>
@@ -145,7 +145,7 @@ export function HowItWorks() {
 
         {/* Bottom CTA */}
         <div className="text-center mt-16">
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 border border-blue-100">
+          <div className="bg-gradient-to-r from-[#2b394c]/10 to-[#ecc00c]/10 rounded-2xl p-8 border border-[#2b394c]/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">
               Ready to get started?
             </h3>
@@ -155,7 +155,7 @@ export function HowItWorks() {
             </p>
             <button 
               onClick={signInWithGoogle}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg"
+              className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg"
             >
               Get Started Now
             </button>
