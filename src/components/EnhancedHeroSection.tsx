@@ -19,8 +19,8 @@ export function EnhancedHeroSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left Side - Text Content */}
           <div className="text-center lg:text-left">
-            <Badge className="mb-6 bg-gradient-to-r from-[#2b394c]/20 to-[#ecc00c]/30 border border-[#2b394c]/30 text-[#2b394c] hover:bg-[#ecc00c]/30 font-medium">
-              <Brain className="w-4 h-4 mr-2" />
+            <Badge className="mb-6 bg-gradient-to-r from-[#2b394c] to-[#ecc00c] border border-[#2b394c] text-white hover:from-[#2b394c]/90 hover:to-[#ecc00c]/90 font-semibold">
+              <Brain className="w-4 h-4 mr-2 text-white" />
               AI-Powered Business Intelligence
             </Badge>
 
@@ -79,7 +79,7 @@ export function EnhancedHeroSection() {
                   <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                 </div>
                 <div className="text-sm text-gray-500">
-                  ReviewLip Dashboard
+                  Dibiex Dashboard
                 </div>
               </div>
 

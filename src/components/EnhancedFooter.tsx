@@ -55,7 +55,7 @@ export function EnhancedFooter() {
               <div className="flex items-center mb-6">
                 <img 
                   src="/logo.png" 
-                  alt="ReviewLip Logo" 
+                  alt="Dibiex Logo" 
                   className="h-10 w-auto object-contain"
                 />
               </div>
@@ -155,7 +155,7 @@ export function EnhancedFooter() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             {/* Copyright */}
             <div className="text-gray-300 text-sm">
-              © 2024 ReviewLip. All rights reserved.
+              © 2024 Dibiex. All rights reserved.
             </div>
 
             {/* Legal Links */}
@@ -191,7 +191,7 @@ export function EnhancedFooter() {
           <div className="mt-6 pt-6 border-t border-[#2b394c]/50">
             <p className="text-xs text-gray-400 text-center leading-relaxed">
               Google and Google Business Profile are trademarks of Google LLC.
-              ReviewLip is not affiliated with or endorsed by Google. This
+              Dibiex is not affiliated with or endorsed by Google. This
               service uses the Google My Business API to fetch publicly
               available review data with proper authentication and user consent.
             </p>

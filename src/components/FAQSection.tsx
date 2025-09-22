@@ -107,7 +107,7 @@ export function FAQSection() {
             </h3>
             <p className="text-gray-600 mb-6">
               Our support team is here to help you get the most out of
-              ReviewLip. Reach out anytime and we'll get back to you
+              Dibiex. Reach out anytime and we'll get back to you
               quickly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -150,7 +150,7 @@ export function HowItWorks() {
               Ready to get started?
             </h3>
             <p className="text-gray-600 mb-6">
-              Join thousands of businesses already using ReviewLip to
+              Join thousands of businesses already using Dibiex to
               improve their customer experience
             </p>
             <button 

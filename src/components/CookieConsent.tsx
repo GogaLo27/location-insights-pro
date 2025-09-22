@@ -35,8 +35,8 @@ const CookieConsent = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3 flex-1">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center shadow-lg animate-float">
-                <Cookie className="w-4 h-4 text-primary-foreground" />
+              <div className="w-8 h-8 bg-gradient-to-br from-[#2b394c] to-[#ecc00c] rounded-lg flex items-center justify-center shadow-lg animate-float">
+                <Cookie className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-foreground mb-1">
@@ -63,7 +63,7 @@ const CookieConsent = () => {
               <Button
                 size="sm"
                 onClick={handleAccept}
-                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-xs px-4 py-1.5"
+                className="bg-gradient-to-r from-[#2b394c] to-[#ecc00c] hover:from-[#2b394c]/90 hover:to-[#ecc00c]/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-xs px-4 py-1.5 text-white"
               >
                 Accept All
               </Button>
