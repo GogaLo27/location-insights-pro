@@ -27,7 +27,8 @@ export const ConditionalThemeProvider: React.FC<ConditionalThemeProviderProps> =
     '/templates',
     '/competitors',
     '/competitors/analysis',
-    '/brands'
+    '/brands',
+    '/feedback'
   ];
   
   // Check if current route is a dashboard route

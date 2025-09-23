@@ -30,7 +30,8 @@ import {
   Crown,
   ArrowUpRight,
   Target,
-  Palette
+  Palette,
+  MessageCircle
 } from "lucide-react";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
@@ -131,6 +132,14 @@ export function AppSidebar() {
                   <NavLink to="/settings" className={getNavCls}>
                     <Settings className="h-4 w-4" />
                     {!collapsed && <span>Settings</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/feedback" className={getNavCls}>
+                    <MessageCircle className="h-4 w-4" />
+                    {!collapsed && <span>Feedback</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

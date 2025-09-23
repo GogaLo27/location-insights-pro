@@ -28,6 +28,7 @@ import CookiePolicy from './pages/CookiePolicy';
 import Contact from './pages/Contact';
 import About from './pages/About';
 import Settings from './pages/Settings';
+import Feedback from './pages/Feedback';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -149,6 +150,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/feedback"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <Feedback />
                 </ProtectedRoute>
               }
             />
