@@ -23,7 +23,11 @@ export const ConditionalThemeProvider: React.FC<ConditionalThemeProviderProps> =
     '/location-selection',
     '/plan-selection',
     '/billing/success',
-    '/billing/cancel'
+    '/billing/cancel',
+    '/templates',
+    '/competitors',
+    '/competitors/analysis',
+    '/brands'
   ];
   
   // Check if current route is a dashboard route
