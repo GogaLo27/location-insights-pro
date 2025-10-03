@@ -1,0 +1,18 @@
+{
+  "locations/123": {
+    "period": "last_28_days",
+    "metrics": {
+      "total_reviews": 25,
+      "average_rating": 4.2,
+      "response_rate": 0.8
+    }
+  },
+  "locations/456": {
+    "period": "last_28_days", 
+    "metrics": {
+      "total_reviews": 18,
+      "average_rating": 4.5,
+      "response_rate": 0.9
+    }
+  }
+}

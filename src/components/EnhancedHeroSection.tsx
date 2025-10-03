@@ -11,7 +11,7 @@ import {
 import { useAuth } from "@/components/ui/auth-provider";
 
 export function EnhancedHeroSection() {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInAsDemo } = useAuth();
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-[#2b394c]/5 via-white to-[#ecc00c]/10 py-20 sm:py-32">
@@ -43,18 +43,27 @@ export function EnhancedHeroSection() {
                 onClick={signInWithGoogle}
               >
                 <BarChart3 className="w-5 h-5 mr-2" />
-                Get Started
+                Start Free Analysis
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-2 border-[#2b394c] hover:border-[#ecc00c] px-8 py-3 text-lg bg-white text-[#2b394c] hover:text-[#ecc00c]"
+                onClick={signInAsDemo}
+              >
+                <PlayIcon className="w-5 h-5 mr-2" />
+                Try Demo
               </Button>
             </div>
 
             <div className="flex items-center justify-center lg:justify-start space-x-6 text-sm text-gray-500">
               <div className="flex items-center">
                 <span className="font-medium">✓</span>
-                <span className="ml-1">Professional analytics</span>
+                <span className="ml-1">No credit card required</span>
               </div>
               <div className="flex items-center">
                 <span className="font-medium">✓</span>
-                <span className="ml-1">AI-powered insights</span>
+                <span className="ml-1">Instant access</span>
               </div>
             </div>
           </div>

@@ -1,0 +1,18 @@
+[
+  {
+    "reviewId": "review-1",
+    "locationId": "locations/123",
+    "authorName": "John Doe",
+    "text": "Great coffee and atmosphere!",
+    "rating": 5,
+    "createTime": "2025-01-15T10:30:00Z"
+  },
+  {
+    "reviewId": "review-2", 
+    "locationId": "locations/456",
+    "authorName": "Jane Smith",
+    "text": "Excellent gym with modern equipment.",
+    "rating": 4,
+    "createTime": "2025-01-14T15:20:00Z"
+  }
+]

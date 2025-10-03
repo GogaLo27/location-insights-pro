@@ -13,6 +13,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe, Palette, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
@@ -382,6 +383,38 @@ const Locations = () => {
     try {
       setLoading(true);
       
+      // Demo: use mock locations without calling Google
+      if (user?.email === DEMO_EMAIL) {
+        // Get actual review counts for demo locations
+        const demoLocationsWithCounts = await Promise.all(
+          mockLocations.map(async (m) => {
+            // Count reviews for this location
+            const { count } = await supabase
+              .from('saved_reviews')
+              .select('*', { count: 'exact', head: true })
+              .eq('location_id', m.id);
+            
+            return {
+              id: m.id,
+              google_place_id: m.google_place_id,
+              name: m.name,
+              address: m.address ?? null,
+              phone: null,
+              website: null,
+              rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+              total_reviews: count || 0,
+              latitude: null,
+              longitude: null,
+              status: 'active',
+              last_fetched_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+          })
+        );
+        setLocations(demoLocationsWithCounts);
+        return;
+      }
 
       // For real users, fetch from database with brand information
       const { data: dbLocations, error: dbError } = await supabase
@@ -422,6 +455,26 @@ const Locations = () => {
 
   const fetchFromGoogle = async () => {
     try {
+      if (user?.email === DEMO_EMAIL) {
+        toast({ title: "Demo Mode", description: "Using mock locations in demo." });
+        setLocations(mockLocations.map((m) => ({
+          id: m.id,
+          google_place_id: m.google_place_id,
+          name: m.name,
+          address: m.address ?? null,
+          phone: null,
+          website: null,
+          rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+          total_reviews: 50,
+          latitude: null,
+          longitude: null,
+          status: 'active',
+          last_fetched_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }) as any));
+        return;
+      }
       let { data: { session } } = await supabase.auth.getSession();
       let googleAccessToken = session?.provider_token;
       if (!googleAccessToken) {
@@ -468,6 +521,31 @@ const Locations = () => {
         description: "Please enter a search term",
         variant: "destructive",
       });
+      return;
+    }
+    // Demo: pretend search found our mock locations and show them
+    if (user?.email === DEMO_EMAIL) {
+      const filtered = mockLocations.filter((l) =>
+        l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (l.address || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setLocations((filtered.length > 0 ? filtered : mockLocations).map((m) => ({
+        id: m.id,
+        google_place_id: m.google_place_id,
+        name: m.name,
+        address: m.address ?? null,
+        phone: null,
+        website: null,
+        rating: m.id === 'demo-location-2' ? 4.2 : 4.6,
+        total_reviews: 50,
+        latitude: null,
+        longitude: null,
+        status: 'active',
+        last_fetched_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })) as any);
+      toast({ title: "Success", description: `Found ${(filtered.length > 0 ? filtered : mockLocations).length} locations` });
       return;
     }
     // Check location limits based on plan

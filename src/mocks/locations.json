@@ -1,0 +1,21 @@
+// src/mocks/locations.json
+[
+  {
+    "locationId": "locations/123",
+    "title": "Graf Coffee Roasters",
+    "address": "25 Rustaveli Ave, Tbilisi",
+    "phone": "+995 555 12 34 56",
+    "website": "https://example.com",
+    "primaryCategory": "Coffee shop",
+    "placeId": "ChIJ-demo-123"
+  },
+  {
+    "locationId": "locations/456",
+    "title": "Blue Lake Gym",
+    "address": "8 Freedom Sq, Tbilisi",
+    "phone": "+995 577 00 11 22",
+    "website": "https://gym.example.com",
+    "primaryCategory": "Gym",
+    "placeId": "ChIJ-demo-456"
+  }
+]

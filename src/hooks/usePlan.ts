@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { supabase } from "@/integrations/supabase/client";
+import { DEMO_EMAIL, mockUserPlan } from "@/utils/mockData";
 
 interface UserPlan {
   id: string;
@@ -23,6 +24,17 @@ export const usePlan = () => {
     // CRITICAL: Set loading to true immediately when user is detected
     // This prevents race condition with ProtectedRoute
     setLoading(true);
+    
+    if (user.email === DEMO_EMAIL) {
+      // Always give demo a plan so route guards pass
+      setPlan({
+        id: mockUserPlan.id,
+        plan_type: mockUserPlan.plan_type,
+        created_at: mockUserPlan.created_at,
+      });
+      setLoading(false);
+      return;
+    }
     
     // For real users, fetch the plan
     fetchPlan();
