@@ -241,26 +241,6 @@ const Sentiment = () => {
     try {
       setLoading(true);
 
-      // Check if demo user and use the same generated demo reviews as Reviews page
-      if (user.email === 'demolip29@gmail.com') {
-        const { getDemoReviewsForLocation, mockLocations } = await import('@/utils/mockData');
-        let filteredReviews: any[] = [];
-        const demoPlaceId: string | undefined = (ctxSelectedLocation as any)?.google_place_id;
-        const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
-        const demoLocationId = match?.id || mockLocations[0]?.id;
-        if (demoLocationId) {
-          filteredReviews = getDemoReviewsForLocation(demoLocationId);
-        }
-
-        // Filter out reviews without sentiment
-        filteredReviews = filteredReviews.filter((r) => r.ai_sentiment !== null);
-
-        console.log('Demo reviews found:', filteredReviews.length);
-        const processedData = processReviewsIntoSentimentData(filteredReviews);
-        console.log('Demo processed sentiment data:', processedData);
-        setSentimentData(processedData);
-        return;
-      }
 
       // Get sentiment data from saved reviews
       let query = supabase

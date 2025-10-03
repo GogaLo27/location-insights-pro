@@ -4,7 +4,7 @@ import { CheckIcon, XIcon } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
 
 export function PricingSection() {
-  const { signInWithGoogle, signInAsDemo } = useAuth();
+  const { signInWithGoogle } = useAuth();
 
   const plans = [
     {
@@ -157,14 +157,6 @@ export function PricingSection() {
                 {plan.cta}
               </Button>
 
-              {/* Demo Button */}
-              <Button
-                variant="outline"
-                onClick={signInAsDemo}
-                className="w-full mt-3 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-800 bg-white"
-              >
-                Try Demo
-              </Button>
 
               {/* Additional Info */}
               <div className="mt-4 text-center">
@@ -190,13 +182,6 @@ export function PricingSection() {
               needs.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                variant="outline"
-                onClick={signInAsDemo}
-                className="border-2 border-gray-300 hover:border-gray-400"
-              >
-                Schedule a Demo
-              </Button>
               <Button 
                 onClick={signInWithGoogle}
                 className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"

@@ -267,7 +267,7 @@ const PlanManagement = () => {
                            disabled={submittingPlan === p.plan_type}
                            onClick={() => handleSubscribe(p.plan_type)}
                          >
-                           {submittingPlan === p.plan_type ? "Processing..." : "Activate Plan (Free Demo)"}
+                           {submittingPlan === p.plan_type ? "Processing..." : "Activate Plan"}
                          </Button>
 
                       </div>

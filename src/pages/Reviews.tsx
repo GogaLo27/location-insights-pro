@@ -242,30 +242,6 @@ const Reviews = () => {
     }
 
     try {
-      // Check if demo user and use mock data
-      if (user.email === 'demolip29@gmail.com') {
-        const { getDemoReviewsForLocation, mockLocations } = await import('@/utils/mockData');
-        let filteredReviews: any[] = [];
-
-        if (locationId && locationId !== 'all' && selectedLocation) {
-          // Map the selected demo location's google_place_id to its mock id
-          // selectedLocation only has google_place_id + location_name in demo
-          const demoPlaceId: string | undefined = (selectedLocation as any).google_place_id;
-          const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
-          const demoLocationId = match?.id;
-          if (demoLocationId) {
-            filteredReviews = getDemoReviewsForLocation(demoLocationId);
-          }
-        }
-
-        setReviews(filteredReviews.map(review => ({
-          ...review,
-          ai_sentiment: review.ai_sentiment as "positive" | "negative" | "neutral" | null
-        })));
-        updateFetch(filteredReviews.length, filteredReviews.length);
-        finishFetch();
-        return;
-      }
 
       // First, get the total count of reviews for this location
       const { count: totalCount, error: countError } = await supabase

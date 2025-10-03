@@ -155,8 +155,8 @@ const Analytics = () => {
 
     try {
       setLoading(true);
-      // Demo: synthesize time series when in demo mode
-      if (user?.email === 'demolip29@gmail.com') {
+      // Real implementation for analytics
+      if (false) {
         const days = parseInt(dateRange);
         const endDate = new Date();
         const series: AnalyticsData[] = [] as any;

@@ -26,8 +26,8 @@ export function FAQSection() {
       answer: "We'll notify you when you're approaching your limits and offer upgrade options. We never cut off your service - we work with you to find the right solution."
     },
     {
-      question: "Can I try before I buy?",
-      answer: "Yes! You can try our demo with sample data to explore all features, or start with our Starter plan and upgrade anytime as your business grows."
+      question: "Can I upgrade or downgrade my plan?",
+      answer: "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any billing differences."
     },
     {
       question: "Which data do you fetch from Google?",

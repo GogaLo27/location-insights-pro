@@ -16,7 +16,7 @@ const scrollToSection = (sectionId: string) => {
 
 export function EnhancedHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { signInWithGoogle, signInAsDemo } = useAuth();
+  const { signInWithGoogle } = useAuth();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -63,13 +63,6 @@ export function EnhancedHeader() {
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              className="text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10"
-              onClick={signInAsDemo}
-            >
-              Try Demo
-            </Button>
             <Button 
               className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               onClick={signInWithGoogle}
@@ -132,13 +125,6 @@ export function EnhancedHeader() {
                 Testimonials
               </button>
               <div className="flex flex-col space-y-2 pt-4">
-                <Button
-                  variant="ghost"
-                  className="justify-start text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10"
-                  onClick={signInAsDemo}
-                >
-                  Try Demo
-                </Button>
                 <Button 
                   className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
                   onClick={signInWithGoogle}

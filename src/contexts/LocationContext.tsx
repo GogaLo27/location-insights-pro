@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { supabase } from "@/integrations/supabase/client";
-import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
 
 interface Location {
   id: string;
@@ -40,19 +39,6 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
   const refreshLocations = async (forceRefresh = false) => {
     if (!user) return;
 
-    // DEMO: return mock locations
-    if (user.email === DEMO_EMAIL) {
-      setLocations(
-        mockLocations.map((m) => ({
-          id: m.id,
-          google_place_id: m.google_place_id,
-          name: m.name,
-          address: m.address ?? null,
-        })) as any
-      );
-      setLoading(false);
-      return;
-    }
 
     try {
       setLoading(true);
@@ -139,20 +125,6 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
   const fetchSelectedLocation = async () => {
     if (!user) return;
 
-    // DEMO: restore from localStorage or pick first
-    if (user.email === DEMO_EMAIL) {
-      const saved = localStorage.getItem(DEMO_SELECTED_KEY);
-      if (saved) {
-        setSelectedLocationState(JSON.parse(saved));
-      } else if (mockLocations.length > 0) {
-        const defaultLocation = {
-          google_place_id: mockLocations[0].google_place_id,
-          location_name: mockLocations[0].name,
-        };
-        setSelectedLocationState(defaultLocation);
-      }
-      return;
-    }
 
     try {
       const { data, error } = await supabase
@@ -178,12 +150,6 @@ export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }
   const setSelectedLocation = async (location: SelectedLocation | null) => {
     if (!user || !location) return;
 
-    // DEMO: persist locally
-    if (user.email === DEMO_EMAIL) {
-      setSelectedLocationState(location);
-      localStorage.setItem(DEMO_SELECTED_KEY, JSON.stringify(location));
-      return;
-    }
 
     try {
       const { error } = await supabase

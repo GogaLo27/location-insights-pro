@@ -3,11 +3,11 @@ import { ArrowRightIcon, CheckIcon } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
 
 export function FinalCTASection() {
-  const { signInWithGoogle, signInAsDemo } = useAuth();
+  const { signInWithGoogle } = useAuth();
 
   const benefits = [
-    "No credit card required",
-    "Instant access",
+    "Professional analytics",
+    "AI-powered insights",
     "Cancel anytime",
     "Setup in under 5 minutes",
   ];
@@ -49,14 +49,6 @@ export function FinalCTASection() {
             >
               Get Started Now
               <ArrowRightIcon className="w-6 h-6 ml-2" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={signInAsDemo}
-              className="border-2 border-white/30 bg-white text-[#2b394c] hover:bg-gray-100 hover:text-[#2b394c] px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300"
-            >
-              Try Demo First
             </Button>
           </div>
 

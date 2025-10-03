@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "@/contexts/LocationContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { format } from "date-fns";
-import { DEMO_EMAIL, getDemoReviewsForLocation, mockLocations } from "@/utils/mockData";
 
 interface Profile {
   id: string;
@@ -84,35 +83,6 @@ const Dashboard = () => {
         return;
       }
 
-      // Demo: synthesize stats
-      if (user?.email === DEMO_EMAIL) {
-        const demoPlaceId: string | undefined = (selectedLocation as any).google_place_id;
-        const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
-        const demoLocationId = match?.id || 'demo-location-1';
-        const reviews = getDemoReviewsForLocation(demoLocationId);
-        const totalReviews = reviews.length;
-        const averageRating = totalReviews > 0 
-          ? reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / totalReviews 
-          : 0;
-        
-        const sentimentCounts = reviews.reduce((acc: any, r: any) => {
-          const sentiment = r.ai_sentiment || 'neutral';
-          acc[sentiment] = (acc[sentiment] || 0) + 1;
-          return acc;
-        }, {});
-
-        setStats({
-          totalLocations: 1,
-          totalReviews,
-          averageRating,
-          sentimentBreakdown: {
-            positive: sentimentCounts.positive || 0,
-            negative: sentimentCounts.negative || 0,
-            neutral: sentimentCounts.neutral || 0,
-          }
-        });
-        return;
-      }
 
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) {
@@ -182,15 +152,6 @@ const Dashboard = () => {
         return;
       }
 
-      // Demo recent reviews
-      if (user?.email === DEMO_EMAIL) {
-        const demoPlaceId: string | undefined = (selectedLocation as any).google_place_id;
-        const match = demoPlaceId ? mockLocations.find(l => l.google_place_id === demoPlaceId) : undefined;
-        const demoLocationId = match?.id || 'demo-location-1';
-        const reviews = getDemoReviewsForLocation(demoLocationId).slice(0, 5);
-        setRecentReviews(reviews);
-        return;
-      }
 
       const { supabaseJwt, googleAccessToken } = await getSessionTokens();
       if (!supabaseJwt || !googleAccessToken) {
