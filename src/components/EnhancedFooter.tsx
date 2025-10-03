@@ -9,7 +9,7 @@ export function EnhancedFooter() {
     company: [
       { name: "About Us", href: "/about" },
       { name: "Contact", href: "/contact" },
-      { name: "Support", href: "#support" },
+      { name: "Support", href: "/contact" },
     ],
 
     resources: [
@@ -23,7 +23,6 @@ export function EnhancedFooter() {
       { name: "Privacy Policy", href: "/privacy" },
       { name: "Terms & Conditions", href: "/terms" },
       { name: "Cookie Policy", href: "/cookie-policy" },
-      { name: "GDPR Compliance", href: "#gdpr" },
     ],
   };
 

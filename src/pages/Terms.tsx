@@ -323,10 +323,11 @@ const Terms = () => {
                   </div>
                   <div className="flex items-center space-x-2 text-sm">
                     <Mail className="w-4 h-4 text-[#2b394c]" />
-                    <span className="font-medium">legal@dibiex.com</span>
+                    <span className="font-medium">Dibiex.ai@gmail.com</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    Address: [Insert Address]
+                    Address: Nutsubidze 77k, 0186<br />
+                    Tbilisi, Georgia<br />
                   </div>
                 </div>
               </CardContent>

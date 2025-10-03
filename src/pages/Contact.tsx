@@ -203,7 +203,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">Email</h4>
-                    <p className="text-gray-600">support@dibiex.com</p>
+                    <p className="text-gray-600">Dibiex.ai@gmail.com</p>
                     <p className="text-sm text-gray-500">We'll respond within 24 hours</p>
                   </div>
                 </div>
@@ -214,7 +214,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">Phone</h4>
-                    <p className="text-gray-600">+1 (555) 123-4567</p>
+                    <p className="text-gray-600">+995 (599) 993-527</p>
+                    <p className="text-gray-600">+995 (591) 070 666</p>
                     <p className="text-sm text-gray-500">Mon-Fri 9AM-6PM EST</p>
                   </div>
                 </div>
@@ -226,9 +227,10 @@ export default function Contact() {
                   <div>
                     <h4 className="font-semibold text-gray-900">Office</h4>
                     <p className="text-gray-600">
-                      123 Business Street<br />
-                      Suite 100<br />
-                      New York, NY 10001
+                      Nutsubidze 77k, 0186<br />
+                      Tbilisi, Georgia<br />
+                      LTD Loothead<br />
+                      I/N: 405283290
                     </p>
                   </div>
                 </div>

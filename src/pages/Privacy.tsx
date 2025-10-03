@@ -85,9 +85,10 @@ const Privacy = () => {
                 <p className="mt-4">Contact details:</p>
                 <ul className="list-disc pl-6 space-y-1 mt-2">
                   <li>Dibiex</li>
-                  <li>Address: [Insert Company Address]</li>
-                  <li>Email: privacy@dibiex.com</li>
-                  <li>Phone: [Insert Company Phone]</li>
+                  <li>Address: Nutsubidze 77k, 0186<br />
+                    Tbilisi, Georgia<br /></li>
+                  <li>Email: Dibiex.ai@gmail.com</li>
+                  <li>Phone: +995 (599) 993-527, +995 (591) 070 666</li>
                 </ul>
               </CardContent>
             </Card>
@@ -278,7 +279,7 @@ const Privacy = () => {
                     </ul>
                   </div>
                 </div>
-                <p className="mt-4">To exercise these rights, please contact us at privacy@dibiex.com.</p>
+                <p className="mt-4">To exercise these rights, please contact us at Dibiex.ai@gmail.com.</p>
               </CardContent>
             </Card>
 
@@ -332,13 +333,14 @@ const Privacy = () => {
                   </div>
                   <div className="flex items-center space-x-2 text-sm">
                     <Mail className="w-4 h-4 text-[#2b394c]" />
-                    <span className="font-medium">privacy@dibiex.com</span>
+                    <span className="font-medium">Dibiex.ai@gmail.com</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    Address: [Insert Company Address]
+                    Address: Nutsubidze 77k, 0186<br />
+                    Tbilisi, Georgia<br />
                   </div>
                   <div className="text-sm text-gray-600">
-                    Phone: [Insert Company Phone]
+                    Phone: +995 (599) 993-527, +995 (591) 070 666
                   </div>
                 </div>
               </CardContent>
