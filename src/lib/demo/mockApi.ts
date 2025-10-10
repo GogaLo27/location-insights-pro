@@ -32,3 +32,4 @@ export async function getInsights(locationId: string): Promise<any> {
   // @ts-ignore
   return insights[locationId] ?? { period: "last_28_days", metrics: {} };
 }
+

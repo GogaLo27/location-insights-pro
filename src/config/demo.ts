@@ -23,3 +23,4 @@ export function enableDemo(): void {
 export function disableDemo(): void {
   localStorage.removeItem(DEMO_STORAGE_KEY);
 }
+
