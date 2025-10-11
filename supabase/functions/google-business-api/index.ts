@@ -90,6 +90,10 @@ async function handleRequest(req: Request) {
       case "fetch_reviews":
         if (!locationId) return jsonError("Missing 'locationId' for fetch_reviews", 400);
         return await fetchLocationReviews(locationId, googleAccessToken);
+      
+      case "sync_reviews_incremental":
+        if (!locationId) return jsonError("Missing 'locationId' for sync_reviews_incremental", 400);
+        return await syncReviewsIncremental(user.id, locationId, googleAccessToken);
 
       case "fetch_analytics":
         if (!locationId) return jsonError("Missing 'locationId' for fetch_analytics", 400);
@@ -802,5 +806,152 @@ async function extractCompetitorFromUrl(url: string) {
   } catch (error) {
     console.error('Error extracting competitor from URL:', error);
     return jsonError("Failed to extract competitor data from URL", 500);
+  }
+}
+
+// ============================================
+// INCREMENTAL SYNC - ONLY FETCH NEW REVIEWS
+// ============================================
+
+async function syncReviewsIncremental(userId: string, locationId: string, accessToken: string) {
+  try {
+    console.log(`🔄 Starting incremental sync for location: ${locationId}`);
+    
+    // Update sync status to 'syncing'
+    await supabase.rpc('update_sync_status', {
+      p_user_id: userId,
+      p_location_id: locationId,
+      p_status: 'syncing'
+    });
+    
+    // Get last sync date from database
+    const { data: syncStatus, error: syncError } = await supabase
+      .from('location_sync_status')
+      .select('last_synced_at')
+      .eq('user_id', userId)
+      .eq('location_id', locationId)
+      .single();
+    
+    const lastSyncDate = syncStatus?.last_synced_at || '2020-01-01';
+    console.log(`📅 Last synced: ${lastSyncDate}`);
+    
+    // Get existing review IDs to avoid duplicates
+    const { data: existingReviews } = await supabase
+      .from('saved_reviews')
+      .select('google_review_id')
+      .eq('user_id', userId)
+      .eq('location_id', locationId);
+    
+    const existingReviewIds = new Set(
+      existingReviews?.map(r => r.google_review_id) || []
+    );
+    
+    console.log(`📊 Found ${existingReviewIds.size} existing reviews`);
+    
+    // Fetch ALL reviews from Google (we'll filter new ones)
+    const accountIds = await getAllAccountIds(accessToken);
+    let allReviews: any[] = [];
+    const maxReviews = 1000; // Limit to prevent memory issues
+    
+    for (const accountId of accountIds) {
+      try {
+        let nextPageToken: string | null = null;
+        let pageCount = 0;
+        const maxPages = 50;
+        
+        do {
+          if (pageCount >= maxPages || allReviews.length >= maxReviews) {
+            break;
+          }
+          
+          const url = `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}/reviews${
+            nextPageToken ? `?pageToken=${nextPageToken}` : ""
+          }`;
+          
+          const data = await googleApiRequest(url, accessToken) as any;
+          const raw = data.reviews || [];
+          
+          const formatted = raw.map((r: any) => ({
+            id: r.reviewId,
+            google_review_id: r.reviewId,
+            author_name: r.reviewer?.displayName || "Anonymous",
+            rating: mapStarRatingToNumber(r.starRating),
+            text: r.comment || "",
+            review_date: r.createTime || r.updateTime,
+            reply_text: r.reviewReply?.comment || null,
+            reply_date: r.reviewReply?.updateTime || null,
+          }));
+          
+          allReviews.push(...formatted);
+          nextPageToken = data.nextPageToken ?? null;
+          pageCount++;
+          
+        } while (nextPageToken);
+        
+      } catch (error) {
+        console.error(`Error fetching reviews from account ${accountId}:`, error);
+      }
+    }
+    
+    // Filter only NEW reviews (not in database)
+    const newReviews = allReviews.filter(
+      review => !existingReviewIds.has(review.google_review_id)
+    );
+    
+    console.log(`✨ Found ${newReviews.length} NEW reviews out of ${allReviews.length} total`);
+    
+    // Save only new reviews to database
+    if (newReviews.length > 0) {
+      const reviewsToInsert = newReviews.map(review => ({
+        user_id: userId,
+        location_id: locationId,
+        google_review_id: review.google_review_id,
+        author_name: review.author_name,
+        rating: review.rating,
+        text: review.text,
+        review_date: review.review_date,
+        reply_text: review.reply_text,
+        reply_date: review.reply_date,
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('saved_reviews')
+        .insert(reviewsToInsert);
+      
+      if (insertError) {
+        console.error('Error saving new reviews:', insertError);
+        throw insertError;
+      }
+    }
+    
+    // Update sync status to 'success'
+    await supabase.rpc('update_sync_status', {
+      p_user_id: userId,
+      p_location_id: locationId,
+      p_status: 'success',
+      p_new_reviews_count: newReviews.length
+    });
+    
+    return json({
+      success: true,
+      total_reviews: allReviews.length,
+      new_reviews: newReviews.length,
+      existing_reviews: existingReviewIds.size,
+      last_synced: new Date().toISOString(),
+      message: `Synced ${newReviews.length} new reviews`,
+    });
+    
+  } catch (error) {
+    console.error('Incremental sync error:', error);
+    
+    // Update sync status to 'failed'
+    await supabase.rpc('update_sync_status', {
+      p_user_id: userId,
+      p_location_id: locationId,
+      p_status: 'failed',
+      p_error_message: error.message
+    });
+    
+    return jsonError(`Sync failed: ${error.message}`, 500);
   }
 }

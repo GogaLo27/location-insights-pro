@@ -17,6 +17,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import ReplyDialog from "@/components/ReplyDialog";
 import LocationSelector from "@/components/LocationSelector";
+import { SyncButton } from "@/components/SyncButton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { FeatureGate } from "@/components/UpgradePrompt";
@@ -915,6 +916,15 @@ Keep the response under 150 words.`;
               </div>
             </div>
             <div className="flex items-center space-x-4 ml-auto">
+              {/* Sync New Reviews Button */}
+              {resolveLocationId() && (
+                <SyncButton 
+                  locationId={resolveLocationId()} 
+                  onSyncComplete={fetchReviews}
+                  className="mr-2"
+                />
+              )}
+              
               {/* Bulk Operations */}
               {selectedReviews.length > 0 && (
                 <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1 rounded-lg">
@@ -1492,18 +1502,35 @@ Keep the response under 150 words.`;
               )}
               {/* Pagination */}
               {shouldShowPagination && (
-                <div className="flex items-center justify-between pt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Page {page} of {totalPages} — {filteredReviews.length} of {totalReviews > 0 ? totalReviews : reviews.length} reviews
+                <div className="space-y-4 pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      Page {page} of {totalPages} — {filteredReviews.length} of {totalReviews > 0 ? totalReviews : reviews.length} reviews
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                        Previous
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
+                        Next
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-                      Previous
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
-                      Next
-                    </Button>
-                  </div>
+                  
+                  {/* Load More Button - loads next page inline */}
+                  {page < totalPages && (
+                    <div className="flex justify-center">
+                      <Button 
+                        variant="default" 
+                        size="lg"
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        className="w-full sm:w-auto"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Load More Reviews
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
