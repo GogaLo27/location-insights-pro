@@ -25,11 +25,16 @@ import OrderHistory from './pages/OrderHistory';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import CookiePolicy from './pages/CookiePolicy';
+import RefundPolicy from './pages/RefundPolicy';
 import Contact from './pages/Contact';
 import About from './pages/About';
 import Settings from './pages/Settings';
 import Feedback from './pages/Feedback';
 import NotFound from './pages/NotFound';
+import DashboardPrivacy from './pages/DashboardPrivacy';
+import DashboardTerms from './pages/DashboardTerms';
+import DashboardRefund from './pages/DashboardRefund';
+import DashboardCookie from './pages/DashboardCookie';
 
 const queryClient = new QueryClient();
 
@@ -192,8 +197,43 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/about" element={<About />} />
+
+            {/* Dashboard Legal Pages */}
+            <Route
+              path="/dashboard/privacy"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <DashboardPrivacy />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/terms"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <DashboardTerms />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/refund"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <DashboardRefund />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/cookie"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <DashboardCookie />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<NotFound />} />

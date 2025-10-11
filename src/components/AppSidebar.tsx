@@ -31,7 +31,10 @@ import {
   ArrowUpRight,
   Target,
   Palette,
-  MessageCircle
+  MessageCircle,
+  Shield,
+  Cookie,
+  CreditCard
 } from "lucide-react";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
@@ -138,6 +141,46 @@ export function AppSidebar() {
                   <NavLink to="/feedback" className={getNavCls}>
                     <MessageCircle className="h-4 w-4" />
                     {!collapsed && <span>Feedback</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="dark:text-white/80">Legal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/dashboard/privacy" className={getNavCls}>
+                    <Shield className="h-4 w-4" />
+                    {!collapsed && <span>Privacy Policy</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/dashboard/terms" className={getNavCls}>
+                    <FileText className="h-4 w-4" />
+                    {!collapsed && <span>Terms & Conditions</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/dashboard/refund" className={getNavCls}>
+                    <CreditCard className="h-4 w-4" />
+                    {!collapsed && <span>Refund Policy</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/dashboard/cookie" className={getNavCls}>
+                    <Cookie className="h-4 w-4" />
+                    {!collapsed && <span>Cookie Policy</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

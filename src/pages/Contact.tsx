@@ -230,7 +230,7 @@ export default function Contact() {
                       Nutsubidze 77k, 0186<br />
                       Tbilisi, Georgia<br />
                       LTD Loothead<br />
-                      I/N: 405283290
+                      I/N: 405283250
                     </p>
                   </div>
                 </div>
