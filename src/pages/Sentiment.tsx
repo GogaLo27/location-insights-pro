@@ -15,6 +15,7 @@ import { MapPin, TrendingUp, TrendingDown, Minus, Calendar as CalendarIcon, BarC
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, subMonths, subYears, startOfDay, endOfDay } from "date-fns";
+import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
 import {
   LineChart,
   Line,
@@ -61,6 +62,20 @@ const Sentiment = () => {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>({ from: new Date('1990-01-01'), to: new Date() });
   const [selectedPreset, setSelectedPreset] = useState<string>("0"); // Default to "All Time"
   const { selectedLocation: ctxSelectedLocation } = useLocationContext();
+  
+  // Analysis progress tracking
+  const userKey = user?.email || 'anonymous';
+  const locKey = (ctxSelectedLocation as any)?.google_place_id || 'default';
+  const {
+    isAnalyzing,
+    progress,
+    total,
+    completed,
+    startProgress,
+    updateProgress,
+    finishProgress,
+    resetProgress
+  } = useAnalysisProgress(`sentiment_${userKey}_${locKey}`);
 
   // Get date range to use - custom if set, otherwise default to all time
   const getDateRange = () => {
@@ -419,10 +434,10 @@ const Sentiment = () => {
   };
 
   const handleGenerateSentiment = async () => {
-    if (!user) return;
+    if (!user || isAnalyzing) return;
 
     try {
-      setLoading(true);
+      startProgress();
 
       // Get the location ID
       const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
@@ -433,6 +448,7 @@ const Sentiment = () => {
           description: "Please select a location first",
           variant: "destructive",
         });
+        finishProgress();
         return;
       }
 
@@ -450,9 +466,11 @@ const Sentiment = () => {
           title: "Info",
           description: "All reviews are already analyzed",
         });
-        setLoading(false);
+        finishProgress();
         return;
       }
+
+      updateProgress(0, unanalyzedReviews.length);
 
       toast({
         title: "Processing",
@@ -487,6 +505,7 @@ const Sentiment = () => {
           }
 
           processedCount += batch.length;
+          updateProgress(processedCount, unanalyzedReviews.length);
         }
       }
 
@@ -495,6 +514,8 @@ const Sentiment = () => {
         description: `Successfully analyzed ${processedCount} reviews`,
       });
 
+      finishProgress();
+      
       // Refresh the sentiment data
       fetchSentimentData();
     } catch (error) {
@@ -504,8 +525,7 @@ const Sentiment = () => {
         description: "Failed to generate sentiment analysis",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      finishProgress();
     }
   };
 
@@ -616,17 +636,50 @@ const Sentiment = () => {
               </div>
               <div className="flex gap-2">
                 {sentimentData.length > 0 && (
-                  <Button onClick={exportToCSV} variant="outline">
+                  <Button onClick={exportToCSV} variant="outline" disabled={isAnalyzing}>
                     <Download className="w-4 h-4 mr-2" />
                     Export CSV
                   </Button>
                 )}
-                <Button onClick={handleGenerateSentiment}>
+                <Button onClick={handleGenerateSentiment} disabled={isAnalyzing}>
                   <BarChart3 className="w-4 h-4 mr-2" />
-                  Generate Analysis
+                  {isAnalyzing ? 'Analyzing...' : 'Generate Analysis'}
                 </Button>
               </div>
             </div>
+
+            {/* Analysis Progress Bar */}
+            {isAnalyzing && (
+              <Card className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                <CardContent className="pt-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-blue-900 dark:text-blue-100">
+                        Analyzing reviews with AI...
+                      </span>
+                      <span className="text-blue-700 dark:text-blue-300">
+                        {completed} / {total} reviews
+                      </span>
+                    </div>
+                    <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-3">
+                      <div
+                        className="bg-blue-600 h-3 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                        style={{ width: `${progress}%` }}
+                      >
+                        {progress > 10 && (
+                          <span className="text-xs text-white font-medium">
+                            {Math.round(progress)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      Please wait while we analyze your reviews. This may take a few moments.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Controls */}
             <Card className="mb-6">
