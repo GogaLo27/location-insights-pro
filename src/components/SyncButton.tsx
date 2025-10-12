@@ -118,3 +118,4 @@ export function SyncButton({ locationId, onSyncComplete, className }: SyncButton
   );
 }
 
+

@@ -15,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useLocation } from "@/contexts/LocationContext";
 import { useAnalysisProgress } from "@/hooks/useAnalysisProgress";
-import { usePaginatedReviews } from "@/hooks/usePaginatedReviews";
 import ReplyDialog from "@/components/ReplyDialog";
 import LocationSelector from "@/components/LocationSelector";
 import { SyncButton } from "@/components/SyncButton";

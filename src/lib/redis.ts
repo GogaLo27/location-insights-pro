@@ -1,15 +1,82 @@
 // ============================================
 // REDIS CACHE HELPER
-// Using Upstash Redis for serverless caching
+// Using Upstash Redis REST API for browser-safe caching
 // ============================================
 
-import { Redis } from '@upstash/redis'
+// Browser-safe Redis client using fetch API
+class BrowserRedis {
+  private url: string;
+  private token: string;
+
+  constructor(url: string, token: string) {
+    this.url = url;
+    this.token = token;
+  }
+
+  private async request(command: string[]) {
+    if (!this.url || !this.token) {
+      console.warn('Redis not configured');
+      return null;
+    }
+
+    try {
+      const response = await fetch(this.url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(command),
+      });
+
+      if (!response.ok) {
+        console.error('Redis request failed:', response.statusText);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.result;
+    } catch (error) {
+      console.error('Redis error:', error);
+      return null;
+    }
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    const result = await this.request(['GET', key]);
+    if (!result) return null;
+    return typeof result === 'string' ? JSON.parse(result) : result;
+  }
+
+  async set(key: string, value: any, options?: { ex?: number }) {
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+    if (options?.ex) {
+      await this.request(['SET', key, stringValue, 'EX', String(options.ex)]);
+    } else {
+      await this.request(['SET', key, stringValue]);
+    }
+  }
+
+  async del(...keys: string[]) {
+    await this.request(['DEL', ...keys]);
+  }
+
+  async keys(pattern: string) {
+    const result = await this.request(['KEYS', pattern]);
+    return result || [];
+  }
+
+  async exists(key: string) {
+    const result = await this.request(['EXISTS', key]);
+    return result || 0;
+  }
+}
 
 // Initialize Redis client
-const redis = new Redis({
-  url: import.meta.env.VITE_UPSTASH_REDIS_URL || '',
-  token: import.meta.env.VITE_UPSTASH_REDIS_TOKEN || '',
-})
+const redis = new BrowserRedis(
+  import.meta.env.VITE_UPSTASH_REDIS_URL || '',
+  import.meta.env.VITE_UPSTASH_REDIS_TOKEN || ''
+);
 
 // Check if Redis is configured
 const isRedisEnabled = (): boolean => {
