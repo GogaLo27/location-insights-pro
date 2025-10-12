@@ -101,8 +101,38 @@ async function analyzeBatchReviews(reviews: any[]) {
   for (let i = 0; i < reviews.length; i += BATCH_SIZE) {
     const batch = reviews.slice(i, i + BATCH_SIZE);
     
-    // Create batch prompt
-    const batchPrompt = createBatchPrompt(batch);
+    // Separate reviews with text from those without
+    const reviewsWithText = [];
+    const reviewsWithoutText = [];
+    
+    batch.forEach(review => {
+      if (review.text && review.text.trim().length > 0) {
+        reviewsWithText.push(review);
+      } else {
+        // Reviews without text - use rating-based sentiment immediately
+        reviewsWithoutText.push({
+          ...review,
+          ai_sentiment: getSentimentFromRating(review.rating),
+          ai_tags: ['rating only'],
+          ai_issues: [],
+          ai_suggestions: []
+        });
+      }
+    });
+    
+    // Add reviews without text to results (no AI needed)
+    results.push(...reviewsWithoutText);
+    
+    console.log(`📊 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${reviewsWithText.length} with text, ${reviewsWithoutText.length} rating-only`);
+    
+    // If no reviews with text, skip AI call
+    if (reviewsWithText.length === 0) {
+      console.log('⚡ Skipping AI call - all reviews are rating-only');
+      continue;
+    }
+    
+    // Create batch prompt only for reviews with text
+    const batchPrompt = createBatchPrompt(reviewsWithText);
     
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -127,8 +157,8 @@ async function analyzeBatchReviews(reviews: any[]) {
 
       if (!response.ok) {
         console.error(`❌ OpenAI API error: ${response.status}`);
-        // Fallback: Use rating-based sentiment
-        batch.forEach(review => {
+        // Fallback: Use rating-based sentiment for reviews with text
+        reviewsWithText.forEach(review => {
           results.push({
             ...review,
             ai_sentiment: getSentimentFromRating(review.rating),
@@ -146,8 +176,8 @@ async function analyzeBatchReviews(reviews: any[]) {
       try {
         const analyses = JSON.parse(aiResponse);
         
-        // Match analyses with reviews
-        batch.forEach((review, index) => {
+        // Match analyses with reviews (only for reviews with text)
+        reviewsWithText.forEach((review, index) => {
           const analysis = analyses[index] || {};
           results.push({
             ...review,
@@ -159,8 +189,8 @@ async function analyzeBatchReviews(reviews: any[]) {
         });
       } catch (parseError) {
         console.error('❌ Failed to parse batch response:', parseError);
-        // Fallback
-        batch.forEach(review => {
+        // Fallback for reviews with text
+        reviewsWithText.forEach(review => {
           results.push({
             ...review,
             ai_sentiment: getSentimentFromRating(review.rating),
@@ -173,8 +203,8 @@ async function analyzeBatchReviews(reviews: any[]) {
       
     } catch (error) {
       console.error('❌ Batch analysis error:', error);
-      // Fallback for entire batch
-      batch.forEach(review => {
+      // Fallback for reviews with text only
+      reviewsWithText.forEach(review => {
         results.push({
           ...review,
           ai_sentiment: getSentimentFromRating(review.rating),
