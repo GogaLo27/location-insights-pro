@@ -245,7 +245,7 @@ const Sentiment = () => {
     if (user) {
       fetchSentimentData();
     }
-  }, [user, ctxSelectedLocation?.google_place_id, dateRange]);
+  }, [user, ctxSelectedLocation?.google_place_id]);
 
 
   const fetchSentimentData = async () => {
