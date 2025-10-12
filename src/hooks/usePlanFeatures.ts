@@ -45,9 +45,10 @@ export interface PlanFeatures {
 }
 
 export const usePlanFeatures = (): PlanFeatures => {
-  const { plan } = usePlan();
+  const { plan, isSubscriptionExpired } = usePlan();
   
-  const planType = plan?.plan_type || null;
+  // If subscription is expired, treat user as having no plan (all features locked)
+  const planType = (isSubscriptionExpired ? null : plan?.plan_type) || null;
   const isStarter = planType === 'starter';
   const isProfessional = planType === 'professional';
   const isEnterprise = planType === 'enterprise';

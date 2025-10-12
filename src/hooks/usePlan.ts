@@ -7,12 +7,15 @@ interface UserPlan {
   id: string;
   plan_type: string;
   created_at: string;
+  subscription_status?: 'active' | 'cancelled' | 'expired';
+  current_period_end?: string | null;
 }
 
 export const usePlan = () => {
   const { user } = useAuth();
   const [plan, setPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubscriptionExpired, setIsSubscriptionExpired] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -57,19 +60,51 @@ export const usePlan = () => {
       if (error) {
         console.error("Error fetching plan:", error);
         setPlan(null);
+        setIsSubscriptionExpired(false);
       } else if (data) {
-        setPlan(data as any);
+        // Also fetch subscription status to check expiration
+        const { data: subscriptionData } = await supabase
+          .from("subscriptions")
+          .select("status, current_period_end")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let expired = false;
+        if (subscriptionData) {
+          // Check if subscription is expired
+          if (subscriptionData.status === 'expired') {
+            expired = true;
+          } else if (subscriptionData.status === 'active' && subscriptionData.current_period_end) {
+            const expiryDate = new Date(subscriptionData.current_period_end);
+            const now = new Date();
+            expired = expiryDate < now;
+          }
+
+          setPlan({
+            ...data,
+            subscription_status: subscriptionData.status as any,
+            current_period_end: subscriptionData.current_period_end,
+          } as any);
+        } else {
+          setPlan(data as any);
+        }
+
+        setIsSubscriptionExpired(expired);
       } else {
         // Don't auto-create a plan - let user choose
         setPlan(null);
+        setIsSubscriptionExpired(false);
       }
     } catch (err) {
       console.error("Error fetching plan:", err);
       setPlan(null);
+      setIsSubscriptionExpired(false);
     } finally {
       setLoading(false);
     }
   };
 
-  return { plan, loading, refetch: fetchPlan };
+  return { plan, loading, refetch: fetchPlan, isSubscriptionExpired };
 };
