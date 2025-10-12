@@ -7,8 +7,12 @@ import {
   Shield,
   CheckCircle2
 } from "lucide-react";
+import { useAuth } from "@/components/ui/auth-provider";
+import { GoogleSignInButton } from "@/components/ui/google-signin-button";
 
 export function EnhancedFeaturesGrid() {
+  const { signInWithGoogle } = useAuth();
+  
   const features = [
     {
       icon: Brain,
@@ -158,9 +162,13 @@ export function EnhancedFeaturesGrid() {
           <p className="text-gray-600 mb-6">
             Ready to experience these features?
           </p>
-          <button className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:scale-105">
-            Get Started Now
-          </button>
+          <GoogleSignInButton
+            onClick={signInWithGoogle}
+            text="Sign in with Google"
+            variant="light"
+            size="default"
+            className="hover:shadow-lg mx-auto w-[240px] h-12"
+          />
         </div>
       </div>
     </section>

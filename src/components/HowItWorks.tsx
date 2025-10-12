@@ -5,6 +5,7 @@ import {
   ArrowRightIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { GoogleSignInButton } from "@/components/ui/google-signin-button";
 
 export function HowItWorks() {
   const { signInWithGoogle } = useAuth();
@@ -153,12 +154,13 @@ export function HowItWorks() {
               Join thousands of businesses already using Dibiex to
               improve their customer experience
             </p>
-            <button 
+            <GoogleSignInButton
               onClick={signInWithGoogle}
-              className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-8 py-3 rounded-lg font-medium transition-all duration-300 hover:shadow-lg"
-            >
-              Get Started Now
-            </button>
+              text="Sign in with Google"
+              variant="light"
+              size="default"
+              className="hover:shadow-lg mx-auto w-[240px] h-12"
+            />
           </div>
         </div>
       </div>

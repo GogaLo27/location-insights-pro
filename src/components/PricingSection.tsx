@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckIcon, XIcon } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { GoogleSignInButton } from "@/components/ui/google-signin-button";
+import { Link } from "react-router-dom";
 
 export function PricingSection() {
   const { signInWithGoogle, signInAsDemo } = useAuth();
@@ -146,16 +148,13 @@ export function PricingSection() {
               </div>
 
               {/* CTA Button */}
-              <Button
+              <GoogleSignInButton
                 onClick={signInWithGoogle}
-                className={`w-full py-3 text-lg font-medium ${
-                  plan.highlight
-                    ? "bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
-                    : "bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
-                }`}
-              >
-                {plan.cta}
-              </Button>
+                text="Sign in with Google"
+                variant="light"
+                size="default"
+                className="w-full h-11"
+              />
 
               {/* Demo Button */}
               <Button
@@ -198,10 +197,12 @@ export function PricingSection() {
                 Schedule a Demo
               </Button>
               <Button 
-                onClick={signInWithGoogle}
+                asChild
                 className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
               >
-                Contact Sales
+                <Link to="/contact">
+                  Contact Sales
+                </Link>
               </Button>
             </div>
           </div>

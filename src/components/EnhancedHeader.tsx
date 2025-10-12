@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { MenuIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { GoogleSignInButton } from "@/components/ui/google-signin-button";
 
 // Smooth scroll function
 const scrollToSection = (sectionId: string) => {
@@ -65,17 +66,18 @@ export function EnhancedHeader() {
           <div className="hidden md:flex items-center space-x-4">
             <Button
               variant="ghost"
-              className="text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10"
+              className="text-[#2b394c] hover:text-[#ecc00c] hover:bg-[#ecc00c]/10 h-10"
               onClick={signInAsDemo}
             >
               Try Demo
             </Button>
-            <Button 
-              className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            <GoogleSignInButton
               onClick={signInWithGoogle}
-            >
-              Get Started
-            </Button>
+              text="Sign in with Google"
+              variant="light"
+              size="default"
+              className="shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 h-10"
+            />
           </div>
 
           {/* Mobile Menu Button */}
@@ -139,12 +141,12 @@ export function EnhancedHeader() {
                 >
                   Try Demo
                 </Button>
-                <Button 
-                  className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white"
+                <GoogleSignInButton
                   onClick={signInWithGoogle}
-                >
-                  Get Started
-                </Button>
+                  text="Sign in with Google"
+                  variant="light"
+                  size="default"
+                />
               </div>
             </nav>
           </div>

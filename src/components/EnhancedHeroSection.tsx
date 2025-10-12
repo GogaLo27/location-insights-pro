@@ -9,6 +9,7 @@ import {
   Brain,
 } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { GoogleSignInButton } from "@/components/ui/google-signin-button";
 
 export function EnhancedHeroSection() {
   const { signInWithGoogle, signInAsDemo } = useAuth();
@@ -37,21 +38,20 @@ export function EnhancedHeroSection() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
-              <Button
-                size="lg"
-                className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-8 py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              <GoogleSignInButton
                 onClick={signInWithGoogle}
-              >
-                <BarChart3 className="w-5 h-5 mr-2" />
-                Start Free Analysis
-              </Button>
+                text="Sign in with Google"
+                variant="light"
+                size="default"
+                className="shadow-lg hover:shadow-xl transition-all duration-300 w-[240px] h-12"
+              />
               <Button
-                size="lg"
+                size="default"
                 variant="outline"
-                className="border-2 border-[#2b394c] hover:border-[#ecc00c] px-8 py-3 text-lg bg-white text-[#2b394c] hover:text-[#ecc00c]"
+                className="border-2 border-[#2b394c] hover:border-[#ecc00c] bg-white text-[#2b394c] hover:text-[#ecc00c] w-[240px] h-12"
                 onClick={signInAsDemo}
               >
-                <PlayIcon className="w-5 h-5 mr-2" />
+                <PlayIcon className="w-4 h-4 mr-2" />
                 Try Demo
               </Button>
             </div>

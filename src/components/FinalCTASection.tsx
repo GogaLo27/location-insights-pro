@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRightIcon, CheckIcon } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
+import { GoogleSignInButton } from "@/components/ui/google-signin-button";
 
 export function FinalCTASection() {
   const { signInWithGoogle, signInAsDemo } = useAuth();
@@ -42,19 +43,18 @@ export function FinalCTASection() {
 
           {/* CTA Buttons */}
           <div className="mb-8 flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              size="lg"
+            <GoogleSignInButton
               onClick={signInWithGoogle}
-              className="bg-[#2b394c] hover:bg-[#2b394c]/90 text-white px-12 py-4 text-xl font-semibold rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105"
-            >
-              Get Started Now
-              <ArrowRightIcon className="w-6 h-6 ml-2" />
-            </Button>
+              text="Sign in with Google"
+              variant="light"
+              size="default"
+              className="shadow-2xl hover:shadow-3xl transition-all duration-300 w-[240px] h-12"
+            />
             <Button
-              size="lg"
+              size="default"
               variant="outline"
               onClick={signInAsDemo}
-              className="border-2 border-white/30 bg-white text-[#2b394c] hover:bg-gray-100 hover:text-[#2b394c] px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300"
+              className="border-2 border-white/30 bg-white text-[#2b394c] hover:bg-gray-100 hover:text-[#2b394c] rounded-xl transition-all duration-300 w-[240px] h-12"
             >
               Try Demo First
             </Button>
