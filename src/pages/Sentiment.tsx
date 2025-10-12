@@ -400,25 +400,83 @@ const Sentiment = () => {
   };
 
   const handleGenerateSentiment = async () => {
+    if (!user) return;
+
     try {
-      const currentDateRange = getDateRange();
-      const { data, error } = await supabase.functions.invoke('ai-review-analysis', {
-        body: {
-          action: 'generate_sentiment_analysis',
-          location_id: ctxSelectedLocation?.google_place_id,
-          period_type: 'overall',
-          start_date: format(currentDateRange.from, 'yyyy-MM-dd'),
-          end_date: format(currentDateRange.to, 'yyyy-MM-dd')
-        }
+      setLoading(true);
+
+      // Get the location ID
+      const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
+      
+      if (!locationId) {
+        toast({
+          title: "Error",
+          description: "Please select a location first",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get reviews that haven't been analyzed yet
+      const { data: unanalyzedReviews, error: fetchError } = await supabase
+        .from('saved_reviews')
+        .select('*')
+        .eq('location_id', locationId)
+        .is('ai_analyzed_at', null);
+
+      if (fetchError) throw fetchError;
+
+      if (!unanalyzedReviews || unanalyzedReviews.length === 0) {
+        toast({
+          title: "Info",
+          description: "All reviews are already analyzed",
+        });
+        setLoading(false);
+        return;
+      }
+
+      toast({
+        title: "Processing",
+        description: `Analyzing ${unanalyzedReviews.length} reviews...`,
       });
 
-      if (error) throw error;
+      // Process reviews in batches of 10
+      const batchSize = 10;
+      let processedCount = 0;
+
+      for (let i = 0; i < unanalyzedReviews.length; i += batchSize) {
+        const batch = unanalyzedReviews.slice(i, i + batchSize);
+
+        // Call the AI analysis edge function
+        const { data: analysisData, error: analysisError } = await supabase.functions.invoke('ai-review-analysis', {
+          body: { reviews: batch }
+        });
+
+        if (!analysisError && analysisData?.reviews) {
+          // Update database with AI analysis
+          for (const analyzedReview of analysisData.reviews) {
+            await supabase
+              .from('saved_reviews')
+              .update({
+                ai_sentiment: analyzedReview.ai_sentiment,
+                ai_tags: analyzedReview.ai_tags,
+                ai_issues: analyzedReview.ai_issues,
+                ai_suggestions: analyzedReview.ai_suggestions,
+                ai_analyzed_at: new Date().toISOString(),
+              })
+              .eq('google_review_id', analyzedReview.google_review_id);
+          }
+
+          processedCount += batch.length;
+        }
+      }
 
       toast({
         title: "Success",
-        description: "Sentiment analysis generated successfully",
+        description: `Successfully analyzed ${processedCount} reviews`,
       });
 
+      // Refresh the sentiment data
       fetchSentimentData();
     } catch (error) {
       console.error('Error generating sentiment analysis:', error);
@@ -427,6 +485,8 @@ const Sentiment = () => {
         description: "Failed to generate sentiment analysis",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
