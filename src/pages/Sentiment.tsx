@@ -252,7 +252,10 @@ const Sentiment = () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load (when no data exists)
+      if (sentimentData.length === 0) {
+        setLoading(true);
+      }
 
       // Check if demo user and use the same generated demo reviews as Reviews page
       if (user.email === 'demolip29@gmail.com') {
