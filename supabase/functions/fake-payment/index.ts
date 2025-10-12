@@ -61,7 +61,11 @@ serve(async (req) => {
     // Simulate payment processing delay
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Create a fake subscription record
+    // Create a fake subscription record with 30-day expiration
+    const currentDate = new Date();
+    const expirationDate = new Date(currentDate);
+    expirationDate.setDate(currentDate.getDate() + 30); // 30 days from now
+    
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .insert({
@@ -70,6 +74,8 @@ serve(async (req) => {
         status: 'active',
         provider: 'fake',
         provider_subscription_id: `fake-sub-${Date.now()}`,
+        current_period_end: expirationDate.toISOString(),
+        cancel_at_period_end: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
