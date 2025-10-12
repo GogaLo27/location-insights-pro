@@ -58,17 +58,15 @@ const Sentiment = () => {
   const { toast } = useToast();
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<string>("3"); // Default to "Last 3 months"
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>({ from: new Date('1990-01-01'), to: new Date() });
+  const [selectedPreset, setSelectedPreset] = useState<string>("0"); // Default to "All Time"
   const { selectedLocation: ctxSelectedLocation } = useLocationContext();
 
-  // Get date range to use - custom if set, otherwise default to last 3 months
+  // Get date range to use - custom if set, otherwise default to all time
   const getDateRange = () => {
     if (dateRange) return dateRange;
-    const now = new Date();
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(now.getMonth() - 3);
-    return { from: threeMonthsAgo, to: now };
+    // Default to all time
+    return { from: new Date('1990-01-01'), to: new Date() };
   };
 
   // Chart data preparation
@@ -262,11 +260,10 @@ const Sentiment = () => {
         return;
       }
 
-      // Get sentiment data from saved reviews
+      // Get ALL reviews (both analyzed and unanalyzed)
       let query = supabase
         .from('saved_reviews')
-        .select('*')
-        .not('ai_sentiment', 'is', null);
+        .select('*');
 
       const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
       if (locationId) {
@@ -276,13 +273,35 @@ const Sentiment = () => {
       const { data: reviews, error } = await query;
 
       if (!error && reviews) {
-        console.log('Reviews found:', reviews.length);
+        console.log('Total reviews found:', reviews.length);
+        
+        // For reviews without AI sentiment, use rating-based sentiment
+        const reviewsWithSentiment = reviews.map(review => {
+          if (!review.ai_sentiment) {
+            // Rating-based sentiment: 5 = positive, 4 = positive, 3 = neutral, 1-2 = negative
+            let sentiment = 'neutral';
+            if (review.rating >= 4) sentiment = 'positive';
+            else if (review.rating <= 2) sentiment = 'negative';
+            
+            return {
+              ...review,
+              ai_sentiment: sentiment,
+              ai_tags: review.ai_tags || [],
+              ai_issues: review.ai_issues || [],
+              ai_suggestions: review.ai_suggestions || []
+            };
+          }
+          return review;
+        });
+        
+        console.log('Reviews with sentiment (AI + rating-based):', reviewsWithSentiment.length);
         console.log('Date range for processing:', {
           from: getDateRange().from,
           to: getDateRange().to
         });
+        
         // Process reviews into sentiment data by period
-        const processedData = processReviewsIntoSentimentData(reviews);
+        const processedData = processReviewsIntoSentimentData(reviewsWithSentiment);
         console.log('Processed sentiment data:', processedData);
         setSentimentData(processedData);
       } else {
@@ -494,7 +513,7 @@ const Sentiment = () => {
   const getDatePresets = () => [
     {
       label: "All Time",
-      from: new Date('2020-01-01'), // Far back enough to capture all data
+      from: new Date('1990-01-01'), // Far back enough to capture all data
       to: new Date()
     },
     {
