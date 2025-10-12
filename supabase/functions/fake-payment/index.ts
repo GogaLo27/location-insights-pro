@@ -74,10 +74,10 @@ serve(async (req) => {
         status: 'active',
         provider: 'fake',
         provider_subscription_id: `fake-sub-${Date.now()}`,
-        current_period_end: expirationDate.toISOString(),
+        current_period_end: expirationDate, // PostgreSQL will handle the timestamp conversion
         cancel_at_period_end: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_at: currentDate,
+        updated_at: currentDate
       })
       .select()
       .single()

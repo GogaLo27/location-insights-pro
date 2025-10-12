@@ -3,7 +3,7 @@
 
 UPDATE subscriptions
 SET 
-  current_period_end = (created_at::timestamp + INTERVAL '30 days')::text,
+  current_period_end = created_at::timestamptz + INTERVAL '30 days',
   cancel_at_period_end = false,
   updated_at = NOW()
 WHERE 
