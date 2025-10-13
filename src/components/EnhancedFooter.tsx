@@ -22,6 +22,7 @@ export function EnhancedFooter() {
     legal: [
       { name: "Privacy Policy", href: "/privacy" },
       { name: "Terms & Conditions", href: "/terms" },
+      { name: "Refund Policy", href: "/refund-policy" },
       { name: "Cookie Policy", href: "/cookie-policy" },
     ],
   };
@@ -141,6 +142,12 @@ export function EnhancedFooter() {
                 className="text-gray-300 hover:text-[#ecc00c] transition-colors"
               >
                 Terms & Conditions
+              </Link>
+              <Link
+                to="/refund-policy"
+                className="text-gray-300 hover:text-[#ecc00c] transition-colors"
+              >
+                Refund Policy
               </Link>
               <Link
                 to="/cookie-policy"

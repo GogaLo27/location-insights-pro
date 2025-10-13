@@ -76,6 +76,11 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/refund-policy" className="text-gray-600 hover:text-blue-600 transition-colors">
+                  Refund Policy
+                </Link>
+              </li>
+              <li>
                 <Link to="/cookie-policy" className="text-gray-600 hover:text-blue-600 transition-colors">
                   Cookie Policy
                 </Link>

@@ -132,7 +132,13 @@ const Terms = () => {
                   <li>Access to the Service may require a subscription or one-time payment.</li>
                   <li>Fees, billing cycles, and payment methods will be disclosed at the time of purchase.</li>
                   <li>We reserve the right to change subscription fees with prior notice.</li>
-                  <li>All payments are non-refundable except as required by law.</li>
+                  <li>
+                    All payments are non-refundable except as required by law. See our{" "}
+                    <Link to="/refund-policy" className="text-[#ecc00c] hover:text-[#2b394c] underline font-medium transition-colors">
+                      Refund Policy
+                    </Link>{" "}
+                    for details.
+                  </li>
                 </ul>
               </CardContent>
             </Card>
