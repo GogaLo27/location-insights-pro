@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Base URL for sitemap entries. Adjust if deploying to a subpath.
-const BASE_URL = process.env.SITE_URL || 'https://yourdomain.com';
+// Default set to the project's domain.
+const BASE_URL = process.env.SITE_URL || 'https://dibiex.com';
 
 const outPath = path.join(__dirname, '..', 'public', 'sitemap.xml');
 
