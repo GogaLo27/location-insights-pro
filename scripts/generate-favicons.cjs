@@ -7,7 +7,7 @@ const pngToIco = require('png-to-ico');
 const publicDir = path.join(__dirname, '..', 'public');
 const logoPath = path.join(publicDir, 'logo.png');
 const outPng32 = path.join(publicDir, 'fav.png');
-const outIco = path.join(publicDir, 'favicon.ico');
+const outIco = path.join(publicDir, 'fav.ico');
 
 async function build() {
   if (!fs.existsSync(logoPath)) {
