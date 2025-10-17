@@ -71,3 +71,17 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Sitemap
+
+This project includes a small sitemap generator that writes `public/sitemap.xml`.
+
+- Run locally: `npm run generate-sitemap` (from the `client` folder).
+- The generator uses the `SITE_URL` environment variable if set. Example:
+
+```powershell
+$env:SITE_URL = 'https://example.com'
+npm run generate-sitemap
+```
+
+The sitemap is also generated automatically before `npm run build` thanks to the `prebuild` script.
