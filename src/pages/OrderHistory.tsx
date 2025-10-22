@@ -15,6 +15,12 @@ interface SubscriptionRow {
   updated_at: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
+  can_refund: boolean | null;
+  refund_eligible_until: string | null;
+  cancelled_at: string | null;
+  store_id: string | null;
+  product_id: string | null;
+  order_id: string | null;
 }
 
 interface EventRow {
@@ -72,7 +78,22 @@ export default function OrderHistory() {
         const sb: any = supabase;
         const { data: subsData } = await sb
           .from("subscriptions")
-          .select("id, plan_type, status, provider_subscription_id, created_at, updated_at, current_period_end, cancel_at_period_end")
+          .select(`
+            id, 
+            plan_type, 
+            status, 
+            provider_subscription_id, 
+            created_at, 
+            updated_at, 
+            current_period_end, 
+            cancel_at_period_end,
+            can_refund,
+            refund_eligible_until,
+            cancelled_at,
+            store_id,
+            product_id,
+            order_id
+          `)
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         if (!mounted) return;

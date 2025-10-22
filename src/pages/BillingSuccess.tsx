@@ -45,17 +45,8 @@ export default function BillingSuccess() {
         return;
       }
 
-      if (tries % 3 === 0 && (localId || providerId)) {
-        const { data: session } = await supabase.auth.getSession();
-        const jwt = session.session?.access_token || "";
-        await supabase.functions.invoke("paypal-sync-subscription", {
-          body: {
-            local_subscription_id: localId,
-            provider_subscription_id: providerId,
-          },
-          headers: { Authorization: `Bearer ${jwt}` },
-        });
-      }
+      // LemonSqueezy webhook will handle subscription updates automatically
+      // No need for manual sync calls
 
       setStatus(`Current status: ${subRow?.status || "pending"}. Waiting…`);
       timer = setTimeout(poll, 2000);

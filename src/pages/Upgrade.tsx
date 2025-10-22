@@ -130,32 +130,40 @@ const Upgrade = () => {
     
     setIsUpgrading(true);
     try {
-      // Update user plan in database
-      const { error } = await supabase
-        .from('user_plans')
-        .update({
+      // Get Supabase auth JWT
+      const { data: authData } = await supabase.auth.getSession();
+      const jwt = authData.session?.access_token || "";
+
+      // Create LemonSqueezy subscription
+      const res = await supabase.functions.invoke("lemonsqueezy-create-subscription", {
+        body: {
           plan_type: planId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      // Refresh plan data
-      await refetch();
-      
-      toast({
-        title: "Success",
-        description: `Successfully upgraded to ${plans.find(p => p.id === planId)?.name} plan!`,
+          return_url: `${window.location.origin}/billing-success`,
+          cancel_url: `${window.location.origin}/upgrade`,
+        },
+        headers: { Authorization: `Bearer ${jwt}` },
       });
-    } catch (error) {
+
+      if (res.error) throw res.error;
+
+      let payload: any = res.data;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+
+      if (!payload?.checkout_url) {
+        throw new Error("Failed to create LemonSqueezy subscription");
+      }
+
+      // Redirect to LemonSqueezy for checkout
+      window.location.href = payload.checkout_url;
+    } catch (error: any) {
       console.error('Error upgrading plan:', error);
       toast({
         title: "Error",
-        description: "Failed to upgrade plan. Please try again.",
+        description: error.message || "Failed to upgrade plan. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsUpgrading(false);
     }
   };
@@ -305,7 +313,7 @@ const Upgrade = () => {
                             </>
                           ) : (
                             <>
-                              Upgrade to {planItem.name}
+                              Subscribe to {planItem.name}
                               <ArrowRight className="h-4 w-4 ml-2" />
                             </>
                           )}

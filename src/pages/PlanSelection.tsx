@@ -23,8 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 type BillingPlanRow = {
   id: string;
   plan_type: "starter" | "professional" | "enterprise";
-  provider: "paypal";
-  provider_plan_id: string; // PayPal plan id "P-XXXX"
+  provider: "lemonsqueezy";
+  provider_plan_id: string; // LemonSqueezy product id
   price_cents: number;
   currency: string; // "USD"
   interval: "month";
@@ -51,13 +51,13 @@ export default function PlanSelection() {
       if (!user) return;
       setLoading(true);
       try {
-        // Use hardcoded plans with correct pricing instead of fetching from DB
+        // Use hardcoded LemonSqueezy plans with correct pricing
         const hardcodedPlans = [
           {
             id: "starter-plan",
             plan_type: "starter",
-            provider: "fake",
-            provider_plan_id: "fake-starter-plan",
+            provider: "lemonsqueezy",
+            provider_plan_id: "669764",
             price_cents: 4900, // $49
             currency: "USD",
             interval: "month",
@@ -68,8 +68,8 @@ export default function PlanSelection() {
           {
             id: "professional-plan",
             plan_type: "professional", 
-            provider: "fake",
-            provider_plan_id: "fake-professional-plan",
+            provider: "lemonsqueezy",
+            provider_plan_id: "669762",
             price_cents: 9900, // $99
             currency: "USD",
             interval: "month",
@@ -80,8 +80,8 @@ export default function PlanSelection() {
           {
             id: "enterprise-plan",
             plan_type: "enterprise",
-            provider: "fake", 
-            provider_plan_id: "fake-enterprise-plan",
+            provider: "lemonsqueezy", 
+            provider_plan_id: "669760",
             price_cents: 19900, // $199
             currency: "USD",
             interval: "month",
@@ -191,10 +191,12 @@ export default function PlanSelection() {
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
-      // Use fake payment system
-      const res = await supabase.functions.invoke("fake-payment", {
+      // Create LemonSqueezy subscription
+      const res = await supabase.functions.invoke("lemonsqueezy-create-subscription", {
         body: {
           plan_type: planType,
+          return_url: `${window.location.origin}/billing-success`,
+          cancel_url: `${window.location.origin}/plan-selection`,
         },
         headers: { Authorization: `Bearer ${jwt}` },
       });
@@ -212,23 +214,13 @@ export default function PlanSelection() {
         }
       }
 
-      if (!payload?.success) {
+      if (!payload?.checkout_url) {
         console.error("Unexpected payload shape:", payload);
-        throw new Error("Payment failed");
+        throw new Error("Failed to create LemonSqueezy subscription");
       }
 
-      // Show success message
-      toast({
-        title: "Payment Successful!",
-        description: payload.message || "Your subscription has been activated.",
-      });
-
-      // Redirect to location selection (users need to select a location after choosing a plan)
-      if (payload.redirect_url) {
-        window.location.href = payload.redirect_url;
-      } else {
-        window.location.href = "/location-selection";
-      }
+      // Redirect to LemonSqueezy for checkout
+      window.location.href = payload.checkout_url;
     } catch (e: any) {
       console.error(e);
       toast({

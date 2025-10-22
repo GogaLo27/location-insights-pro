@@ -63,7 +63,7 @@ const PlanManagement = () => {
       const { data, error } = await (supabase as any)
         .from("billing_plans")
         .select("id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at")
-        .eq("provider", "fake")
+        .eq("provider", "lemonsqueezy")
         .order("price_cents", { ascending: true });
 
       if (error) throw error;
@@ -104,9 +104,11 @@ const PlanManagement = () => {
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
-      const res = await supabase.functions.invoke("fake-payment", {
+      const res = await supabase.functions.invoke("lemonsqueezy-create-subscription", {
         body: {
           plan_type: planType,
+          return_url: `${window.location.origin}/billing-success`,
+          cancel_url: `${window.location.origin}/plan-management`,
         },
         headers: { Authorization: `Bearer ${jwt}` },
       });
@@ -118,23 +120,10 @@ const PlanManagement = () => {
         try { payload = JSON.parse(payload); } catch {}
       }
 
-      if (!payload?.success) throw new Error("Payment failed");
+      if (!payload?.checkout_url) throw new Error("Failed to create LemonSqueezy subscription");
 
-      // Show success message
-      toast({
-        title: "Payment Successful!",
-        description: payload.message || "Your subscription has been activated.",
-      });
-
-      // Refresh plan data
-      await fetchCurrentPlan();
-
-      // Redirect to dashboard
-      if (payload.redirect_url) {
-        window.location.href = payload.redirect_url;
-      } else {
-        window.location.href = "/dashboard";
-      }
+      // Redirect to LemonSqueezy for checkout
+      window.location.href = payload.checkout_url;
     } catch (e: any) {
       console.error(e);
       toast({
