@@ -1,60 +1,121 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-const sb: any = supabase;
-
-function getQueryParam(name: string) {
-  const url = new URL(window.location.href);
-  return url.searchParams.get(name) || undefined;
-}
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/components/ui/auth-provider'
+import { supabase } from '@/integrations/supabase/client'
 
 export default function BillingSuccess() {
-  const [status, setStatus] = useState("Checking your subscription…");
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('Processing your subscription...')
 
   useEffect(() => {
-    const localId = localStorage.getItem("pendingSubId") || undefined;
-    const providerId = getQueryParam("subscription_id"); // from PayPal redirect
-    let tries = 0;
-    let timer: ReturnType<typeof setTimeout>;
+    const processSubscription = async () => {
+      try {
+        // Get the latest subscription
+        const { data: subscription, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user?.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
 
-    async function poll() {
-      tries++;
+        if (error) {
+          console.error('Error fetching subscription:', error)
+          setMessage('There was an issue processing your subscription. Please contact support.')
+          return
+        }
 
-      let subRow: any = null;
-      if (localId) {
-        const { data } = await sb
-          .from("subscriptions")
-          .select("id,status,provider_subscription_id")
-          .eq("id", localId)
-          .single();
-        subRow = data;
-      } else if (providerId) {
-        const { data } = await sb
-          .from("subscriptions")
-          .select("id,status,provider_subscription_id")
-          .eq("provider_subscription_id", providerId)
-          .maybeSingle();
-        subRow = data;
+        if (subscription?.paypal_subscription_id) {
+          // Check PayPal subscription status directly
+          const { data: paypalStatus, error: paypalError } = await supabase.functions.invoke('check-paypal-subscription', {
+            body: {
+              subscription_id: subscription.paypal_subscription_id
+            }
+          })
+
+          if (paypalError) {
+            console.error('Error checking PayPal subscription:', paypalError)
+            setMessage('Subscription is being processed. This may take a few minutes...')
+            setTimeout(() => {
+              window.location.reload()
+            }, 10000)
+            return
+          }
+
+          if (paypalStatus?.status === 'ACTIVE') {
+            // Update our database
+            const { error: updateError } = await supabase
+              .from('subscriptions')
+              .update({
+                status: 'active',
+                current_period_end: paypalStatus.billing_info?.next_billing_time 
+                  ? new Date(paypalStatus.billing_info.next_billing_time).toISOString()
+                  : null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', subscription.id)
+
+            if (updateError) {
+              console.error('Error updating subscription:', updateError)
+            }
+
+            setMessage('Subscription activated successfully! Redirecting to dashboard...')
+            setTimeout(() => {
+              navigate('/dashboard')
+            }, 2000)
+          } else {
+            setMessage('Subscription is being processed. This may take a few minutes...')
+            setTimeout(() => {
+              window.location.reload()
+            }, 10000)
+          }
+        } else {
+          setMessage('Subscription is being processed. This may take a few minutes...')
+          setTimeout(() => {
+            window.location.reload()
+          }, 10000)
+        }
+      } catch (error) {
+        console.error('Error processing subscription:', error)
+        setMessage('There was an issue processing your subscription. Please contact support.')
+      } finally {
+        setLoading(false)
       }
-
-      if (subRow?.status === "active") {
-        setStatus("Subscription active! Redirecting to dashboard…");
-        localStorage.removeItem("pendingSubId");
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 1000);
-        return;
-      }
-
-      // LemonSqueezy webhook will handle subscription updates automatically
-      // No need for manual sync calls
-
-      setStatus(`Current status: ${subRow?.status || "pending"}. Waiting…`);
-      timer = setTimeout(poll, 2000);
     }
 
-    poll();
-    return () => clearTimeout(timer);
-  }, []);
+    if (user) {
+      processSubscription()
+    }
+  }, [user, navigate])
 
-  return <div className="p-8 text-lg">{status}</div>;
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+            <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-lg font-medium text-gray-900 mb-2">Payment Successful!</h1>
+          <p className="text-sm text-gray-600 mb-4">{message}</p>
+          {loading && (
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+          )}
+          <div className="mt-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }

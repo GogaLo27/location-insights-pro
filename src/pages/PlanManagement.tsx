@@ -104,26 +104,65 @@ const PlanManagement = () => {
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
-      const res = await supabase.functions.invoke("lemonsqueezy-create-subscription", {
-        body: {
-          plan_type: planType,
-          return_url: `${window.location.origin}/billing-success`,
-          cancel_url: `${window.location.origin}/plan-management`,
-        },
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
+      // Try PayPal first (default payment method)
+      try {
+        const paypalRes = await supabase.functions.invoke("paypal-create-subscription", {
+          body: {
+            plan_type: planType,
+            return_url: `${window.location.origin}/billing-success`,
+            cancel_url: `${window.location.origin}/plan-management`,
+          },
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
 
-      if (res.error) throw new Error(res.error.message || "Edge function error");
+        if (paypalRes.error) {
+          throw new Error(paypalRes.error.message || "PayPal edge function error");
+        }
 
-      let payload: any = res.data;
-      if (typeof payload === "string") {
-        try { payload = JSON.parse(payload); } catch {}
+        let paypalPayload: any = paypalRes.data;
+        if (typeof paypalPayload === "string") {
+          try {
+            paypalPayload = JSON.parse(paypalPayload);
+          } catch {
+            // ignore
+          }
+        }
+
+        if (paypalPayload?.checkout_url) {
+          // Redirect to PayPal for checkout
+          window.location.href = paypalPayload.checkout_url;
+          return;
+        }
+      } catch (paypalError) {
+        console.warn("PayPal subscription failed, falling back to LemonSqueezy:", paypalError);
+        
+        // Fallback to LemonSqueezy
+        const lemonRes = await supabase.functions.invoke("lemonsqueezy-create-subscription", {
+          body: {
+            plan_type: planType,
+            return_url: `${window.location.origin}/billing-success`,
+            cancel_url: `${window.location.origin}/plan-management`,
+          },
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+
+        if (lemonRes.error) throw new Error(lemonRes.error.message || "LemonSqueezy edge function error");
+
+        let lemonPayload: any = lemonRes.data;
+        if (typeof lemonPayload === "string") {
+          try { lemonPayload = JSON.parse(lemonPayload); } catch {}
+        }
+
+        if (!lemonPayload?.checkout_url) throw new Error("Failed to create LemonSqueezy subscription");
+
+        // Redirect to LemonSqueezy for checkout
+        window.location.href = lemonPayload.checkout_url;
+        return;
       }
 
-      if (!payload?.checkout_url) throw new Error("Failed to create LemonSqueezy subscription");
+      // If we get here, both PayPal and LemonSqueezy failed
+      throw new Error("Both PayPal and LemonSqueezy payment methods failed");
 
-      // Redirect to LemonSqueezy for checkout
-      window.location.href = payload.checkout_url;
     } catch (e: any) {
       console.error(e);
       toast({

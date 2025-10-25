@@ -55,6 +55,14 @@ const App = () => (
               }
             />
             <Route
+              path="/billing-success"
+              element={
+                <ProtectedRoute requiresPlan={false}>
+                  <BillingSuccess />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dashboard"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
