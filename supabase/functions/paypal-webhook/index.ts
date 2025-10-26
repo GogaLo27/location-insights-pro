@@ -290,7 +290,7 @@ async function handleSubscriptionExpired(supabase: any, event: PayPalWebhookEven
   // Find subscription by PayPal subscription ID
   const { data: sub, error: fetchError } = await supabase
     .from("subscriptions")
-    .select("id")
+    .select("id, user_id")
     .eq("paypal_subscription_id", subscription.id)
     .single()
 
@@ -311,6 +311,19 @@ async function handleSubscriptionExpired(supabase: any, event: PayPalWebhookEven
   if (error) {
     console.error("Error updating subscription:", error)
     throw error
+  }
+
+  // Downgrade user to free/starter plan when subscription expires
+  if (sub.user_id) {
+    await supabase
+      .from("user_plans")
+      .update({
+        plan_type: "starter", // or "free" if you have a free tier
+        updated_at: new Date().toISOString()
+      })
+      .eq("user_id", sub.user_id)
+    
+    console.log("User downgraded to starter plan after expiration")
   }
 
   // Create subscription event

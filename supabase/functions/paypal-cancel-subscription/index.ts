@@ -101,7 +101,8 @@ serve(async (req) => {
       throw new Error(`Failed to cancel PayPal subscription: ${errorText}`)
     }
 
-    // Update local subscription
+    // Update local subscription to cancelled status
+    // User keeps access until expiration, then gets downgraded automatically
     const { error: updateError } = await supabase
       .from("subscriptions")
       .update({
@@ -115,6 +116,11 @@ serve(async (req) => {
       console.error("Error updating subscription:", updateError)
       throw updateError
     }
+
+    // NOTE: We do NOT downgrade the user here
+    // User keeps their paid plan features until the subscription expires
+    // The webhook will handle downgrade when BILLING.SUBSCRIPTION.EXPIRED fires
+    console.log("Subscription marked as cancelled. User keeps access until expiration.")
 
     // Log cancellation event
     await supabase
