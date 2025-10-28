@@ -5,6 +5,7 @@ import { LocationProvider } from '@/contexts/LocationContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ConditionalThemeProvider } from '@/components/ui/conditional-theme-provider';
 import CookieConsent from '@/components/CookieConsent';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Locations from './pages/Locations';
@@ -43,6 +44,7 @@ const App = () => (
     <AuthProvider>
       <LocationProvider>
         <BrowserRouter>
+          <GoogleAnalytics />
           <ConditionalThemeProvider>
             <Routes>
             <Route path="/" element={<Landing />} />
