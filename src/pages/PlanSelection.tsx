@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBillingPlans } from "@/hooks/useBillingPlans";
 import { DynamicPlanCard } from "@/components/DynamicPlanCard";
 import { RefreshCw } from "lucide-react";
+import SEOHead from "@/components/SEOHead";
 
 export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
@@ -164,6 +165,7 @@ export default function PlanSelection() {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <SidebarInset>
+          <SEOHead routePath="/plan-selection" />
           <div className="flex-1 flex flex-col">
             <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
               <div className="flex items-center gap-2 px-4 w-full">

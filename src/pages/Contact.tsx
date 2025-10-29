@@ -14,6 +14,7 @@ import {
   Clock,
   CheckCircle
 } from "lucide-react";
+import SEOHead from "@/components/SEOHead";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -45,6 +46,7 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-[#2b394c]/5">
+      <SEOHead routePath="/contact" />
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">

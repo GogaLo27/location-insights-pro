@@ -9,6 +9,7 @@ import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { PricingSection } from "@/components/PricingSection";
 import { FAQSection } from "@/components/FAQSection";
 import { FinalCTASection } from "@/components/FinalCTASection";
+import SEOHead from "@/components/SEOHead";
 
 const Landing = () => {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen">
+      <SEOHead routePath="/" />
       {/* Sticky Header */}
       <EnhancedHeader />
 
