@@ -27,6 +27,53 @@ interface PayPalWebhookEvent {
   }>
 }
 
+async function getPayPalAccessToken(): Promise<string> {
+  const clientId = Deno.env.get('PAYPAL_CLIENT_ID') ?? ''
+  const clientSecret = Deno.env.get('PAYPAL_CLIENT_SECRET') ?? ''
+  const mode = Deno.env.get('PAYPAL_MODE') || 'sandbox'
+  const base = mode === 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com'
+
+  const authHeader = 'Basic ' + btoa(`${clientId}:${clientSecret}`)
+  const res = await fetch(`${base}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'grant_type=client_credentials'
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    console.error('Failed to fetch PayPal token:', text)
+    throw new Error('Failed to fetch PayPal token')
+  }
+
+  const data = await res.json()
+  return data.access_token
+}
+
+async function cancelPayPalSubscription(paypalSubscriptionId: string, reason: string = 'Replaced by upgrade'): Promise<void> {
+  const mode = Deno.env.get('PAYPAL_MODE') || 'sandbox'
+  const base = mode === 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com'
+  const token = await getPayPalAccessToken()
+
+  const res = await fetch(`${base}/v1/billing/subscriptions/${paypalSubscriptionId}/cancel`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ reason })
+  })
+
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text()
+    console.error('Failed to cancel PayPal subscription:', paypalSubscriptionId, text)
+    throw new Error('Failed to cancel PayPal subscription')
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
@@ -193,6 +240,44 @@ async function handleSubscriptionActivated(supabase: any, event: PayPalWebhookEv
   }
 
   console.log("User plan updated successfully")
+
+  // Immediately cancel any other active PayPal subscription for this user (ensure single active sub)
+  try {
+    const { data: otherSubs, error: listError } = await supabase
+      .from('subscriptions')
+      .select('id, paypal_subscription_id')
+      .eq('user_id', existingSub.user_id)
+      .eq('provider', 'paypal')
+      .eq('status', 'active')
+      .neq('id', existingSub.id)
+
+    if (listError) {
+      console.error('Error fetching other active subscriptions:', listError)
+    } else if (otherSubs && otherSubs.length > 0) {
+      console.log('Cancelling other active PayPal subscriptions for user:', otherSubs.map(s => s.id))
+      for (const oldSub of otherSubs) {
+        if (oldSub.paypal_subscription_id) {
+          try {
+            await cancelPayPalSubscription(oldSub.paypal_subscription_id, 'Upgraded to a new plan')
+          } catch (err) {
+            console.error('PayPal cancel API failed (will still mark as cancelled locally):', err)
+          }
+
+          const { error: markErr } = await supabase
+            .from('subscriptions')
+            .update({ status: 'cancelled', cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', oldSub.id)
+
+          if (markErr) {
+            console.error('Failed to mark old subscription as cancelled:', markErr)
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error while auto-cancelling previous subscriptions:', e)
+  }
+
   console.log("=== PAYPAL WEBHOOK PROCESSING COMPLETE ===")
 }
 

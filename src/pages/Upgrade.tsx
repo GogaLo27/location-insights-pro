@@ -30,6 +30,16 @@ import { useToast } from "@/hooks/use-toast";
 import { usePlan } from "@/hooks/usePlan";
 import { useBillingPlans } from "@/hooks/useBillingPlans";
 import { DynamicPlanCard } from "@/components/DynamicPlanCard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PlanFeature {
   name: string;
@@ -53,6 +63,9 @@ const Upgrade = () => {
   const { plan, loading: planLoading, refetch } = usePlan();
   const { toast } = useToast();
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
+  const [pendingPlanName, setPendingPlanName] = useState<string | null>(null);
   
   // Fetch dynamic billing plans
   const { plans: paypalPlans, loading: plansLoading } = useBillingPlans('paypal');
@@ -143,6 +156,18 @@ const Upgrade = () => {
       });
       setIsUpgrading(false);
     }
+  };
+
+  const requestUpgrade = (planId: string, planName: string) => {
+    setPendingPlanId(planId);
+    setPendingPlanName(planName);
+    setConfirmOpen(true);
+  };
+
+  const confirmUpgrade = async () => {
+    if (!pendingPlanId) return;
+    setConfirmOpen(false);
+    await handleUpgrade(pendingPlanId);
   };
 
   const getFeatureStatus = (featureName: string, planId: string) => {
@@ -274,7 +299,7 @@ const Upgrade = () => {
                       className="w-full mt-6"
                       variant={planItem.popular ? "default" : "outline"}
                       disabled={planItem.current || isUpgrading}
-                      onClick={() => handleUpgrade(planItem.id)}
+                      onClick={() => requestUpgrade(planItem.id, planItem.name)}
                     >
                       {planItem.current ? (
                         <>
@@ -347,6 +372,25 @@ const Upgrade = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm upgrade to {pendingPlanName}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Upgrading will switch you to {pendingPlanName} immediately and charge the full price now.
+                    Your current subscription will be cancelled right away and will not renew. There are no refunds
+                    or proration credits for any unused time from your previous plan. Do you want to proceed?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isUpgrading}>No, keep current plan</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmUpgrade} disabled={isUpgrading}>
+                    Yes, charge me and upgrade
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* FAQ Section */}
             <Card>
