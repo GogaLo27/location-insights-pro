@@ -836,11 +836,14 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
     console.log(`📅 Last synced: ${lastSyncDate}`);
     
     // Get existing review IDs to avoid duplicates
+    // Check existing reviews by user (not narrowed to location) because
+    // the same Google review_id can appear across multiple locations
+    // for the same business/account. The unique constraint is on
+    // (user_id, google_review_id), so we must dedupe at the user level.
     const { data: existingReviews } = await supabase
       .from('saved_reviews')
       .select('google_review_id')
-      .eq('user_id', userId)
-      .eq('location_id', locationId);
+      .eq('user_id', userId);
     
     const existingReviewIds = new Set(
       existingReviews?.map(r => r.google_review_id) || []
@@ -902,7 +905,15 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
     
     // Save only new reviews to database
     if (newReviews.length > 0) {
-      const reviewsToInsert = newReviews.map(review => ({
+      // De-duplicate by google_review_id in case Google returned duplicates
+      const seen = new Set<string>()
+      const deduped = newReviews.filter(r => {
+        if (seen.has(r.google_review_id)) return false
+        seen.add(r.google_review_id)
+        return true
+      })
+
+      const reviewsToInsert = deduped.map(review => ({
         user_id: userId,
         location_id: locationId,
         google_review_id: review.google_review_id,
@@ -914,9 +925,10 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
         reply_date: review.reply_date,
       }));
       
+      // Use upsert keyed to the unique constraint (user_id, google_review_id)
       const { error: insertError } = await supabase
         .from('saved_reviews')
-        .insert(reviewsToInsert);
+        .upsert(reviewsToInsert, { onConflict: 'user_id,google_review_id' });
       
       if (insertError) {
         console.error('Error saving new reviews:', insertError);

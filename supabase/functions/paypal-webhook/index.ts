@@ -77,6 +77,28 @@ async function cancelPayPalSubscription(paypalSubscriptionId: string, reason: st
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
+  // Handle GET requests (PayPal sometimes sends GET to verify webhook URL)
+  if (req.method === "GET") {
+    console.log("GET request received - likely webhook URL verification")
+    return new Response(JSON.stringify({ 
+      status: "ok", 
+      message: "PayPal webhook endpoint is active" 
+    }), {
+      status: 200,
+      headers: { ...cors, "Content-Type": "application/json" }
+    })
+  }
+
+  // Only POST requests should reach here
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ 
+      error: "Method not allowed. Only POST requests are accepted." 
+    }), {
+      status: 405,
+      headers: { ...cors, "Content-Type": "application/json" }
+    })
+  }
+
   try {
     const body = await req.text()
     const webhookId = Deno.env.get('PAYPAL_WEBHOOK_ID')
@@ -92,6 +114,17 @@ serve(async (req) => {
     } else {
       // Production validation would go here
       console.log("Production mode - would validate webhook here")
+    }
+
+    // Validate body is not empty
+    if (!body || body.trim() === '') {
+      console.error("Empty webhook body received")
+      return new Response(JSON.stringify({ 
+        error: "Empty request body" 
+      }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
     }
 
     const event: PayPalWebhookEvent = JSON.parse(body)

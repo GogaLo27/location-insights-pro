@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2, Trash2, CheckSquare, Square, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -905,6 +906,7 @@ Keep the response under 150 words.`;
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <SidebarInset>
+          <TooltipProvider>
           {/* --- your UI below is unchanged --- */}
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
@@ -919,11 +921,20 @@ Keep the response under 150 words.`;
             <div className="flex items-center space-x-4 ml-auto">
               {/* Sync New Reviews Button */}
               {resolveLocationId() && (
-                <SyncButton 
-                  locationId={resolveLocationId()} 
-                  onSyncComplete={fetchReviews}
-                  className="mr-2"
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <SyncButton 
+                        locationId={resolveLocationId()} 
+                        onSyncComplete={fetchReviews}
+                        className="mr-2"
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Fetch new Google reviews for this location and update the list
+                  </TooltipContent>
+                </Tooltip>
               )}
               
               {/* Bulk Operations */}
@@ -978,52 +989,73 @@ Keep the response under 150 words.`;
               )}
               
               <FeatureGate feature="AI Analysis" variant="inline">
-                <Button
-                  onClick={runAIAnalysis}
-                  size="sm"
-                  variant="outline"
-                  disabled={isAnalyzing}
-                >
-                  {isAnalyzing ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Bot className="w-4 h-4 mr-2" />
-                  )}
-                  {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={runAIAnalysis}
+                      size="sm"
+                      variant="outline"
+                      disabled={isAnalyzing}
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Bot className="w-4 h-4 mr-2" />
+                      )}
+                      {isAnalyzing ? `Analyzing (${completed}/${total})` : 'AI Analysis'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Run AI sentiment and tagging for selected reviews
+                  </TooltipContent>
+                </Tooltip>
               </FeatureGate>
-              <Button onClick={() => {
-                setReviewsDeleted(false); // Reset deletion flag when manually refreshing
-                setDeletedFlag(false); // Clear localStorage deletion flag
-                fetchReviews(true);
-              }} size="sm" disabled={isAnalyzing}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={() => {
+                    setReviewsDeleted(false); // Reset deletion flag when manually refreshing
+                    setDeletedFlag(false); // Clear localStorage deletion flag
+                    fetchReviews(true);
+                  }} size="sm" disabled={isAnalyzing}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Reload from database and clear any delete-all hiding flags
+                </TooltipContent>
+              </Tooltip>
               {selectedLocation && reviews.length > 0 && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button 
-                      size="sm" 
-                      variant="destructive" 
-                      disabled={isDeleting || isAnalyzing}
-                      onClick={() => {
-                        console.log('Delete button clicked');
-                        console.log('Current state:', {
-                          user: user?.id,
-                          selectedLocation,
-                          reviewsCount: reviews.length,
-                          locationId: resolveLocationId()
-                        });
-                      }}
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 mr-2" />
-                      )}
-                      {isDeleting ? 'Deleting...' : 'Delete All'}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          disabled={isDeleting || isAnalyzing}
+                          onClick={() => {
+                            console.log('Delete button clicked');
+                            console.log('Current state:', {
+                              user: user?.id,
+                              selectedLocation,
+                              reviewsCount: reviews.length,
+                              locationId: resolveLocationId()
+                            });
+                          }}
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 mr-2" />
+                          )}
+                          {isDeleting ? 'Deleting...' : 'Delete All'}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Permanently delete all reviews and AI data for this location
+                      </TooltipContent>
+                    </Tooltip>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -1067,6 +1099,7 @@ Keep the response under 150 words.`;
               )}
             </div>
           </header>
+          </TooltipProvider>
 
           <div className="flex-1 space-y-6 p-8 pt-6">
             {/* Fetch Progress Bar */}
