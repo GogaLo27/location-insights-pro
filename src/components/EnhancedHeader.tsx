@@ -60,6 +60,12 @@ export function EnhancedHeader() {
             >
               Testimonials
             </button>
+            <a
+              href="/blog"
+              className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
+            >
+              Blog
+            </a>
           </nav>
 
           {/* Desktop CTA Buttons */}

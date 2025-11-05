@@ -8,6 +8,7 @@ export function EnhancedFooter() {
   const footerLinks = {
     company: [
       { name: "About Us", href: "/about" },
+      { name: "Blog", href: "/blog" },
       { name: "Contact", href: "/contact" },
       { name: "Support", href: "/contact" },
     ],

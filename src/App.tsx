@@ -29,6 +29,9 @@ import CookiePolicy from './pages/CookiePolicy';
 import RefundPolicy from './pages/RefundPolicy';
 import Contact from './pages/Contact';
 import About from './pages/About';
+import BlogList from './pages/BlogList';
+import BlogPost from './pages/BlogPost';
+import CategoryPage from './pages/CategoryPage';
 import Settings from './pages/Settings';
 import Feedback from './pages/Feedback';
 import NotFound from './pages/NotFound';
@@ -210,6 +213,9 @@ const App = () => (
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/about" element={<About />} />
+            <Route path="/blog" element={<BlogList />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/blog/category/:categorySlug" element={<CategoryPage />} />
 
             {/* Dashboard Legal Pages */}
             <Route
