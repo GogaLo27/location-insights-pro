@@ -10,9 +10,23 @@ import { PricingSection } from "@/components/PricingSection";
 import { FAQSection } from "@/components/FAQSection";
 import { FinalCTASection } from "@/components/FinalCTASection";
 import SEOHead from "@/components/SEOHead";
+import { useEffect } from "react";
 
 const Landing = () => {
   const { user } = useAuth();
+
+  // Handle hash scrolling when coming from other pages
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      setTimeout(() => {
+        const element = document.getElementById(hash);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, []);
 
   if (user) {
     // Let ProtectedRoute handle the redirect logic

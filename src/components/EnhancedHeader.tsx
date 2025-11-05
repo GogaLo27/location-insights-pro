@@ -3,21 +3,30 @@ import { MenuIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { GoogleSignInButton } from "@/components/ui/google-signin-button";
+import { useNavigate, useLocation } from "react-router-dom";
 
-// Smooth scroll function
-const scrollToSection = (sectionId: string) => {
-  const element = document.getElementById(sectionId);
-  if (element) {
-    element.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
+// Smooth scroll function or navigate to home
+const scrollToSection = (sectionId: string, navigate: (path: string) => void, currentPath: string) => {
+  // If we're on the home page, scroll to section
+  if (currentPath === '/') {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  } else {
+    // Otherwise, navigate to home with hash
+    navigate(`/#${sectionId}`);
   }
 };
 
 export function EnhancedHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { signInWithGoogle, signInAsDemo } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -37,25 +46,25 @@ export function EnhancedHeader() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <button
-              onClick={() => scrollToSection('features')}
+              onClick={() => scrollToSection('features', navigate, location.pathname)}
               className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               Features
             </button>
             <button
-              onClick={() => scrollToSection('pricing')}
+              onClick={() => scrollToSection('pricing', navigate, location.pathname)}
               className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               Pricing
             </button>
             <button
-              onClick={() => scrollToSection('how-it-works')}
+              onClick={() => scrollToSection('how-it-works', navigate, location.pathname)}
               className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               How It Works
             </button>
             <button
-              onClick={() => scrollToSection('testimonials')}
+              onClick={() => scrollToSection('testimonials', navigate, location.pathname)}
               className="text-[#2b394c] hover:text-[#ecc00c] transition-colors"
             >
               Testimonials
@@ -105,7 +114,7 @@ export function EnhancedHeader() {
             <nav className="flex flex-col space-y-4">
               <button
                 onClick={() => {
-                  scrollToSection('features');
+                  scrollToSection('features', navigate, location.pathname);
                   setIsMenuOpen(false);
                 }}
                 className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
@@ -114,7 +123,7 @@ export function EnhancedHeader() {
               </button>
               <button
                 onClick={() => {
-                  scrollToSection('pricing');
+                  scrollToSection('pricing', navigate, location.pathname);
                   setIsMenuOpen(false);
                 }}
                 className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
@@ -123,7 +132,7 @@ export function EnhancedHeader() {
               </button>
               <button
                 onClick={() => {
-                  scrollToSection('how-it-works');
+                  scrollToSection('how-it-works', navigate, location.pathname);
                   setIsMenuOpen(false);
                 }}
                 className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
@@ -132,13 +141,19 @@ export function EnhancedHeader() {
               </button>
               <button
                 onClick={() => {
-                  scrollToSection('testimonials');
+                  scrollToSection('testimonials', navigate, location.pathname);
                   setIsMenuOpen(false);
                 }}
                 className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
               >
                 Testimonials
               </button>
+              <a
+                href="/blog"
+                className="text-[#2b394c] hover:text-[#ecc00c] transition-colors text-left"
+              >
+                Blog
+              </a>
               <div className="flex flex-col space-y-2 pt-4">
                 <Button
                   variant="ghost"
