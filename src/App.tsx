@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/ui/auth-provider';
 import { LocationProvider } from '@/contexts/LocationContext';
+import { CampaignProvider } from '@/contexts/CampaignContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ConditionalThemeProvider } from '@/components/ui/conditional-theme-provider';
 import CookieConsent from '@/components/CookieConsent';
@@ -46,8 +47,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <LocationProvider>
-        <BrowserRouter>
-          <GoogleAnalytics />
+        <CampaignProvider>
+          <BrowserRouter>
+            <GoogleAnalytics />
           <ConditionalThemeProvider>
             <Routes>
             <Route path="/" element={<Landing />} />
@@ -257,6 +259,7 @@ const App = () => (
             <CookieConsent />
           </ConditionalThemeProvider>
         </BrowserRouter>
+        </CampaignProvider>
       </LocationProvider>
     </AuthProvider>
   </QueryClientProvider>

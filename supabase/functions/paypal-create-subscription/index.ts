@@ -58,7 +58,20 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(auth || "")
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: cors })
 
-    const { plan_type, return_url, cancel_url } = await req.json()
+    const { 
+      plan_type, 
+      return_url, 
+      cancel_url,
+      // Campaign tracking parameters
+      campaign_code,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      landing_page,
+      conversion_page
+    } = await req.json()
 
     // Get PayPal credentials
     const clientId = Deno.env.get('PAYPAL_CLIENT_ID')
@@ -109,7 +122,7 @@ serve(async (req) => {
     const tokenData = await tokenResponse.json()
     const accessToken = tokenData.access_token
 
-    // Create local subscription (pending)
+    // Create local subscription (pending) with campaign tracking
     const { data: sub, error: subErr } = await supabase
       .from("subscriptions")
       .insert({ 
@@ -119,7 +132,16 @@ serve(async (req) => {
         provider: "paypal",
         payment_method: "paypal",
         paypal_plan_id: planIds[plan_type],
-        refund_eligible_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 hours from now
+        refund_eligible_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), // 48 hours from now
+        // Campaign tracking data
+        campaign_code: campaign_code || null,
+        referral_source: utm_source || null,
+        referral_medium: utm_medium || null,
+        referral_campaign: utm_campaign || null,
+        referral_content: utm_content || null,
+        referral_term: utm_term || null,
+        landing_page: landing_page || null,
+        conversion_page: conversion_page || null
       })
       .select("*")
       .single()

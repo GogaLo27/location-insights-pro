@@ -13,6 +13,7 @@ import { useBillingPlans } from "@/hooks/useBillingPlans";
 import { DynamicPlanCard } from "@/components/DynamicPlanCard";
 import { RefreshCw } from "lucide-react";
 import SEOHead from "@/components/SEOHead";
+import { getCampaignDataFromStorage } from "@/contexts/CampaignContext";
 
 export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
@@ -44,6 +45,9 @@ export default function PlanSelection() {
       const { data: authData } = await supabase.auth.getSession();
       const jwt = authData.session?.access_token || "";
 
+      // Get campaign tracking data from storage
+      const campaignData = getCampaignDataFromStorage();
+
       // Try PayPal first (default payment method)
       try {
         const paypalRes = await supabase.functions.invoke("paypal-create-subscription", {
@@ -51,6 +55,15 @@ export default function PlanSelection() {
           plan_type: planType,
           return_url: `${window.location.origin}/billing-success`,
           cancel_url: `${window.location.origin}/plan-selection`,
+          // Include campaign tracking data
+          campaign_code: campaignData?.campaign_code,
+          utm_source: campaignData?.utm_source,
+          utm_medium: campaignData?.utm_medium,
+          utm_campaign: campaignData?.utm_campaign,
+          utm_content: campaignData?.utm_content,
+          utm_term: campaignData?.utm_term,
+          landing_page: campaignData?.landing_page,
+          conversion_page: '/plan-selection'
         },
         headers: { Authorization: `Bearer ${jwt}` },
       });
