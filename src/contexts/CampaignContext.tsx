@@ -54,10 +54,11 @@ const getOrCreateSessionId = (): string => {
 // Track visit to backend
 const trackCampaignVisit = async (campaignData: CampaignData) => {
   try {
+    console.log('🔵 Tracking campaign visit for:', campaignData.campaign_code);
     const visitorId = getOrCreateVisitorId();
     const sessionId = getOrCreateSessionId();
 
-    await supabase.functions.invoke('track-campaign-visit', {
+    const response = await supabase.functions.invoke('track-campaign-visit', {
       body: {
         campaign_code: campaignData.campaign_code,
         visitor_id: visitorId,
@@ -73,9 +74,14 @@ const trackCampaignVisit = async (campaignData: CampaignData) => {
       }
     });
     
-    console.log('📊 Visit tracked for campaign:', campaignData.campaign_code);
+    console.log('🔵 Edge function response:', response);
+    if (response.error) {
+      console.error('🔴 Edge function error:', response.error);
+    } else {
+      console.log('✅ Visit tracked successfully for campaign:', campaignData.campaign_code);
+    }
   } catch (error) {
-    console.error('Failed to track campaign visit:', error);
+    console.error('🔴 Failed to track campaign visit:', error);
     // Don't block user experience if tracking fails
   }
 };
@@ -84,6 +90,7 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({ children }) 
   const [campaignData, setCampaignData] = useState<CampaignData | null>(null);
 
   useEffect(() => {
+    console.log('🔵 CampaignProvider mounted - checking for campaign parameters...');
     // Try to load existing campaign data from localStorage
     const loadCampaignData = () => {
       try {
@@ -114,10 +121,13 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({ children }) 
 
     // Capture URL parameters on first load
     const captureUrlParams = async () => {
+      console.log('🔵 Capturing URL params from:', window.location.href);
       const params = new URLSearchParams(window.location.search);
+      console.log('🔵 URL params:', Object.fromEntries(params.entries()));
       
       const visitorId = getOrCreateVisitorId();
       const sessionId = getOrCreateSessionId();
+      console.log('🔵 Visitor ID:', visitorId);
       
       const newData: CampaignData = {
         // Primary campaign code (can be 'ref' or 'campaign' parameter)
@@ -147,7 +157,10 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({ children }) 
           && newData[key as keyof CampaignData]
       );
 
+      console.log('🔵 Has tracking data?', hasTrackingData, newData);
+
       if (hasTrackingData) {
+        console.log('🔵 Saving campaign data and tracking visit...');
         // Don't override existing campaign data unless this is a new campaign
         const existing = loadCampaignData();
         if (!existing || params.get('ref') || params.get('campaign')) {
@@ -168,11 +181,16 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({ children }) 
     };
 
     captureUrlParams().then(data => {
+      console.log('🔵 captureUrlParams result:', data);
       setCampaignData(data);
       // Log for debugging (remove in production)
       if (data && (data.campaign_code || data.utm_source)) {
         console.log('📊 Campaign tracking captured:', data);
+      } else {
+        console.log('🔵 No campaign data captured');
       }
+    }).catch(error => {
+      console.error('🔴 Error in captureUrlParams:', error);
     });
   }, []); // Only run once on mount
 

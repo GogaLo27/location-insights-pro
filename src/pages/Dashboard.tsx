@@ -15,6 +15,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { format } from "date-fns";
 import { DEMO_EMAIL, getDemoReviewsForLocation, mockLocations } from "@/utils/mockData";
+import { useCampaignSignupTracking } from "@/hooks/useCampaignSignupTracking";
 
 interface Profile {
   id: string;
@@ -38,6 +39,9 @@ const Dashboard = () => {
   const { selectedLocation, locations } = useLocation();
   const { maxLocations } = usePlanFeatures();
   const [profile, setProfile] = useState<Profile | null>(null);
+  
+  // Track campaign signup after Google auth
+  useCampaignSignupTracking();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentReviews, setRecentReviews] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
