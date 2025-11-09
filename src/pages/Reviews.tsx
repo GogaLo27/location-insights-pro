@@ -565,11 +565,16 @@ const Reviews = () => {
   };
 
   const deleteAllReviewsForLocation = async () => {
-    if (!user || !selectedLocation || isDeleting) return;
+    console.log('🗑️ DELETE FUNCTION CALLED');
+    
+    if (!user || !selectedLocation || isDeleting) {
+      console.log('❌ DELETE BLOCKED:', { user: !!user, selectedLocation: !!selectedLocation, isDeleting });
+      return;
+    }
 
     const locationId = resolveLocationId();
     if (!locationId) {
-      console.error('No location ID resolved');
+      console.error('❌ No location ID resolved');
       toast({
         title: "Error",
         description: "Could not resolve location ID",
@@ -580,11 +585,10 @@ const Reviews = () => {
 
     try {
       setIsDeleting(true);
-
-      console.log('Starting delete operation for:', {
+      console.log('✅ Starting delete operation for:', {
         locationId,
         userId: user.id,
-        selectedLocation
+        selectedLocationName: selectedLocation.location_name
       });
 
       // First, let's check how many reviews we're about to delete
@@ -1046,22 +1050,13 @@ Keep the response under 150 words.`;
               </Tooltip>
               {selectedLocation && reviews.length > 0 && (
                 <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertDialogTrigger asChild>
                         <Button 
                           size="sm" 
                           variant="destructive" 
                           disabled={isDeleting || isAnalyzing}
-                          onClick={() => {
-                            console.log('Delete button clicked');
-                            console.log('Current state:', {
-                              user: user?.id,
-                              selectedLocation,
-                              reviewsCount: reviews.length,
-                              locationId: resolveLocationId()
-                            });
-                          }}
                         >
                           {isDeleting ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1070,12 +1065,12 @@ Keep the response under 150 words.`;
                           )}
                           {isDeleting ? 'Deleting...' : 'Delete All'}
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Permanently delete all reviews and AI data for this location
-                      </TooltipContent>
-                    </Tooltip>
-                  </AlertDialogTrigger>
+                      </AlertDialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Permanently delete all reviews and AI data for this location
+                    </TooltipContent>
+                  </Tooltip>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete All Reviews</AlertDialogTitle>
@@ -1096,7 +1091,11 @@ Keep the response under 150 words.`;
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={deleteAllReviewsForLocation}
+                        onClick={(e) => {
+                          console.log('🔴 CONFIRM DELETE BUTTON CLICKED');
+                          e.preventDefault();
+                          deleteAllReviewsForLocation();
+                        }}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         disabled={isDeleting}
                       >
