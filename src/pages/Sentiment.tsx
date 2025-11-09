@@ -281,7 +281,8 @@ const Sentiment = () => {
       // Get ALL reviews (both analyzed and unanalyzed)
       let query = supabase
         .from('saved_reviews')
-        .select('*');
+        .select('*')
+        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
 
       const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
       if (locationId) {
@@ -460,7 +461,8 @@ const Sentiment = () => {
         .from('saved_reviews')
         .select('*')
         .eq('location_id', locationId)
-        .is('ai_analyzed_at', null);
+        .is('ai_analyzed_at', null)
+        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
 
       if (fetchError) throw fetchError;
 

@@ -285,7 +285,8 @@ const Reviews = () => {
         .from('saved_reviews')
         .select('*')
         .eq('location_id', locationId)
-        .order('review_date', { ascending: false });
+        .order('review_date', { ascending: false })
+        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
 
       if (!dbError && savedReviews) {
         setReviews(savedReviews.map(review => ({
@@ -346,7 +347,8 @@ const Reviews = () => {
             .from('saved_reviews')
             .select('*', { count: 'exact' })
             .eq('location_id', locationId)
-            .order('review_date', { ascending: false });
+            .order('review_date', { ascending: false })
+            .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
 
           if (updatedReviews) {
             setReviews(updatedReviews.map(review => ({
@@ -869,7 +871,7 @@ Keep the response under 150 words.`;
   const pagedReviews = filteredReviews.slice((page - 1) * pageSize, page * pageSize);
   
   // Performance optimization: limit displayed reviews for very large datasets
-  const maxDisplayedReviews = 1000;
+  const maxDisplayedReviews = 50000; // Increased from 1000 to 50k to handle large locations
   const shouldShowPagination = filteredReviews.length > pageSize;
   const displayReviews = filteredReviews.length > maxDisplayedReviews 
     ? filteredReviews.slice(0, maxDisplayedReviews) 

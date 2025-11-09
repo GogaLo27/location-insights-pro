@@ -134,7 +134,8 @@ const Dashboard = () => {
       const { data: reviews, error } = await supabase
         .from('saved_reviews')
         .select('*')
-        .eq('location_id', locationId);
+        .eq('location_id', locationId)
+        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
 
       if (!error && reviews) {
         const totalReviews = reviews.length;
