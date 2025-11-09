@@ -63,6 +63,8 @@ const Sentiment = () => {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>({ from: new Date('1990-01-01'), to: new Date() });
   const [selectedPreset, setSelectedPreset] = useState<string>("0"); // Default to "All Time"
+  const [sentimentPage, setSentimentPage] = useState(1);
+  const sentimentPageSize = 5; // Show 5 periods per page
   const { selectedLocation: ctxSelectedLocation } = useLocationContext();
   
   // Analysis progress tracking
@@ -1435,8 +1437,8 @@ const Sentiment = () => {
               </div>
             )}
 
-            {/* Empty State - Only show if no sentiment data */}
-            {sentimentData.length === 0 && (
+            {/* Detailed Sentiment Data with Pagination */}
+            {sentimentData.length === 0 ? (
               <Card>
                 <CardContent className="text-center py-12">
                   <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -1450,6 +1452,155 @@ const Sentiment = () => {
                   </Button>
                 </CardContent>
               </Card>
+            ) : (
+              <>
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle>Detailed Sentiment Analysis</CardTitle>
+                    <CardDescription>
+                      Historical breakdown of sentiment over time • Showing {Math.min((sentimentPage - 1) * sentimentPageSize + 1, sentimentData.length)}-{Math.min(sentimentPage * sentimentPageSize, sentimentData.length)} of {sentimentData.length} periods
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <div className="space-y-4">
+                  {sentimentData
+                    .slice((sentimentPage - 1) * sentimentPageSize, sentimentPage * sentimentPageSize)
+                    .map((data) => (
+                      <Card key={data.id}>
+                        <CardHeader>
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <CardTitle className="text-lg">
+                                {format(new Date(data.analysis_date), 'MMM d, yyyy')}
+                              </CardTitle>
+                              <CardDescription>
+                                {data.location_name} • {data.period_type} analysis
+                              </CardDescription>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold">{data.average_rating.toFixed(1)}</div>
+                              <p className="text-sm text-muted-foreground">Avg Rating</p>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-3 gap-6 mb-6">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">{data.positive_count}</div>
+                              <p className="text-sm text-muted-foreground">Positive</p>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-gray-600">{data.neutral_count}</div>
+                              <p className="text-sm text-muted-foreground">Neutral</p>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-red-600">{data.negative_count}</div>
+                              <p className="text-sm text-muted-foreground">Negative</p>
+                            </div>
+                          </div>
+
+                          <div className="grid md:grid-cols-2 gap-6">
+                            {data.top_positive_tags && data.top_positive_tags.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold text-green-600 mb-2">Top Positive Tags</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {data.top_positive_tags.map((tag, index) => (
+                                    <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {data.top_negative_tags && data.top_negative_tags.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold text-red-600 mb-2">Top Negative Tags</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {data.top_negative_tags.map((tag, index) => (
+                                    <span key={index} className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {((data.top_issues && data.top_issues.length > 0) || (data.top_suggestions && data.top_suggestions.length > 0)) && (
+                            <div className="grid md:grid-cols-2 gap-6 mt-6">
+                              {data.top_issues && data.top_issues.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-destructive mb-3 flex items-center">
+                                    <span className="w-2 h-2 bg-destructive rounded-full mr-2"></span>
+                                    Key Issues to Address
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {data.top_issues.map((issue, index) => (
+                                      <div key={index} className="text-sm bg-destructive/5 p-3 rounded-lg border-l-2 border-destructive/20">
+                                        ⚠️ {issue}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {data.top_suggestions && data.top_suggestions.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-primary mb-3 flex items-center">
+                                    <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
+                                    Recommended Actions
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {data.top_suggestions.map((suggestion, index) => (
+                                      <div key={index} className="text-sm bg-primary/5 p-3 rounded-lg border-l-2 border-primary/20">
+                                        💡 {suggestion}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {(!data.top_issues || data.top_issues.length === 0) && (!data.top_suggestions || data.top_suggestions.length === 0) && (
+                            <div className="mt-6 p-4 bg-muted/50 rounded-lg text-center">
+                              <p className="text-muted-foreground">No specific issues or suggestions identified for this period.</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {sentimentData.length > sentimentPageSize && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Page {sentimentPage} of {Math.ceil(sentimentData.length / sentimentPageSize)}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSentimentPage(p => Math.max(1, p - 1))}
+                        disabled={sentimentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSentimentPage(p => Math.min(Math.ceil(sentimentData.length / sentimentPageSize), p + 1))}
+                        disabled={sentimentPage >= Math.ceil(sentimentData.length / sentimentPageSize)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </SidebarInset>
