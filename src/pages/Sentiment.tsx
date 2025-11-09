@@ -30,6 +30,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  AreaChart,
+  Area,
 } from "recharts";
 
 interface SentimentData {
@@ -93,6 +95,8 @@ const Sentiment = () => {
       const dataDate = new Date(data.analysis_date);
       // Check if date is valid
       if (isNaN(dataDate.getTime())) return false;
+      // Filter out invalid ratings (outliers)
+      if (!data.avg_rating || data.avg_rating < 1 || data.avg_rating > 5) return false;
       return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
     });
 
@@ -103,7 +107,33 @@ const Sentiment = () => {
       return dateA.getTime() - dateB.getTime();
     });
 
-    return sortedData.map(data => {
+    // If too many data points (>100), aggregate by week
+    let processedData = sortedData;
+    if (sortedData.length > 100) {
+      const weekMap = new Map<string, { sum: number; count: number; date: Date }>();
+      sortedData.forEach(data => {
+        const dataDate = new Date(data.analysis_date);
+        // Get week key (year-week)
+        const weekKey = `${dataDate.getFullYear()}-W${Math.floor(dataDate.getDate() / 7)}`;
+        if (!weekMap.has(weekKey)) {
+          weekMap.set(weekKey, { sum: 0, count: 0, date: dataDate });
+        }
+        const week = weekMap.get(weekKey)!;
+        week.sum += data.avg_rating || 0;
+        week.count += 1;
+      });
+      // Convert back to array with averages
+      processedData = Array.from(weekMap.values()).map(week => ({
+        analysis_date: week.date.toISOString(),
+        avg_rating: week.sum / week.count,
+        total_positive: 0,
+        total_negative: 0,
+        total_neutral: 0,
+        total_reviews: week.count
+      }));
+    }
+
+    return processedData.map(data => {
       const dataDate = new Date(data.analysis_date);
       return {
         date: format(dataDate, 'MMM d, yyyy'),
@@ -1073,7 +1103,7 @@ const Sentiment = () => {
                   </CardContent>
                 </Card>
 
-                {/* Rating Trend - Simple Line Chart */}
+                {/* Rating Trend - Beautiful Area Chart */}
                 {getSentimentTrendData().length > 0 && (
                   <Card>
                     <CardHeader>
@@ -1081,33 +1111,60 @@ const Sentiment = () => {
                         <TrendingUp className="w-5 h-5" />
                         Average Rating Over Time
                       </CardTitle>
-                      <CardDescription>How your ratings have changed</CardDescription>
+                      <CardDescription>Track your rating performance over time</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={getSentimentTrendData()}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                      <ResponsiveContainer width="100%" height={350}>
+                        <AreaChart data={getSentimentTrendData()}>
+                          <defs>
+                            <linearGradient id="ratingGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                              <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                           <XAxis 
                             dataKey="date" 
-                            angle={-45}
+                            angle={-35}
                             textAnchor="end"
-                            height={80}
-                            interval={0}
+                            height={90}
+                            interval="preserveStartEnd"
+                            tick={{ fontSize: 12 }}
+                            stroke="#9ca3af"
                           />
-                          <YAxis domain={[0, 5]} />
+                          <YAxis 
+                            domain={[1, 5]} 
+                            ticks={[1, 2, 3, 4, 5]}
+                            tick={{ fontSize: 12 }}
+                            stroke="#9ca3af"
+                          />
                           <Tooltip 
-                            formatter={(value: any) => [value.toFixed(1), 'Rating']}
-                            labelFormatter={(label) => `Date: ${label}`}
+                            contentStyle={{ 
+                              backgroundColor: '#1f2937', 
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              padding: '12px'
+                            }}
+                            formatter={(value: any) => [
+                              <span style={{ color: '#10b981', fontWeight: 'bold' }}>
+                                {value.toFixed(2)} ⭐
+                              </span>, 
+                              'Average Rating'
+                            ]}
+                            labelFormatter={(label) => <span style={{ color: '#9ca3af' }}>📅 {label}</span>}
                           />
-                          <Line 
+                          <Area 
                             type="monotone" 
                             dataKey="rating" 
-                            stroke="#3b82f6" 
-                            strokeWidth={3} 
-                            dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                            name="Average Rating" 
+                            stroke="#10b981" 
+                            strokeWidth={3}
+                            fill="url(#ratingGradient)"
+                            dot={{ fill: '#10b981', strokeWidth: 2, r: 5, fillOpacity: 1 }}
+                            activeDot={{ r: 7, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                            name="Rating" 
                           />
-                        </LineChart>
+                        </AreaChart>
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
