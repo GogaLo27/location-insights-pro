@@ -1013,7 +1013,17 @@ Keep the response under 150 words.`;
 
   const getSentimentCounts = () => {
     const counts = { positive: 0, negative: 0, neutral: 0 };
-    reviews.forEach(r => { if (r.ai_sentiment) counts[r.ai_sentiment]++; });
+    reviews.forEach(r => {
+      // Use AI sentiment if available, otherwise fallback to rating-based sentiment
+      let sentiment = r.ai_sentiment;
+      if (!sentiment) {
+        // Fallback: 4-5 stars = positive, 1-2 = negative, 3 = neutral
+        if (r.rating >= 4) sentiment = 'positive';
+        else if (r.rating <= 2) sentiment = 'negative';
+        else sentiment = 'neutral';
+      }
+      if (sentiment) counts[sentiment]++;
+    });
     return counts;
   };
 

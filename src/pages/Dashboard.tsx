@@ -100,7 +100,14 @@ const Dashboard = () => {
           : 0;
         
         const sentimentCounts = reviews.reduce((acc: any, r: any) => {
-          const sentiment = r.ai_sentiment || 'neutral';
+          // Use AI sentiment if available, otherwise fallback to rating-based sentiment
+          let sentiment = r.ai_sentiment;
+          if (!sentiment) {
+            // Fallback: 4-5 stars = positive, 1-2 = negative, 3 = neutral
+            if (r.rating >= 4) sentiment = 'positive';
+            else if (r.rating <= 2) sentiment = 'negative';
+            else sentiment = 'neutral';
+          }
           acc[sentiment] = (acc[sentiment] || 0) + 1;
           return acc;
         }, {});
@@ -168,7 +175,14 @@ const Dashboard = () => {
           : 0;
         
         const sentimentCounts = reviews.reduce((acc: any, r: any) => {
-          const sentiment = r.ai_sentiment || 'neutral';
+          // Use AI sentiment if available, otherwise fallback to rating-based sentiment
+          let sentiment = r.ai_sentiment;
+          if (!sentiment) {
+            // Fallback: 4-5 stars = positive, 1-2 = negative, 3 = neutral
+            if (r.rating >= 4) sentiment = 'positive';
+            else if (r.rating <= 2) sentiment = 'negative';
+            else sentiment = 'neutral';
+          }
           acc[sentiment] = (acc[sentiment] || 0) + 1;
           return acc;
         }, {});
