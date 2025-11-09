@@ -497,7 +497,8 @@ const Reviews = () => {
         .from('saved_reviews')
         .select('*')
         .eq('location_id', resolveLocationId())
-        .is('ai_analyzed_at', null);
+        .is('ai_analyzed_at', null)
+        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
 
       if (!unanalyzedReviews || unanalyzedReviews.length === 0) {
         toast({
