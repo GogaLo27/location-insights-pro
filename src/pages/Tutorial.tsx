@@ -529,27 +529,6 @@ const Tutorial = () => {
               </CardContent>
             </Card>
 
-            {/* Need More Help */}
-            <Card className="mt-8 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <h3 className="text-xl font-semibold mb-2">Still need help?</h3>
-                  <p className="text-muted-foreground mb-4">
-                    We're here to support you on your journey to better customer reviews!
-                  </p>
-                  <div className="flex justify-center gap-4">
-                    <Button variant="outline">
-                      <Mail className="mr-2 h-4 w-4" />
-                      Contact Support
-                    </Button>
-                    <Button>
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      View Documentation
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </SidebarInset>
       </div>
