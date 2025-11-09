@@ -24,28 +24,26 @@ useEffect(() => {
   if (savedProgress) {
     const { isAnalyzing: savedAnalyzing, completed: savedCompleted, total: savedTotal, timestamp } = JSON.parse(savedProgress);
     
-    // Auto-clear stuck progress (older than 10 minutes)
-    const now = Date.now();
-    const tenMinutes = 10 * 60 * 1000;
-    if (timestamp && (now - timestamp) > tenMinutes) {
-      console.log('🧹 Auto-clearing stuck analysis progress (older than 10 minutes)');
+    // Auto-clear if no timestamp (old format) - DO THIS FIRST
+    if (!timestamp) {
+      console.log('🧹 Auto-clearing progress with no timestamp (old format)');
       localStorage.removeItem(storageKey);
       return;
     }
     
-    // Auto-clear if stuck at 0 completed (likely interrupted/old state)
-    if (savedCompleted === 0 && savedTotal > 0 && timestamp) {
-      const fiveMinutes = 5 * 60 * 1000;
-      if ((now - timestamp) > fiveMinutes) {
-        console.log('🧹 Auto-clearing stuck progress at 0 completed (older than 5 minutes)');
-        localStorage.removeItem(storageKey);
-        return;
-      }
+    const now = Date.now();
+    
+    // Auto-clear if stuck at 0 completed (page was refreshed/interrupted) - INSTANT CLEAR
+    if (savedCompleted === 0 && savedTotal > 0) {
+      console.log('🧹 Auto-clearing stuck progress at 0 completed (page refresh detected)');
+      localStorage.removeItem(storageKey);
+      return;
     }
     
-    // Auto-clear if no timestamp (old format)
-    if (!timestamp) {
-      console.log('🧹 Auto-clearing progress with no timestamp (old format)');
+    // Auto-clear stuck progress (older than 10 minutes)
+    const tenMinutes = 10 * 60 * 1000;
+    if (timestamp && (now - timestamp) > tenMinutes) {
+      console.log('🧹 Auto-clearing stuck analysis progress (older than 10 minutes)');
       localStorage.removeItem(storageKey);
       return;
     }
