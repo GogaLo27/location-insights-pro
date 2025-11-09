@@ -96,7 +96,7 @@ const Sentiment = () => {
       // Check if date is valid
       if (isNaN(dataDate.getTime())) return false;
       // Filter out invalid ratings (outliers)
-      if (!data.avg_rating || data.avg_rating < 1 || data.avg_rating > 5) return false;
+      if (!data.average_rating || data.average_rating < 1 || data.average_rating > 5) return false;
       return dataDate >= currentDateRange.from && dataDate <= currentDateRange.to;
     });
 
@@ -119,13 +119,13 @@ const Sentiment = () => {
           weekMap.set(weekKey, { sum: 0, count: 0, date: dataDate });
         }
         const week = weekMap.get(weekKey)!;
-        week.sum += data.avg_rating || 0;
+        week.sum += data.average_rating || 0;
         week.count += 1;
       });
       // Convert back to array with averages
       processedData = Array.from(weekMap.values()).map(week => ({
         analysis_date: week.date.toISOString(),
-        avg_rating: week.sum / week.count,
+        average_rating: week.sum / week.count,
         total_positive: 0,
         total_negative: 0,
         total_neutral: 0,
