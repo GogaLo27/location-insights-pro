@@ -492,24 +492,51 @@ const Reviews = () => {
     try {
       startProgress();
 
-      // Get reviews that haven't been analyzed yet
-      const { data: unanalyzedReviews, error: fetchError } = await supabase
-        .from('saved_reviews')
-        .select('*')
-        .eq('location_id', resolveLocationId())
-        .is('ai_analyzed_at', null)
-        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
+      // Get reviews that haven't been analyzed yet - FETCH ALL IN CHUNKS
+      const locationId = resolveLocationId();
+      let allUnanalyzedReviews: any[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const chunkSize = 1000;
 
-      console.log('🔍 FETCHED UNANALYZED REVIEWS:', {
-        count: unanalyzedReviews?.length || 0,
-        error: fetchError,
-        locationId: resolveLocationId()
-      });
+      console.log('🔍 FETCHING ALL UNANALYZED REVIEWS IN CHUNKS...');
 
-      if (fetchError) {
-        console.error('❌ Error fetching unanalyzed reviews:', fetchError);
-        throw fetchError;
+      // Fetch in chunks of 1000 until we get all reviews
+      while (hasMore) {
+        const { data: chunk, error: fetchError } = await supabase
+          .from('saved_reviews')
+          .select('*')
+          .eq('location_id', locationId)
+          .is('ai_analyzed_at', null)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + chunkSize - 1);
+
+        if (fetchError) {
+          console.error('❌ Error fetching chunk:', fetchError);
+          throw fetchError;
+        }
+
+        const chunkLength = chunk?.length || 0;
+        console.log(`📦 Fetched chunk: ${chunkLength} reviews (offset: ${offset})`);
+        
+        if (chunk && chunk.length > 0) {
+          allUnanalyzedReviews.push(...chunk);
+        }
+
+        // If we got fewer than chunkSize results, we've fetched all
+        if (chunkLength < chunkSize) {
+          hasMore = false;
+        } else {
+          offset += chunkSize;
+        }
       }
+
+      const unanalyzedReviews = allUnanalyzedReviews;
+
+      console.log('✅ TOTAL UNANALYZED REVIEWS FETCHED:', {
+        count: unanalyzedReviews.length,
+        locationId
+      });
 
       if (!unanalyzedReviews || unanalyzedReviews.length === 0) {
         toast({
