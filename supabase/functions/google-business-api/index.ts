@@ -304,8 +304,7 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
   try {
     const accountIds = await getAllAccountIds(accessToken);
     let allReviews: any[] = [];
-    const maxReviews = 1000; // Limit to prevent memory issues
-    const maxPages = 50; // Prevent infinite loops
+    const maxPages = 1000; // Safety limit: ~20,000-50,000 reviews depending on API response size
 
     for (const accountId of accountIds) {
       try {
@@ -314,20 +313,15 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
         const seenTokens = new Set<string>(); // Prevent infinite loops
         
         do {
-          // Safety checks
+          // Safety check for infinite pagination
           if (pageCount >= maxPages) {
-            console.log(`Reached maximum page limit (${maxPages}) for location ${locationId}`);
-            break;
-          }
-          
-          if (allReviews.length >= maxReviews) {
-            console.log(`Reached maximum review limit (${maxReviews}) for location ${locationId}`);
+            console.warn(`⚠️ SAFETY LIMIT: Reached maximum page limit (${maxPages}) for location ${locationId}. Fetched ${allReviews.length} reviews so far.`);
             break;
           }
 
-          // Check for infinite loop
+          // Check for infinite loop with duplicate tokens
           if (nextPageToken && seenTokens.has(nextPageToken)) {
-            console.log(`Detected infinite loop with token: ${nextPageToken}`);
+            console.error(`🔴 ERROR: Detected infinite loop with duplicate pagination token for location ${locationId}`);
             break;
           }
           
@@ -367,6 +361,11 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
           nextPageToken = data.nextPageToken ?? null;
           pageCount++;
           
+          // Progress logging every 10 pages
+          if (pageCount % 10 === 0) {
+            console.log(`📊 Progress: Fetched ${allReviews.length} reviews (page ${pageCount}/${maxPages}) for location ${locationId}`);
+          }
+          
           // Rate limiting - small delay between requests
           if (nextPageToken) {
             await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
@@ -374,6 +373,7 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
           
         } while (nextPageToken);
 
+        console.log(`✅ Successfully fetched ALL ${allReviews.length} reviews for location ${locationId} (${pageCount} pages)`);
         break; // owning account found
       } catch (error) {
         console.log(`Error fetching reviews for location ${locationId} in ${accountId}:`, error);
@@ -382,7 +382,7 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
       }
     }
 
-    console.log(`Successfully fetched ${allReviews.length} reviews for location ${locationId}`);
+    console.log(`🎉 FINAL: Successfully fetched ${allReviews.length} total reviews for location ${locationId}`);
     return json({ reviews: allReviews });
   } catch (error) {
     console.error("Error fetching reviews:", error);
@@ -854,17 +854,29 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
     // Fetch ALL reviews from Google (we'll filter new ones)
     const accountIds = await getAllAccountIds(accessToken);
     let allReviews: any[] = [];
-    const maxReviews = 1000; // Limit to prevent memory issues
+    const maxPages = 1000; // Safety limit: ~20,000-50,000 reviews depending on API response size
     
     for (const accountId of accountIds) {
       try {
         let nextPageToken: string | null = null;
         let pageCount = 0;
-        const maxPages = 50;
+        const seenTokens = new Set<string>(); // Prevent infinite loops
         
         do {
-          if (pageCount >= maxPages || allReviews.length >= maxReviews) {
+          // Safety check for infinite pagination
+          if (pageCount >= maxPages) {
+            console.warn(`⚠️ SAFETY LIMIT: Reached maximum page limit (${maxPages}) during incremental sync for location ${locationId}. Fetched ${allReviews.length} reviews so far.`);
             break;
+          }
+
+          // Check for infinite loop with duplicate tokens
+          if (nextPageToken && seenTokens.has(nextPageToken)) {
+            console.error(`🔴 ERROR: Detected infinite loop with duplicate pagination token during sync for location ${locationId}`);
+            break;
+          }
+          
+          if (nextPageToken) {
+            seenTokens.add(nextPageToken);
           }
           
           const url = `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}/reviews${
@@ -889,10 +901,24 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
           nextPageToken = data.nextPageToken ?? null;
           pageCount++;
           
+          // Progress logging every 10 pages during sync
+          if (pageCount % 10 === 0) {
+            console.log(`📊 Sync Progress: Fetched ${allReviews.length} reviews (page ${pageCount}/${maxPages}) for location ${locationId}`);
+          }
+          
+          // Small delay to prevent rate limiting
+          if (nextPageToken) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
         } while (nextPageToken);
+        
+        console.log(`✅ Incremental sync: Fetched ALL ${allReviews.length} reviews for location ${locationId} (${pageCount} pages)`);
+        break; // owning account found
         
       } catch (error) {
         console.error(`Error fetching reviews from account ${accountId}:`, error);
+        continue;
       }
     }
     
