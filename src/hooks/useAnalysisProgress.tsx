@@ -22,7 +22,17 @@ export const useAnalysisProgress = (namespace: string = 'default'): AnalysisProg
 useEffect(() => {
   const savedProgress = localStorage.getItem(storageKey);
   if (savedProgress) {
-    const { isAnalyzing: savedAnalyzing, completed: savedCompleted, total: savedTotal } = JSON.parse(savedProgress);
+    const { isAnalyzing: savedAnalyzing, completed: savedCompleted, total: savedTotal, timestamp } = JSON.parse(savedProgress);
+    
+    // Auto-clear stuck progress (older than 10 minutes)
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000;
+    if (timestamp && (now - timestamp) > tenMinutes) {
+      console.log('🧹 Auto-clearing stuck analysis progress (older than 10 minutes)');
+      localStorage.removeItem(storageKey);
+      return;
+    }
+    
     setIsAnalyzing(savedAnalyzing);
     setCompleted(savedCompleted);
     setTotal(savedTotal);
@@ -41,7 +51,8 @@ useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({
       isAnalyzing: true,
       completed: 0,
-      total: 0
+      total: 0,
+      timestamp: Date.now()
     }));
   };
 
@@ -63,7 +74,8 @@ useEffect(() => {
   localStorage.setItem(storageKey, JSON.stringify({
     isAnalyzing: true,
     completed: newCompleted,
-    total: newTotal
+    total: newTotal,
+    timestamp: Date.now()
   }));
   };
 

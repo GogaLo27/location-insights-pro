@@ -658,13 +658,23 @@ const Sentiment = () => {
               <Card className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
                 <CardContent className="pt-6">
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between items-center text-sm">
                       <span className="font-medium text-blue-900 dark:text-blue-100">
                         Analyzing reviews with AI...
                       </span>
-                      <span className="text-blue-700 dark:text-blue-300">
-                        {completed} / {total} reviews
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-700 dark:text-blue-300">
+                          {completed} / {total} reviews
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={finishProgress}
+                          className="h-6 text-xs text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                     </div>
                     <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-3">
                       <div

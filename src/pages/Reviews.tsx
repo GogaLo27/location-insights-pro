@@ -1158,9 +1158,19 @@ Keep the response under 150 words.`;
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between items-center text-sm">
                       <span>AI Analysis Progress</span>
-                      <span>{Math.round(progress)}%</span>
+                      <div className="flex items-center gap-2">
+                        <span>{Math.round(progress)}%</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={resetProgress}
+                          className="h-6 text-xs"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                     </div>
                     <Progress value={progress} className="w-full" />
                     <p className="text-xs text-muted-foreground">
