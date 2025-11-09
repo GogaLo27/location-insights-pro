@@ -609,20 +609,36 @@ const Reviews = () => {
         return;
       }
 
-      // Delete all reviews for the selected location
-      const { data: deletedData, error: deleteError } = await supabase
-        .from('saved_reviews')
-        .delete()
-        .eq('location_id', locationId)
-        .eq('user_id', user.id)
-        .select(); // Add select to see what was deleted
+      // Delete all reviews in batches (Supabase has 1000 row delete limit)
+      let totalDeleted = 0;
+      let continueDeleting = true;
+      
+      while (continueDeleting) {
+        const { data: deletedData, error: deleteError } = await supabase
+          .from('saved_reviews')
+          .delete()
+          .eq('location_id', locationId)
+          .eq('user_id', user.id)
+          .limit(1000)
+          .select();
 
-      if (deleteError) {
-        console.error('Delete error:', deleteError);
-        throw deleteError;
+        if (deleteError) {
+          console.error('Delete error:', deleteError);
+          throw deleteError;
+        }
+
+        const deletedCount = deletedData?.length || 0;
+        totalDeleted += deletedCount;
+        
+        console.log(`Deleted batch: ${deletedCount} reviews (total: ${totalDeleted}/${reviewCount})`);
+        
+        // If we deleted fewer than 1000, we're done
+        if (deletedCount < 1000) {
+          continueDeleting = false;
+        }
       }
 
-      console.log('Successfully deleted reviews:', deletedData);
+      console.log(`Successfully deleted all ${totalDeleted} reviews`);
 
       // Reset all state
       setReviews([]);
@@ -639,7 +655,7 @@ const Reviews = () => {
 
       toast({
         title: "Success",
-        description: `Successfully deleted ${reviewCount} reviews and all AI analysis data for this location`,
+        description: `Successfully deleted ${totalDeleted} reviews and all AI analysis data for this location`,
       });
 
     } catch (error) {
