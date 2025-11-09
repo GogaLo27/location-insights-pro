@@ -33,6 +33,23 @@ useEffect(() => {
       return;
     }
     
+    // Auto-clear if stuck at 0 completed (likely interrupted/old state)
+    if (savedCompleted === 0 && savedTotal > 0 && timestamp) {
+      const fiveMinutes = 5 * 60 * 1000;
+      if ((now - timestamp) > fiveMinutes) {
+        console.log('🧹 Auto-clearing stuck progress at 0 completed (older than 5 minutes)');
+        localStorage.removeItem(storageKey);
+        return;
+      }
+    }
+    
+    // Auto-clear if no timestamp (old format)
+    if (!timestamp) {
+      console.log('🧹 Auto-clearing progress with no timestamp (old format)');
+      localStorage.removeItem(storageKey);
+      return;
+    }
+    
     setIsAnalyzing(savedAnalyzing);
     setCompleted(savedCompleted);
     setTotal(savedTotal);
