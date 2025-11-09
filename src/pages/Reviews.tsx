@@ -493,12 +493,23 @@ const Reviews = () => {
       startProgress();
 
       // Get reviews that haven't been analyzed yet
-      const { data: unanalyzedReviews } = await supabase
+      const { data: unanalyzedReviews, error: fetchError } = await supabase
         .from('saved_reviews')
         .select('*')
         .eq('location_id', resolveLocationId())
         .is('ai_analyzed_at', null)
         .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
+
+      console.log('🔍 FETCHED UNANALYZED REVIEWS:', {
+        count: unanalyzedReviews?.length || 0,
+        error: fetchError,
+        locationId: resolveLocationId()
+      });
+
+      if (fetchError) {
+        console.error('❌ Error fetching unanalyzed reviews:', fetchError);
+        throw fetchError;
+      }
 
       if (!unanalyzedReviews || unanalyzedReviews.length === 0) {
         toast({
@@ -509,6 +520,7 @@ const Reviews = () => {
         return;
       }
 
+      console.log(`✅ SETTING PROGRESS TOTAL TO: ${unanalyzedReviews.length}`);
       updateProgress(0, unanalyzedReviews.length);
 
       // Process reviews in batches for better UX
