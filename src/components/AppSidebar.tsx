@@ -34,7 +34,8 @@ import {
   MessageCircle,
   Shield,
   Cookie,
-  CreditCard
+  CreditCard,
+  BookOpen
 } from "lucide-react";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
@@ -48,6 +49,7 @@ const navigationItems = [
   { title: "Sentiment", url: "/sentiment", icon: TrendingUp, requiresPlan: true },
   { title: "Competitors", url: "/competitors", icon: Target, requiresPlan: "professional", locked: true },
   { title: "Orders", url: "/orders", icon: ReceiptText, requiresPlan: true },
+  { title: "Tutorial & Help", url: "/tutorial", icon: BookOpen, requiresPlan: true },
 ];
 
 export function AppSidebar() {

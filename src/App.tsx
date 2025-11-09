@@ -11,6 +11,7 @@ import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Locations from './pages/Locations';
 import Reviews from './pages/Reviews';
+import Tutorial from './pages/Tutorial';
 import ReviewTemplates from './pages/ReviewTemplates';
 import BrandManagement from './pages/BrandManagement';
 import Analytics from './pages/Analytics';
@@ -114,6 +115,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
                   <Sentiment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tutorial"
+              element={
+                <ProtectedRoute requiresPlan={true} requiresLocation={false}>
+                  <Tutorial />
                 </ProtectedRoute>
               }
             />
