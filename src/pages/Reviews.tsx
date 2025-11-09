@@ -280,13 +280,46 @@ const Reviews = () => {
         setTotalReviews(totalCount);
       }
 
-      // Load all saved reviews from database for instant display
-      const { data: savedReviews, error: dbError } = await supabase
-        .from('saved_reviews')
-        .select('*')
-        .eq('location_id', locationId)
-        .order('review_date', { ascending: false })
-        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
+      // Load all saved reviews from database for instant display - FETCH IN CHUNKS
+      let allSavedReviews: any[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const chunkSize = 1000;
+
+      console.log('📦 FETCHING ALL SAVED REVIEWS IN CHUNKS...');
+
+      while (hasMore) {
+        const { data: chunk, error: chunkError } = await supabase
+          .from('saved_reviews')
+          .select('*')
+          .eq('location_id', locationId)
+          .order('review_date', { ascending: false })
+          .range(offset, offset + chunkSize - 1);
+
+        if (chunkError) {
+          console.error('❌ Error fetching chunk:', chunkError);
+          break;
+        }
+
+        const chunkLength = chunk?.length || 0;
+        console.log(`📦 Loaded chunk: ${chunkLength} reviews (offset: ${offset})`);
+        
+        if (chunk && chunk.length > 0) {
+          allSavedReviews.push(...chunk);
+        }
+
+        // If we got fewer than chunkSize results, we've fetched all
+        if (chunkLength < chunkSize) {
+          hasMore = false;
+        } else {
+          offset += chunkSize;
+        }
+      }
+
+      const savedReviews = allSavedReviews;
+      const dbError = null;
+
+      console.log(`✅ TOTAL SAVED REVIEWS LOADED: ${savedReviews.length}`);
 
       if (!dbError && savedReviews) {
         setReviews(savedReviews.map(review => ({
@@ -342,13 +375,51 @@ const Reviews = () => {
             updateFetch(processed, total);
           });
 
-          // Get updated reviews from database and update total count
-          const { data: updatedReviews, count: updatedCount } = await supabase
+          // Get updated reviews from database and update total count - FETCH IN CHUNKS
+          let allUpdatedReviews: any[] = [];
+          let hasMoreUpdated = true;
+          let offsetUpdated = 0;
+          const chunkSizeUpdated = 1000;
+
+          console.log('📦 FETCHING UPDATED REVIEWS AFTER SYNC IN CHUNKS...');
+
+          // First get the count
+          const { count: updatedCount } = await supabase
             .from('saved_reviews')
-            .select('*', { count: 'exact' })
-            .eq('location_id', locationId)
-            .order('review_date', { ascending: false })
-            .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
+            .select('*', { count: 'exact', head: true })
+            .eq('location_id', locationId);
+
+          // Then fetch all reviews in chunks
+          while (hasMoreUpdated) {
+            const { data: chunkUpdated, error: chunkErrorUpdated } = await supabase
+              .from('saved_reviews')
+              .select('*')
+              .eq('location_id', locationId)
+              .order('review_date', { ascending: false })
+              .range(offsetUpdated, offsetUpdated + chunkSizeUpdated - 1);
+
+            if (chunkErrorUpdated) {
+              console.error('❌ Error fetching updated chunk:', chunkErrorUpdated);
+              break;
+            }
+
+            const chunkLengthUpdated = chunkUpdated?.length || 0;
+            console.log(`📦 Updated chunk: ${chunkLengthUpdated} reviews (offset: ${offsetUpdated})`);
+            
+            if (chunkUpdated && chunkUpdated.length > 0) {
+              allUpdatedReviews.push(...chunkUpdated);
+            }
+
+            if (chunkLengthUpdated < chunkSizeUpdated) {
+              hasMoreUpdated = false;
+            } else {
+              offsetUpdated += chunkSizeUpdated;
+            }
+          }
+
+          const updatedReviews = allUpdatedReviews;
+
+          console.log(`✅ TOTAL UPDATED REVIEWS: ${updatedReviews.length}`);
 
           if (updatedReviews) {
             setReviews(updatedReviews.map(review => ({

@@ -130,12 +130,36 @@ const Dashboard = () => {
       }
 
       const locationId = selectedLocation.google_place_id.split('/').pop();
-      // Get reviews from saved_reviews table
-      const { data: reviews, error } = await supabase
-        .from('saved_reviews')
-        .select('*')
-        .eq('location_id', locationId)
-        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
+      
+      // Get reviews from saved_reviews table - FETCH IN CHUNKS
+      let allReviews: any[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const chunkSize = 1000;
+
+      while (hasMore) {
+        const { data: chunk, error: chunkError } = await supabase
+          .from('saved_reviews')
+          .select('*')
+          .eq('location_id', locationId)
+          .range(offset, offset + chunkSize - 1);
+
+        if (chunkError) break;
+
+        const chunkLength = chunk?.length || 0;
+        if (chunk && chunk.length > 0) {
+          allReviews.push(...chunk);
+        }
+
+        if (chunkLength < chunkSize) {
+          hasMore = false;
+        } else {
+          offset += chunkSize;
+        }
+      }
+
+      const reviews = allReviews;
+      const error = null;
 
       if (!error && reviews) {
         const totalReviews = reviews.length;

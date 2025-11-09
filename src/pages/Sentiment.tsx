@@ -278,18 +278,51 @@ const Sentiment = () => {
         return;
       }
 
-      // Get ALL reviews (both analyzed and unanalyzed)
-      let query = supabase
-        .from('saved_reviews')
-        .select('*')
-        .limit(100000); // Allow fetching up to 100k reviews (Supabase default is 1000)
-
+      // Get ALL reviews (both analyzed and unanalyzed) - FETCH IN CHUNKS
       const locationId = (ctxSelectedLocation as any)?.id || (ctxSelectedLocation as any)?.location_id || (ctxSelectedLocation as any)?.google_place_id?.split('/').pop();
-      if (locationId) {
-        query = query.eq('location_id', locationId);
+      
+      let allReviews: any[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const chunkSize = 1000;
+
+      console.log('📦 [Sentiment] FETCHING ALL REVIEWS IN CHUNKS...');
+
+      while (hasMore) {
+        let query = supabase
+          .from('saved_reviews')
+          .select('*')
+          .range(offset, offset + chunkSize - 1);
+
+        if (locationId) {
+          query = query.eq('location_id', locationId);
+        }
+
+        const { data: chunk, error: chunkError } = await query;
+
+        if (chunkError) {
+          console.error('❌ Error fetching chunk:', chunkError);
+          break;
+        }
+
+        const chunkLength = chunk?.length || 0;
+        console.log(`📦 [Sentiment] Loaded chunk: ${chunkLength} reviews (offset: ${offset})`);
+        
+        if (chunk && chunk.length > 0) {
+          allReviews.push(...chunk);
+        }
+
+        if (chunkLength < chunkSize) {
+          hasMore = false;
+        } else {
+          offset += chunkSize;
+        }
       }
 
-      const { data: reviews, error } = await query;
+      const reviews = allReviews;
+      const error = null;
+
+      console.log(`✅ [Sentiment] TOTAL REVIEWS LOADED: ${reviews.length}`);
 
       if (!error && reviews) {
         console.log('Total reviews found:', reviews.length);
