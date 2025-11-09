@@ -986,8 +986,17 @@ Keep the response under 150 words.`;
       review.text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       review.author_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
+    // Use AI sentiment if available, otherwise fallback to rating-based sentiment
+    let reviewSentiment = review.ai_sentiment;
+    if (!reviewSentiment) {
+      // Fallback: 4-5 stars = positive, 1-2 = negative, 3 = neutral
+      if (review.rating >= 4) reviewSentiment = 'positive';
+      else if (review.rating <= 2) reviewSentiment = 'negative';
+      else reviewSentiment = 'neutral';
+    }
+
     const matchesSentiment =
-      sentimentFilter === "all" || review.ai_sentiment === sentimentFilter;
+      sentimentFilter === "all" || reviewSentiment === sentimentFilter;
 
     const matchesRating =
       ratingFilter === "all" || String(review.rating) === ratingFilter;
