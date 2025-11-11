@@ -463,7 +463,7 @@ async function handlePaymentCompleted(supabase: any, event: PayPalWebhookEvent) 
   // Find subscription by PayPal subscription ID
   const { data: sub, error: fetchError } = await supabase
     .from("subscriptions")
-    .select("id")
+    .select("id, user_id, plan_type")
     .eq("paypal_subscription_id", payment.billing_agreement_id)
     .single()
 
@@ -493,6 +493,30 @@ async function handlePaymentCompleted(supabase: any, event: PayPalWebhookEvent) 
     event_data: payment,
     created_at: new Date().toISOString()
   })
+
+  // Generate invoice for this payment
+  try {
+    const billingPeriodStart = new Date()
+    const billingPeriodEnd = new Date()
+    billingPeriodEnd.setMonth(billingPeriodEnd.getMonth() + 1)
+
+    await supabase.functions.invoke('generate-invoice', {
+      body: {
+        user_id: sub.user_id,
+        subscription_id: sub.id,
+        payment_method: 'paypal',
+        transaction_id: payment.id,
+        amount_cents: Math.round(parseFloat(payment.amount.total) * 100),
+        plan_type: sub.plan_type,
+        billing_period_start: billingPeriodStart.toISOString(),
+        billing_period_end: billingPeriodEnd.toISOString()
+      }
+    })
+    console.log("Invoice generated for payment:", payment.id)
+  } catch (invoiceError) {
+    console.error("Failed to generate invoice:", invoiceError)
+    // Don't fail the whole webhook if invoice generation fails
+  }
 
   console.log("Payment completed event processed successfully")
 }

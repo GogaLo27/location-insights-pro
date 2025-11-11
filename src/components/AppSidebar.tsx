@@ -35,7 +35,8 @@ import {
   Shield,
   Cookie,
   CreditCard,
-  BookOpen
+  BookOpen,
+  Receipt
 } from "lucide-react";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 
@@ -127,6 +128,14 @@ export function AppSidebar() {
                   <NavLink to="/upgrade" className={getNavCls}>
                     <Crown className="h-4 w-4" />
                     {!collapsed && <span>Upgrade Plan</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/invoices" className={getNavCls}>
+                    <Receipt className="h-4 w-4" />
+                    {!collapsed && <span>Invoices</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
