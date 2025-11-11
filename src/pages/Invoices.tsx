@@ -330,10 +330,10 @@ const Invoices = () => {
                 onClick={() => setViewingInvoice(null)}
               >
                 <Card 
-                  className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                  className="max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-background"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <CardHeader>
+                  <CardHeader className="bg-background">
                     <div className="flex justify-between items-center">
                       <CardTitle>Invoice Preview</CardTitle>
                       <div className="flex gap-2">
@@ -355,11 +355,72 @@ const Invoices = () => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div 
-                      className="border rounded-lg p-8 bg-white dark:bg-gray-900"
-                      dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(viewingInvoice).match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || '' }}
-                    />
+                  <CardContent className="bg-background">
+                    <div className="border rounded-lg p-8 bg-card">
+                      <div className="flex justify-between items-start mb-8 pb-6 border-b-2 border-primary">
+                        <div>
+                          <div className="text-3xl font-bold">DIBIEX</div>
+                          <p className="text-sm text-muted-foreground mt-1">Review Management Platform</p>
+                          <p className="text-sm text-muted-foreground">support@dibiex.com</p>
+                        </div>
+                        <div className="text-right">
+                          <h2 className="text-2xl font-bold text-primary">INVOICE</h2>
+                          <p className="text-lg font-semibold mt-1">{viewingInvoice.invoice_number}</p>
+                          <p className="text-sm text-muted-foreground">{format(new Date(viewingInvoice.invoice_date), 'MMMM dd, yyyy')}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-8 mb-8">
+                        <div>
+                          <div className="text-xs text-muted-foreground uppercase mb-2">Bill To:</div>
+                          <div className="font-semibold text-lg mb-1">{viewingInvoice.customer_name || viewingInvoice.customer_email}</div>
+                          {viewingInvoice.customer_company && <div className="text-muted-foreground mb-1">{viewingInvoice.customer_company}</div>}
+                          <div className="text-muted-foreground">{viewingInvoice.customer_email}</div>
+                        </div>
+                        <div className="text-sm space-y-1">
+                          <div><span className="text-muted-foreground">Invoice Date:</span> <span className="font-medium">{format(new Date(viewingInvoice.invoice_date), 'MMM dd, yyyy')}</span></div>
+                          <div><span className="text-muted-foreground">Payment Date:</span> <span className="font-medium">{viewingInvoice.paid_date ? format(new Date(viewingInvoice.paid_date), 'MMM dd, yyyy') : 'Pending'}</span></div>
+                          <div><span className="text-muted-foreground">Payment Method:</span> <span className="font-medium uppercase">{viewingInvoice.payment_method}</span></div>
+                          <div><span className="text-muted-foreground">Status:</span> <span className="font-semibold text-green-600">{viewingInvoice.status.toUpperCase()}</span></div>
+                        </div>
+                      </div>
+
+                      <table className="w-full mb-8">
+                        <thead>
+                          <tr className="border-b-2">
+                            <th className="py-3 text-left text-sm font-semibold">Description</th>
+                            <th className="py-3 text-left text-sm font-semibold">Period</th>
+                            <th className="py-3 text-right text-sm font-semibold">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="py-4">
+                              <div className="font-semibold">{viewingInvoice.plan_name || viewingInvoice.plan_type}</div>
+                              <div className="text-sm text-muted-foreground">Monthly Subscription</div>
+                            </td>
+                            <td className="py-4 text-sm">
+                              {viewingInvoice.billing_period_start && viewingInvoice.billing_period_end 
+                                ? `${format(new Date(viewingInvoice.billing_period_start), 'MMM dd, yyyy')} - ${format(new Date(viewingInvoice.billing_period_end), 'MMM dd, yyyy')}`
+                                : 'N/A'}
+                            </td>
+                            <td className="py-4 text-right font-medium">${(viewingInvoice.amount_cents / 100).toFixed(2)}</td>
+                          </tr>
+                          <tr className="bg-muted/50">
+                            <td colSpan={2} className="py-4 text-right font-bold text-lg">Total Amount:</td>
+                            <td className="py-4 text-right font-bold text-xl">${(viewingInvoice.amount_cents / 100).toFixed(2)} {viewingInvoice.currency}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      <div className="bg-muted/30 p-6 rounded-lg">
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Thank you for your business!</strong><br/>
+                          This invoice confirms your payment for Dibiex {viewingInvoice.plan_name || viewingInvoice.plan_type}. 
+                          Your subscription is active and you have access to all plan features.
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
