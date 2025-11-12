@@ -8,6 +8,7 @@ import { ConditionalThemeProvider } from '@/components/ui/conditional-theme-prov
 import CookieConsent from '@/components/CookieConsent';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import Landing from './pages/Landing';
+import PreLaunch from './pages/PreLaunch';
 import Dashboard from './pages/Dashboard';
 import Locations from './pages/Locations';
 import Reviews from './pages/Reviews';
@@ -54,7 +55,8 @@ const App = () => (
             <GoogleAnalytics />
           <ConditionalThemeProvider>
             <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<PreLaunch />} />
+            <Route path="/old-landing" element={<Landing />} />
             <Route
               path="/plan-selection"
               element={
