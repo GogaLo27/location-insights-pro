@@ -9,6 +9,7 @@ import CookieConsent from '@/components/CookieConsent';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import Landing from './pages/Landing';
 import PreLaunch from './pages/PreLaunch';
+import LandingWaitlist from './pages/LandingWaitlist';
 import Dashboard from './pages/Dashboard';
 import Locations from './pages/Locations';
 import Reviews from './pages/Reviews';
@@ -55,8 +56,10 @@ const App = () => (
             <GoogleAnalytics />
           <ConditionalThemeProvider>
             <Routes>
-            <Route path="/" element={<PreLaunch />} />
-            <Route path="/old-landing" element={<Landing />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/prelaunch" element={<PreLaunch />} />
+            <Route path="/waitlist" element={<LandingWaitlist />} />
+            <Route path="/coming-soon" element={<LandingWaitlist />} />
             <Route
               path="/plan-selection"
               element={

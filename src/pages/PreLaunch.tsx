@@ -84,6 +84,27 @@ const PreLaunch = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-blue-950 dark:to-purple-950">
+      {/* Navigation */}
+      <nav className="border-b bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition">
+            <img 
+              src="/logo.png" 
+              alt="Dibiex Logo" 
+              className="h-8 w-auto"
+            />
+          </a>
+          <Button 
+            variant="outline"
+            onClick={() => window.location.href = '/'}
+            className="flex items-center gap-2"
+          >
+            <ArrowRight className="h-4 w-4 rotate-180" />
+            Back to Main Site
+          </Button>
+        </div>
+      </nav>
+
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-20">
         <div className="text-center mb-12">
@@ -266,9 +287,33 @@ const PreLaunch = () => {
         )}
 
         {/* Footer */}
-        <div className="mt-32 text-center text-sm text-muted-foreground">
-          <p>© 2025 Dibiex. All rights reserved.</p>
-          <p className="mt-2">Making review management simple, powerful, and intelligent.</p>
+        <div className="mt-32">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 max-w-6xl mx-auto">
+            <div className="flex flex-col items-center md:items-start">
+              <div className="flex items-center gap-3 mb-3">
+                <img 
+                  src="/logo.png" 
+                  alt="Dibiex Logo" 
+                  className="h-8 w-auto"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Making review management simple, powerful, and intelligent.
+              </p>
+            </div>
+            <div className="flex flex-col items-center md:items-end gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => window.location.href = '/'}
+              >
+                <ArrowRight className="h-4 w-4 rotate-180 mr-2" />
+                Back to Main Site
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                © 2025 Dibiex. All rights reserved.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
