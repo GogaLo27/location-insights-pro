@@ -27,8 +27,45 @@ export default function BillingSuccess() {
           return
         }
 
-        if (subscription?.paypal_subscription_id) {
-          // Check PayPal subscription status directly
+        // Check subscription status based on provider
+        if (subscription?.status === 'active') {
+          // Already active - redirect to dashboard
+          setMessage('Subscription activated successfully! Redirecting to dashboard...')
+          setTimeout(() => {
+            navigate('/dashboard')
+          }, 2000)
+          return
+        }
+
+        if (subscription?.provider === 'keepz' || subscription?.keepz_order_id) {
+          // Keepz subscription - wait for webhook to update status
+          if (subscription?.status === 'pending') {
+            setMessage('Subscription is being processed. This may take a few moments...')
+            // Poll for status update
+            const checkStatus = setInterval(async () => {
+              const { data: updated } = await supabase
+                .from('subscriptions')
+                .select('status')
+                .eq('id', subscription.id)
+                .single()
+              
+              if (updated?.status === 'active') {
+                clearInterval(checkStatus)
+                setMessage('Subscription activated successfully! Redirecting to dashboard...')
+                setTimeout(() => {
+                  navigate('/dashboard')
+                }, 2000)
+              }
+            }, 3000) // Check every 3 seconds
+
+            // Stop checking after 2 minutes
+            setTimeout(() => {
+              clearInterval(checkStatus)
+              setMessage('Subscription is still processing. Please check your dashboard or contact support.')
+            }, 120000)
+          }
+        } else if (subscription?.paypal_subscription_id) {
+          // PayPal subscription - check status directly
           const { data: paypalStatus, error: paypalError } = await supabase.functions.invoke('check-paypal-subscription', {
             body: {
               subscription_id: subscription.paypal_subscription_id

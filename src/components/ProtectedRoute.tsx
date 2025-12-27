@@ -30,7 +30,7 @@ export const ProtectedRoute = ({
   requiresLocation = false,
 }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { plan, loading: planLoading } = usePlan();
+  const { plan, loading: planLoading, isSubscriptionExpired } = usePlan();
   const { selectedLocation, loading: locationLoading } = useLocationContext();
 
 
@@ -47,8 +47,9 @@ export const ProtectedRoute = ({
   if (!user) {
     return <Navigate to="/" replace />;
   }
-  // Requires a plan → go to plan selection if none exists (but only after loading is complete)
-  if (requiresPlan && !planLoading && !plan) {
+  
+  // Requires a plan → go to plan selection if none exists OR subscription is expired
+  if (requiresPlan && !planLoading && (!plan || isSubscriptionExpired)) {
     return <Navigate to="/plan-selection" replace />;
   }
 

@@ -102,10 +102,13 @@ export default function Checkout() {
 
       if (error) throw error;
 
-      if (data?.approval_url) {
+      // PayPal returns checkout_url
+      if (data?.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else if (data?.approval_url) {
         window.location.href = data.approval_url;
       } else {
-        throw new Error("No approval URL received");
+        throw new Error("No checkout URL received");
       }
     } catch (error: any) {
       console.error("PayPal payment error:", error);
