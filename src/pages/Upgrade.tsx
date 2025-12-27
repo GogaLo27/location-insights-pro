@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ const Upgrade = () => {
   const { user, loading: authLoading } = useAuth();
   const { plan, loading: planLoading, refetch } = usePlan();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
@@ -107,55 +108,8 @@ const Upgrade = () => {
   const handleUpgrade = async (planId: string) => {
     if (!user) return;
     
-    // Simple approach: Create new subscription, charge immediately, user gets new features immediately
-    // The old subscription will naturally expire and won't renew
-    
-    setIsUpgrading(true);
-    try {
-      // Get Supabase auth JWT
-      const { data: authData } = await supabase.auth.getSession();
-      const jwt = authData.session?.access_token || "";
-
-      // Create new subscription via PayPal
-      const paypalRes = await supabase.functions.invoke("paypal-create-subscription", {
-        body: {
-          plan_type: planId,
-          return_url: `${window.location.origin}/billing-success`,
-          cancel_url: `${window.location.origin}/upgrade`,
-        },
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-      if (paypalRes.error) {
-        throw new Error(paypalRes.error.message || "PayPal edge function error");
-      }
-
-      let paypalPayload: any = paypalRes.data;
-      if (typeof paypalPayload === "string") {
-        try {
-          paypalPayload = JSON.parse(paypalPayload);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (paypalPayload?.checkout_url) {
-        // Redirect to PayPal for checkout
-        window.location.href = paypalPayload.checkout_url;
-        return;
-      }
-
-      throw new Error("No checkout URL returned");
-
-    } catch (error: any) {
-      console.error('Error upgrading plan:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to upgrade plan. Please try again.",
-        variant: "destructive",
-      });
-      setIsUpgrading(false);
-    }
+    // Redirect to checkout page where user can choose payment method
+    navigate(`/checkout?plan=${planId}&upgrade=true`);
   };
 
   const requestUpgrade = (planId: string, planName: string) => {

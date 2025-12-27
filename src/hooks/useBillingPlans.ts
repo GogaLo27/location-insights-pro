@@ -21,7 +21,7 @@ interface BillingPlan {
   updated_at: string
 }
 
-export function useBillingPlans(provider: 'paypal' | 'lemonsqueezy' = 'paypal') {
+export function useBillingPlans(provider: 'paypal' | 'lemonsqueezy' | 'keepz' = 'paypal') {
   const [plans, setPlans] = useState<BillingPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

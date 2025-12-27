@@ -40,6 +40,7 @@ import CategoryPage from './pages/CategoryPage';
 import Settings from './pages/Settings';
 import Feedback from './pages/Feedback';
 import NotFound from './pages/NotFound';
+import Checkout from './pages/Checkout';
 import DashboardPrivacy from './pages/DashboardPrivacy';
 import DashboardTerms from './pages/DashboardTerms';
 import DashboardRefund from './pages/DashboardRefund';
@@ -65,6 +66,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={false}>
                   <PlanSelection />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute requiresPlan={false}>
+                  <Checkout />
                 </ProtectedRoute>
               }
             />

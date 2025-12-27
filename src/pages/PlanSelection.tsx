@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -8,16 +8,15 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useBillingPlans } from "@/hooks/useBillingPlans";
 import { DynamicPlanCard } from "@/components/DynamicPlanCard";
 import { RefreshCw } from "lucide-react";
 import SEOHead from "@/components/SEOHead";
-import { getCampaignDataFromStorage } from "@/contexts/CampaignContext";
 
 export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   // Use dynamic billing plans from database (try paypal first, fallback to lemonsqueezy)
@@ -40,100 +39,8 @@ export default function PlanSelection() {
   };
 
   const handleSubscribe = async (planType: string) => {
-    try {
-      setSubmittingPlan(planType);
-      const { data: authData } = await supabase.auth.getSession();
-      const jwt = authData.session?.access_token || "";
-
-      // Get campaign tracking data from storage
-      const campaignData = getCampaignDataFromStorage();
-
-      // Try PayPal first (default payment method)
-      try {
-        const paypalRes = await supabase.functions.invoke("paypal-create-subscription", {
-        body: {
-          plan_type: planType,
-          return_url: `${window.location.origin}/billing-success`,
-          cancel_url: `${window.location.origin}/plan-selection`,
-          // Include campaign tracking data
-          campaign_code: campaignData?.campaign_code,
-          utm_source: campaignData?.utm_source,
-          utm_medium: campaignData?.utm_medium,
-          utm_campaign: campaignData?.utm_campaign,
-          utm_content: campaignData?.utm_content,
-          utm_term: campaignData?.utm_term,
-          landing_page: campaignData?.landing_page,
-          conversion_page: '/plan-selection'
-        },
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-        if (paypalRes.error) {
-          throw new Error(paypalRes.error.message || "PayPal edge function error");
-      }
-
-        let paypalPayload: any = paypalRes.data;
-        if (typeof paypalPayload === "string") {
-        try {
-            paypalPayload = JSON.parse(paypalPayload);
-        } catch {
-          // ignore
-        }
-      }
-
-        if (paypalPayload?.checkout_url) {
-          // Redirect to PayPal for checkout
-          window.location.href = paypalPayload.checkout_url;
-          return;
-        }
-      } catch (paypalError) {
-        console.warn("PayPal subscription failed, falling back to LemonSqueezy:", paypalError);
-        
-        // Fallback to LemonSqueezy
-        const lemonRes = await supabase.functions.invoke("lemonsqueezy-create-subscription", {
-          body: {
-            plan_type: planType,
-            return_url: `${window.location.origin}/billing-success`,
-            cancel_url: `${window.location.origin}/plan-selection`,
-          },
-          headers: { Authorization: `Bearer ${jwt}` },
-        });
-
-        if (lemonRes.error) {
-          throw new Error(lemonRes.error.message || "LemonSqueezy edge function error");
-        }
-
-        let lemonPayload: any = lemonRes.data;
-        if (typeof lemonPayload === "string") {
-          try {
-            lemonPayload = JSON.parse(lemonPayload);
-          } catch {
-            // ignore
-          }
-        }
-
-        if (!lemonPayload?.checkout_url) {
-          console.error("Unexpected LemonSqueezy payload shape:", lemonPayload);
-        throw new Error("Failed to create LemonSqueezy subscription");
-      }
-
-      // Redirect to LemonSqueezy for checkout
-        window.location.href = lemonPayload.checkout_url;
-        return;
-      }
-
-      // If we get here, both PayPal and LemonSqueezy failed
-      throw new Error("Both PayPal and LemonSqueezy payment methods failed");
-
-    } catch (e: any) {
-      console.error(e);
-      toast({
-        title: "Payment error",
-        description: e.message || "Failed to process payment",
-        variant: "destructive",
-      });
-      setSubmittingPlan(null);
-    }
+    // Redirect to checkout page where user can choose payment method
+    navigate(`/checkout?plan=${planType}`);
   };
 
   if (!user && !authLoading) {
