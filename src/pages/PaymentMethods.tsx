@@ -244,10 +244,10 @@ const PaymentMethods = () => {
           </div>
 
           {/* Security Notice */}
-          <Card className="border-blue-200 bg-blue-50">
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50">
             <CardContent className="flex items-center gap-3 py-4">
-              <Shield className="h-5 w-5 text-blue-600" />
-              <p className="text-sm text-blue-800">
+              <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <p className="text-sm text-blue-800 dark:text-blue-200">
                 Your card details are securely stored by our payment provider. We only store a reference token, not your actual card number.
               </p>
             </CardContent>
@@ -327,7 +327,7 @@ const PaymentMethods = () => {
                         size="sm"
                         onClick={() => setCardToDelete(card)}
                         disabled={deletingCard === card.id}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
                       >
                         {deletingCard === card.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />

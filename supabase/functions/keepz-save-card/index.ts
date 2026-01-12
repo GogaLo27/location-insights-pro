@@ -135,17 +135,25 @@ serve(async (req) => {
     }
 
     console.log("Creating Keepz card save with payload:", JSON.stringify(orderPayload, null, 2))
+    console.log("Using Keepz URL:", KEEPZ_BASE_URL)
+    console.log("Integrator ID:", KEEPZ_INTEGRATOR_ID)
+    console.log("Public key length:", KEEPZ_PUBLIC_KEY?.length || 0)
+    console.log("Public key starts with:", KEEPZ_PUBLIC_KEY?.substring(0, 20))
 
     // Try PKCS1 padding first, then OAEP
     const paddingModes: Array<'PKCS1' | 'OAEP'> = ['PKCS1', 'OAEP']
     let lastError: Error | null = null
     
     for (const paddingMode of paddingModes) {
+      console.log(`\n--- Trying ${paddingMode} padding mode ---`)
       const keepzCrypto = new KeepzCrypto(KEEPZ_PUBLIC_KEY, paddingMode)
       
       let encrypted
       try {
         encrypted = keepzCrypto.encrypt(orderPayload)
+        console.log(`${paddingMode} encryption succeeded`)
+        console.log("Encrypted data length:", encrypted.encryptedData.length)
+        console.log("Encrypted keys length:", encrypted.encryptedKeys.length)
       } catch (encryptError) {
         console.log(`${paddingMode} encryption failed:`, encryptError)
         lastError = encryptError as Error
@@ -160,6 +168,7 @@ serve(async (req) => {
         aes: true
       }
 
+      console.log("Sending to Keepz API...")
       const response = await fetch(`${KEEPZ_BASE_URL}/api/integrator/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,6 +176,7 @@ serve(async (req) => {
       })
 
       const responseText = await response.text()
+      console.log("Keepz response status:", response.status)
       console.log("Keepz response:", responseText)
 
       let responseData
@@ -176,8 +186,9 @@ serve(async (req) => {
         throw new Error(`Invalid response from Keepz: ${responseText}`)
       }
 
-      // Check for error
+      // Check for error - but DON'T continue if it's a decrypt error, try other padding
       if (responseData.message && responseData.statusCode) {
+        console.log(`${paddingMode} - Keepz returned error:`, responseData.message)
         lastError = new Error(`Keepz API error: ${responseData.message}`)
         continue
       }
