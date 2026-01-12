@@ -41,6 +41,7 @@ import Settings from './pages/Settings';
 import Feedback from './pages/Feedback';
 import NotFound from './pages/NotFound';
 import Checkout from './pages/Checkout';
+import PaymentMethods from './pages/PaymentMethods';
 import DashboardPrivacy from './pages/DashboardPrivacy';
 import DashboardTerms from './pages/DashboardTerms';
 import DashboardRefund from './pages/DashboardRefund';
@@ -202,6 +203,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={false}>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-methods"
+              element={
+                <ProtectedRoute requiresPlan={false} requiresLocation={false}>
+                  <PaymentMethods />
                 </ProtectedRoute>
               }
             />

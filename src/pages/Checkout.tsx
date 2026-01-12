@@ -4,21 +4,42 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CreditCard, ArrowLeft, Check } from "lucide-react";
+import { Loader2, CreditCard, ArrowLeft, Check, Plus, ChevronDown } from "lucide-react";
 import { useBillingPlans } from "@/hooks/useBillingPlans";
+import { useAuth } from "@/components/ui/auth-provider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface SavedCard {
+  id: string;
+  card_token: string;
+  card_mask: string | null;
+  card_brand: string | null;
+  last_4_digits: string | null;
+  is_default: boolean;
+}
 
 export default function Checkout() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const planType = searchParams.get("plan") || "professional";
   const isUpgrade = searchParams.get("upgrade") === "true";
   
   const [loading, setLoading] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<"keepz" | "paypal" | null>(null);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string>("");
+  const [loadingCards, setLoadingCards] = useState(true);
 
-  // Fetch plans from database - no hardcoding!
+  // Fetch plans from database
   const { plans: paypalPlans, loading: plansLoading } = useBillingPlans('paypal');
   
   // Find the selected plan from database
@@ -31,7 +52,50 @@ export default function Checkout() {
     features: selectedPlan.features || []
   } : { name: "Loading...", price: 0, features: [] };
 
-  const handleKeepzPayment = async () => {
+  // Fetch saved cards
+  useEffect(() => {
+    const fetchSavedCards = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("user_payment_methods")
+          .select("*")
+          .eq("user_id", user.id)
+          .neq("card_mask", "pending")
+          .order("is_default", { ascending: false });
+
+        if (error) throw error;
+        
+        setSavedCards(data || []);
+        
+        // Auto-select default card
+        const defaultCard = data?.find(c => c.is_default);
+        if (defaultCard) {
+          setSelectedCardId(defaultCard.id);
+        } else if (data && data.length > 0) {
+          setSelectedCardId(data[0].id);
+        }
+      } catch (err) {
+        console.error("Error fetching saved cards:", err);
+      } finally {
+        setLoadingCards(false);
+      }
+    };
+
+    fetchSavedCards();
+  }, [user]);
+
+  const handleKeepzPaymentWithSavedCard = async () => {
+    if (!selectedCardId) {
+      toast({
+        title: "Select a Card",
+        description: "Please select a saved card or add a new one",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -45,9 +109,10 @@ export default function Checkout() {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("keepz-create-subscription", {
+      const { data, error } = await supabase.functions.invoke("keepz-charge-saved-card", {
         body: {
           plan_type: planType,
+          payment_method_id: selectedCardId,
           return_url: `${window.location.origin}/billing-success`,
           cancel_url: `${window.location.origin}/checkout?plan=${planType}`,
         },
@@ -58,16 +123,26 @@ export default function Checkout() {
 
       if (error) throw error;
 
-      if (data?.checkout_url) {
-        window.location.href = data.checkout_url;
+      // If there's a payment URL (shouldn't be for saved cards, but just in case)
+      if (data?.payment_url) {
+        window.location.href = data.payment_url;
+      } else if (data?.success) {
+        toast({
+          title: "Payment Processing",
+          description: "Your payment is being processed. Redirecting...",
+        });
+        // Redirect to success page
+        setTimeout(() => {
+          navigate("/billing-success");
+        }, 2000);
       } else {
-        throw new Error("No checkout URL received");
+        throw new Error("Payment failed");
       }
     } catch (error: any) {
       console.error("Keepz payment error:", error);
       toast({
         title: "Payment Error",
-        description: error.message || "Failed to initialize payment",
+        description: error.message || "Failed to process payment",
         variant: "destructive"
       });
     } finally {
@@ -102,7 +177,6 @@ export default function Checkout() {
 
       if (error) throw error;
 
-      // PayPal returns checkout_url
       if (data?.checkout_url) {
         window.location.href = data.checkout_url;
       } else if (data?.approval_url) {
@@ -124,13 +198,20 @@ export default function Checkout() {
 
   const handlePayment = () => {
     if (selectedPayment === "keepz") {
-      handleKeepzPayment();
+      handleKeepzPaymentWithSavedCard();
     } else if (selectedPayment === "paypal") {
       handlePayPalPayment();
     }
   };
 
-  if (plansLoading) {
+  const handleAddNewCard = () => {
+    navigate("/payment-methods");
+  };
+
+  // Check if Keepz payment is possible
+  const canPayWithKeepz = savedCards.length > 0 && selectedCardId;
+
+  if (plansLoading || loadingCards) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -211,7 +292,7 @@ export default function Checkout() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Keepz Option */}
+                {/* Keepz Option with Saved Cards */}
                 <div
                   className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     selectedPayment === "keepz"
@@ -226,8 +307,13 @@ export default function Checkout() {
                         <CreditCard className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <p className="font-medium text-white">Keepz</p>
-                        <p className="text-sm text-slate-400">Credit/Debit Card</p>
+                        <p className="font-medium text-white">Credit/Debit Card</p>
+                        <p className="text-sm text-slate-400">
+                          {savedCards.length > 0 
+                            ? `${savedCards.length} saved card${savedCards.length > 1 ? 's' : ''}`
+                            : "No saved cards"
+                          }
+                        </p>
                       </div>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 ${
@@ -240,6 +326,67 @@ export default function Checkout() {
                       )}
                     </div>
                   </div>
+
+                  {/* Saved Cards Dropdown - shown when Keepz is selected */}
+                  {selectedPayment === "keepz" && (
+                    <div className="mt-4 pt-4 border-t border-slate-600">
+                      {savedCards.length > 0 ? (
+                        <div className="space-y-3">
+                          <label className="text-sm text-slate-300">Select Card</label>
+                          <Select value={selectedCardId} onValueChange={setSelectedCardId}>
+                            <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                              <SelectValue placeholder="Select a card" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-700 border-slate-600">
+                              {savedCards.map((card) => (
+                                <SelectItem 
+                                  key={card.id} 
+                                  value={card.id}
+                                  className="text-white hover:bg-slate-600"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <CreditCard className="w-4 h-4" />
+                                    {card.card_brand || 'Card'} •••• {card.last_4_digits || '****'}
+                                    {card.is_default && <span className="text-xs text-blue-400">(Default)</span>}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-400 hover:text-blue-300 p-0 h-auto"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddNewCard();
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Add new card
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-center py-2">
+                          <p className="text-sm text-slate-400 mb-3">
+                            You need to add a payment method first
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-blue-500 text-blue-400 hover:bg-blue-500/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddNewCard();
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Payment Method
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* PayPal Option */}
@@ -277,7 +424,11 @@ export default function Checkout() {
                 <Button
                   className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   size="lg"
-                  disabled={!selectedPayment || loading}
+                  disabled={
+                    !selectedPayment || 
+                    loading || 
+                    (selectedPayment === "keepz" && !canPayWithKeepz)
+                  }
                   onClick={handlePayment}
                 >
                   {loading ? (
@@ -290,6 +441,12 @@ export default function Checkout() {
                   )}
                 </Button>
 
+                {selectedPayment === "keepz" && !canPayWithKeepz && (
+                  <p className="text-xs text-center text-amber-400">
+                    Please add a payment method to continue with card payment
+                  </p>
+                )}
+
                 <p className="text-xs text-center text-slate-500">
                   By completing this purchase, you agree to our Terms of Service and Privacy Policy.
                 </p>
@@ -301,4 +458,3 @@ export default function Checkout() {
     </div>
   );
 }
-

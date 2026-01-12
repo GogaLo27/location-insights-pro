@@ -3,6 +3,8 @@
 ## Overview
 This document provides step-by-step instructions for deploying the Keepz payment integration.
 
+**Architecture**: Users must save a card first, then use saved cards for subscriptions.
+
 ## Prerequisites
 - Supabase CLI installed and logged in
 - Keepz integration credentials (Integrator ID, Receiver ID, Public Key, Private Key)
@@ -34,26 +36,61 @@ npx supabase secrets set KEEPZ_MODE="dev"  # Use "live" for production
 cd client
 
 # Deploy all Keepz functions
-npx supabase functions deploy keepz-create-subscription
+npx supabase functions deploy keepz-save-card
+npx supabase functions deploy keepz-charge-saved-card
 npx supabase functions deploy keepz-webhook
 npx supabase functions deploy keepz-cancel-subscription
 ```
 
 ## Database Migration
 
-Run the migration to add Keepz-specific columns:
+Run these SQL commands in Supabase SQL Editor:
 
-```bash
-cd client
-npx supabase db push
-```
-
-Or manually run:
+### 1. Add Keepz columns to subscriptions table
 ```sql
 ALTER TABLE public.subscriptions 
 ADD COLUMN IF NOT EXISTS keepz_subscription_id TEXT,
 ADD COLUMN IF NOT EXISTS keepz_order_id TEXT,
 ADD COLUMN IF NOT EXISTS keepz_card_token TEXT;
+```
+
+### 2. Create user_payment_methods table
+```sql
+CREATE TABLE IF NOT EXISTS public.user_payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL DEFAULT 'keepz',
+  card_token TEXT NOT NULL,
+  card_mask TEXT,
+  card_brand TEXT,
+  last_4_digits TEXT,
+  expiration_date TEXT,
+  is_default BOOLEAN DEFAULT false,
+  nickname TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, card_token)
+);
+
+ALTER TABLE public.user_payment_methods ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own payment methods" 
+ON public.user_payment_methods FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own payment methods" 
+ON public.user_payment_methods FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own payment methods" 
+ON public.user_payment_methods FOR UPDATE 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own payment methods" 
+ON public.user_payment_methods FOR DELETE 
+USING (auth.uid() = user_id);
+
+CREATE INDEX idx_payment_methods_user_id ON public.user_payment_methods(user_id);
 ```
 
 ## Webhook Configuration
@@ -63,12 +100,28 @@ Configure your Keepz integration callback URL:
 https://maxpyehrsnrcfriukuvv.supabase.co/functions/v1/keepz-webhook
 ```
 
+## Payment Flow
+
+### Step 1: User Saves Card
+1. User goes to `/payment-methods`
+2. Clicks "Add New Card"
+3. Redirected to Keepz (1 GEL authorization)
+4. Card saved to `user_payment_methods` table
+
+### Step 2: User Subscribes
+1. User goes to `/checkout?plan=professional`
+2. Selects saved card from dropdown
+3. Clicks "Pay"
+4. `keepz-charge-saved-card` charges the actual amount
+5. Subscription created
+
 ## Testing
 
-1. Go to `/checkout?plan=professional`
-2. Select Keepz as payment method
-3. Complete the payment flow
-4. Check logs at: https://supabase.com/dashboard/project/maxpyehrsnrcfriukuvv/functions
+1. Go to `/payment-methods` and add a card
+2. Go to `/checkout?plan=professional`
+3. Select your saved card
+4. Complete the payment
+5. Check logs at: https://supabase.com/dashboard/project/maxpyehrsnrcfriukuvv/functions
 
 ## Encryption
 
@@ -89,10 +142,27 @@ The integration uses hybrid encryption (AES-256-CBC + RSA):
 ### "Currency not allowed"
 - Check which currencies are enabled for your integration (GEL, EUR, USD, etc.)
 
-## Files Created
+## Files
 
-- `supabase/functions/keepz-create-subscription/index.ts` - Creates payment/subscription
+### Edge Functions
+- `supabase/functions/keepz-save-card/index.ts` - Saves card (1 GEL auth)
+- `supabase/functions/keepz-charge-saved-card/index.ts` - Charges saved card for subscription
 - `supabase/functions/keepz-webhook/index.ts` - Handles callbacks from Keepz
 - `supabase/functions/keepz-cancel-subscription/index.ts` - Cancels subscriptions
-- `src/pages/Checkout.tsx` - Checkout page with payment method selection
 
+### Frontend Pages
+- `src/pages/PaymentMethods.tsx` - Manage saved cards
+- `src/pages/Checkout.tsx` - Checkout with saved card selection
+
+## Security
+
+We only store:
+- `card_token` - UUID reference to card in Keepz system
+- `card_mask` - Masked card number (411111******1111)
+- `card_brand` - VISA, MasterCard, etc.
+- `expiration_date` - MM/YY
+
+We NEVER store:
+- Full card number
+- CVV/CVC
+- PIN

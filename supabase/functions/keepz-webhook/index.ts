@@ -172,6 +172,7 @@ async function handleCallback(data: any) {
     orderId, 
     subscriptionId,
     cardToken,
+    cardInfo,
     amount,
     currency
   } = data
@@ -181,6 +182,20 @@ async function handleCallback(data: any) {
       status: 400,
       headers: { ...cors, "Content-Type": "application/json" }
     })
+  }
+
+  // Check if this is a CARD SAVE callback (card saved without subscription)
+  // We identify this by checking if there's a pending record in user_payment_methods
+  const { data: pendingCard, error: pendingErr } = await supabase
+    .from("user_payment_methods")
+    .select("*")
+    .eq("card_token", integratorOrderId) // We stored integratorOrderId as temp token
+    .eq("card_mask", "pending")
+    .single()
+
+  if (pendingCard && !pendingErr) {
+    console.log("This is a CARD SAVE callback, not subscription")
+    return await handleCardSaveCallback(data, pendingCard)
   }
 
   // Find subscription by keepz_order_id
@@ -240,6 +255,60 @@ async function handleCallback(data: any) {
     throw updateErr
   }
 
+  // If subscription became active, cancel any OTHER active subscriptions for this user (upgrade/downgrade handling)
+  if (newStatus === "active") {
+    try {
+      const { data: otherSubs, error: listError } = await supabase
+        .from('subscriptions')
+        .select('id, keepz_subscription_id, provider')
+        .eq('user_id', subscription.user_id)
+        .eq('status', 'active')
+        .neq('id', subscription.id)
+
+      if (listError) {
+        console.error('Error fetching other active subscriptions:', listError)
+      } else if (otherSubs && otherSubs.length > 0) {
+        console.log('Cancelling other active subscriptions for user (upgrade/downgrade):', otherSubs.map(s => s.id))
+        
+        for (const oldSub of otherSubs) {
+          // Mark old subscription as cancelled
+          const { error: markErr } = await supabase
+            .from('subscriptions')
+            .update({ 
+              status: 'cancelled', 
+              cancelled_at: new Date().toISOString(), 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', oldSub.id)
+
+          if (markErr) {
+            console.error('Failed to mark old subscription as cancelled:', markErr)
+          } else {
+            console.log(`Old subscription ${oldSub.id} cancelled due to upgrade/downgrade`)
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error while auto-cancelling previous subscriptions:', e)
+    }
+
+    // Update user_plans to reflect the new plan
+    const { error: planError } = await supabase
+      .from('user_plans')
+      .upsert({
+        user_id: subscription.user_id,
+        plan_type: subscription.plan_type,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' })
+
+    if (planError) {
+      console.error('Error updating user_plans:', planError)
+    } else {
+      console.log(`User plan updated to ${subscription.plan_type}`)
+    }
+  }
+
   // Log the event
   await supabase
     .from("subscription_events")
@@ -256,5 +325,94 @@ async function handleCallback(data: any) {
     status: 200,
     headers: { ...cors, "Content-Type": "application/json" }
   })
+}
+
+// Handle card save callback (when user saves card without subscription)
+async function handleCardSaveCallback(data: any, pendingCard: any) {
+  const { 
+    integratorOrderId, 
+    status, 
+    cardInfo,
+    cardToken
+  } = data
+
+  console.log("Processing card save callback for user:", pendingCard.user_id)
+  console.log("Card info received:", cardInfo)
+
+  // Check if payment/card save was successful
+  if (status === "SUCCESS" || status === "COMPLETED") {
+    // Get actual card token from cardInfo or cardToken field
+    const actualCardToken = cardInfo?.token || cardToken
+
+    if (!actualCardToken) {
+      console.error("No card token received from Keepz!")
+      // Delete the pending record
+      await supabase
+        .from("user_payment_methods")
+        .delete()
+        .eq("id", pendingCard.id)
+      
+      return new Response(JSON.stringify({ error: "No card token received" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
+    }
+
+    // Update the pending record with actual card details
+    const { error: updateErr } = await supabase
+      .from("user_payment_methods")
+      .update({
+        card_token: actualCardToken,  // Replace temp token with real one
+        card_mask: cardInfo?.cardMask || null,
+        card_brand: cardInfo?.cardBrand || null,
+        last_4_digits: cardInfo?.cardMask ? cardInfo.cardMask.slice(-4) : null,
+        expiration_date: cardInfo?.expirationDate || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", pendingCard.id)
+
+    if (updateErr) {
+      console.error("Error updating payment method:", updateErr)
+      throw updateErr
+    }
+
+    // Check if this is the user's first card - make it default
+    const { data: allCards } = await supabase
+      .from("user_payment_methods")
+      .select("id")
+      .eq("user_id", pendingCard.user_id)
+      .neq("card_mask", "pending")
+
+    if (allCards && allCards.length === 1) {
+      // This is the only (first) card - make it default
+      await supabase
+        .from("user_payment_methods")
+        .update({ is_default: true })
+        .eq("id", pendingCard.id)
+      
+      console.log("Set as default card (first card for user)")
+    }
+
+    console.log(`Card saved successfully for user ${pendingCard.user_id}`)
+    
+    return new Response(JSON.stringify({ success: true, card_saved: true }), {
+      status: 200,
+      headers: { ...cors, "Content-Type": "application/json" }
+    })
+
+  } else {
+    // Card save failed - delete the pending record
+    console.log("Card save failed with status:", status)
+    
+    await supabase
+      .from("user_payment_methods")
+      .delete()
+      .eq("id", pendingCard.id)
+
+    return new Response(JSON.stringify({ success: false, status }), {
+      status: 200,
+      headers: { ...cors, "Content-Type": "application/json" }
+    })
+  }
 }
 

@@ -149,6 +149,14 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
+                  <NavLink to="/payment-methods" className={getNavCls}>
+                    <CreditCard className="h-4 w-4" />
+                    {!collapsed && <span>Payment Methods</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
                   <NavLink to="/feedback" className={getNavCls}>
                     <MessageCircle className="h-4 w-4" />
                     {!collapsed && <span>Feedback</span>}
