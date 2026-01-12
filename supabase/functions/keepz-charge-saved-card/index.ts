@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { publicEncrypt, createCipheriv, randomBytes, constants, privateDecrypt, createDecipheriv } from "node:crypto"
+import { publicEncrypt, createCipheriv, randomBytes, constants, privateDecrypt, createDecipheriv, createPublicKey, createPrivateKey } from "node:crypto"
 import { Buffer } from "node:buffer"
 
 const cors = {
@@ -24,44 +24,47 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
 
-// Encryption class for Keepz API
+// Encryption class for Keepz API - Following exact documentation example
 class KeepzCrypto {
   private rsaPublicKey: string
-  private paddingMode: 'PKCS1' | 'OAEP'
 
-  constructor(rsaPublicKey: string, paddingMode: 'PKCS1' | 'OAEP' = 'PKCS1') {
+  constructor(rsaPublicKey: string) {
     this.rsaPublicKey = rsaPublicKey
-    this.paddingMode = paddingMode
   }
 
   encrypt(data: object): { encryptedData: string; encryptedKeys: string } {
-    const aesKey = randomBytes(32)
-    const iv = randomBytes(16)
+    // 1. Generate AES-256 key and IV
+    const aesKey = randomBytes(32) // 256-bit key
+    const iv = randomBytes(16) // 128-bit IV
 
+    // 2. Encrypt data with AES-CBC
     const cipher = createCipheriv('aes-256-cbc', aesKey, iv)
     const encryptedData = Buffer.concat([
       cipher.update(Buffer.from(JSON.stringify(data), 'utf8')),
       cipher.final()
     ])
 
+    // 3. Prepare encryptedKeys (AES key + IV)
     const encodedKey = aesKey.toString('base64')
     const encodedIV = iv.toString('base64')
     const concat = `${encodedKey}.${encodedIV}`
 
-    const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${this.rsaPublicKey.match(/.{1,64}/g)?.join('\n')}\n-----END PUBLIC KEY-----`
+    // Create public key from DER format (Base64 encoded) - EXACTLY as documentation shows
+    const rsaPublicKey = createPublicKey({
+      key: Buffer.from(this.rsaPublicKey, 'base64'),
+      format: 'der',
+      type: 'spki',
+    })
 
-    let encryptedKeys: Buffer
-    if (this.paddingMode === 'PKCS1') {
-      encryptedKeys = publicEncrypt(
-        { key: publicKeyPem, padding: constants.RSA_PKCS1_PADDING },
-        Buffer.from(concat, 'utf8')
-      )
-    } else {
-      encryptedKeys = publicEncrypt(
-        { key: publicKeyPem, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
-        Buffer.from(concat, 'utf8')
-      )
-    }
+    // Encrypt with RSA OAEP padding + SHA-256 - EXACTLY as documentation shows
+    const encryptedKeys = publicEncrypt(
+      {
+        key: rsaPublicKey,
+        padding: constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256',
+      },
+      Buffer.from(concat, 'utf8')
+    )
 
     return {
       encryptedData: encryptedData.toString('base64'),
@@ -209,95 +212,84 @@ serve(async (req) => {
 
     console.log("Charging saved card with payload:", JSON.stringify(orderPayload, null, 2))
 
-    // Try PKCS1 padding first, then OAEP
-    const paddingModes: Array<'PKCS1' | 'OAEP'> = ['PKCS1', 'OAEP']
-    let lastError: Error | null = null
-    
-    for (const paddingMode of paddingModes) {
-      const keepzCrypto = new KeepzCrypto(KEEPZ_PUBLIC_KEY, paddingMode)
-      
-      let encrypted
-      try {
-        encrypted = keepzCrypto.encrypt(orderPayload)
-      } catch (encryptError) {
-        console.log(`${paddingMode} encryption failed:`, encryptError)
-        lastError = encryptError as Error
-        continue
-      }
+    // Encrypt using exact method from Keepz documentation
+    const keepzCrypto = new KeepzCrypto(KEEPZ_PUBLIC_KEY)
+    const encrypted = keepzCrypto.encrypt(orderPayload)
 
-      const requestBody = {
-        identifier: KEEPZ_INTEGRATOR_ID,
-        encryptedData: encrypted.encryptedData,
-        encryptedKeys: encrypted.encryptedKeys,
-        aes: true
-      }
-
-      const response = await fetch(`${KEEPZ_BASE_URL}/api/integrator/order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      })
-
-      const responseText = await response.text()
-      console.log("Keepz response:", responseText)
-
-      let responseData
-      try {
-        responseData = JSON.parse(responseText)
-      } catch {
-        throw new Error(`Invalid response from Keepz: ${responseText}`)
-      }
-
-      if (responseData.message && responseData.statusCode) {
-        lastError = new Error(`Keepz API error: ${responseData.message}`)
-        continue
-      }
-
-      // Decrypt response
-      if (responseData.encryptedData && responseData.encryptedKeys) {
-        const privateKeyPem = `-----BEGIN PRIVATE KEY-----\n${KEEPZ_PRIVATE_KEY.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`
-        
-        let decryptedConcat
-        try {
-          decryptedConcat = privateDecrypt(
-            { key: privateKeyPem, padding: paddingMode === 'PKCS1' ? constants.RSA_PKCS1_PADDING : constants.RSA_PKCS1_OAEP_PADDING, ...(paddingMode === 'OAEP' ? { oaepHash: 'sha256' } : {}) },
-            Buffer.from(responseData.encryptedKeys, 'base64')
-          ).toString('utf8')
-        } catch {
-          continue
-        }
-
-        const [encodedKey, encodedIV] = decryptedConcat.split('.')
-        const aesKey = Buffer.from(encodedKey, 'base64')
-        const iv = Buffer.from(encodedIV, 'base64')
-
-        const decipher = createDecipheriv('aes-256-cbc', aesKey, iv)
-        const decryptedData = Buffer.concat([
-          decipher.update(Buffer.from(responseData.encryptedData, 'base64')),
-          decipher.final()
-        ])
-
-        const decrypted = JSON.parse(decryptedData.toString('utf8'))
-        console.log("Decrypted Keepz response:", decrypted)
-
-        // For saved card payments, there's no redirect URL needed
-        // The payment is processed immediately and webhook will confirm
-
-        return new Response(JSON.stringify({
-          success: true,
-          subscription_id: sub.id,
-          order_id: integratorOrderId,
-          message: "Payment processing. You will be charged shortly.",
-          // If Keepz returns a URL for some reason, include it
-          payment_url: decrypted.urlForQR || null
-        }), {
-          status: 200,
-          headers: { ...cors, "Content-Type": "application/json" }
-        })
-      }
+    const requestBody = {
+      identifier: KEEPZ_INTEGRATOR_ID,
+      encryptedData: encrypted.encryptedData,
+      encryptedKeys: encrypted.encryptedKeys,
+      aes: true
     }
 
-    throw lastError || new Error("Failed to process payment")
+    const response = await fetch(`${KEEPZ_BASE_URL}/api/integrator/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    })
+
+    const responseText = await response.text()
+    console.log("Keepz response:", responseText)
+
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+    } catch {
+      throw new Error(`Invalid response from Keepz: ${responseText}`)
+    }
+
+    if (responseData.message && responseData.statusCode) {
+      throw new Error(`Keepz API error: ${responseData.message}`)
+    }
+
+    // Decrypt response using exact method from documentation
+    if (responseData.encryptedData && responseData.encryptedKeys) {
+      const rsaPrivateKey = createPrivateKey({
+        key: Buffer.from(KEEPZ_PRIVATE_KEY, 'base64'),
+        format: 'der',
+        type: 'pkcs8',
+      })
+
+      const decryptedConcat = privateDecrypt(
+        {
+          key: rsaPrivateKey,
+          padding: constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(responseData.encryptedKeys, 'base64')
+      ).toString('utf8')
+
+      const [encodedKey, encodedIV] = decryptedConcat.split('.')
+      const aesKey = Buffer.from(encodedKey, 'base64')
+      const iv = Buffer.from(encodedIV, 'base64')
+
+      const decipher = createDecipheriv('aes-256-cbc', aesKey, iv)
+      const decryptedData = Buffer.concat([
+        decipher.update(Buffer.from(responseData.encryptedData, 'base64')),
+        decipher.final()
+      ])
+
+      const decrypted = JSON.parse(decryptedData.toString('utf8'))
+      console.log("Decrypted Keepz response:", decrypted)
+
+      // For saved card payments, there's no redirect URL needed
+      // The payment is processed immediately and webhook will confirm
+
+      return new Response(JSON.stringify({
+        success: true,
+        subscription_id: sub.id,
+        order_id: integratorOrderId,
+        message: "Payment processing. You will be charged shortly.",
+        // If Keepz returns a URL for some reason, include it
+        payment_url: decrypted.urlForQR || null
+      }), {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
+    }
+
+    throw new Error("Invalid response from Keepz - no encrypted data")
 
   } catch (error) {
     console.error("Error charging saved card:", error)
