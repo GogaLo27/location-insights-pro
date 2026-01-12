@@ -230,16 +230,16 @@ serve(async (req) => {
       throw subErr
     }
 
-    // Build Keepz order payload
-    // NOTE: subscriptionPlan is commented out until Keepz enables subscription permissions
+    // Build Keepz order payload for SUBSCRIPTION
+    // Per Keepz docs: amount must be 0 and saveCard must be true when using subscriptionPlan
     const orderPayload = {
-      amount: price, // Initial payment amount
+      amount: 0, // Must be 0 for subscriptions - recurring amount is in subscriptionPlan
       receiverId: KEEPZ_RECEIVER_ID,
       receiverType: "BRANCH",
       integratorId: KEEPZ_INTEGRATOR_ID,
       integratorOrderId: integratorOrderId,
-      //currency: billingPlan.currency || "GEL",
       currency: "GEL",
+      saveCard: true, // Required for subscriptions
       subscriptionPlan: {
         interval: "MONTHLY",
         intervalCount: 1,
