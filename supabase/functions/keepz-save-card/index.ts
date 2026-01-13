@@ -102,7 +102,7 @@ serve(async (req) => {
       console.error("Error creating pending card record:", pendingError)
     }
 
-    // Build Keepz order payload
+    // Build Keepz order payload - pure card save, no charge
     const orderPayload = {
       amount: 0,
       receiverId: KEEPZ_RECEIVER_ID,
@@ -112,11 +112,6 @@ serve(async (req) => {
       currency: "GEL",
       saveCard: true,
       directLinkProvider: "CREDO",
-      subscriptionPlan: {
-        interval: "MONTHLY",
-        intervalCount: 1,
-        amount: 1,
-      },
       successRedirectUri: return_url || `${req.headers.get('origin')}/payment-methods?saved=true`,
       failRedirectUri: cancel_url || `${req.headers.get('origin')}/payment-methods?saved=false`,
       callbackUri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/keepz-webhook`,
