@@ -279,13 +279,49 @@ serve(async (req) => {
         const decrypted = JSON.parse(decryptedData.toString('utf8'))
         console.log("Decrypted Keepz response:", decrypted)
 
-        // Payment initiated - webhook will activate subscription when Keepz confirms
+        // Payment accepted by Keepz - activate subscription NOW
+        
+        // 1. Activate this subscription
+        const { error: activateErr } = await supabase
+          .from("subscriptions")
+          .update({
+            status: "active",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", sub.id)
+
+        if (activateErr) {
+          console.error("Failed to activate subscription:", activateErr)
+        }
+
+        // 2. Update user_plans
+        const { error: planErr } = await supabase
+          .from("user_plans")
+          .upsert({
+            user_id: user.id,
+            plan_type: plan_type,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' })
+
+        if (planErr) {
+          console.error("Failed to update user_plans:", planErr)
+        }
+
+        // 3. Cancel other active subscriptions
+        await supabase
+          .from('subscriptions')
+          .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .neq('id', sub.id)
+
+        console.log(`Subscription ${sub.id} activated, plan_type: ${plan_type}`)
+
         return new Response(JSON.stringify({
           success: true,
           subscription_id: sub.id,
-          order_id: integratorOrderId,
-          message: "Payment initiated. Waiting for confirmation.",
-          payment_url: decrypted.urlForQR || null
+          plan_type: plan_type,
+          message: "Subscription activated"
         }), {
           status: 200,
           headers: { ...cors, "Content-Type": "application/json" }
