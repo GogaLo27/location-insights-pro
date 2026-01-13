@@ -282,10 +282,14 @@ serve(async (req) => {
         // Payment accepted by Keepz - activate subscription NOW
         
         // 1. Activate this subscription
+        const isWeekly = plan_type?.includes('weekly') || plan_type?.includes('week')
+        const periodDays = isWeekly ? 7 : 30
+        
         const { error: activateErr } = await supabase
           .from("subscriptions")
           .update({
             status: "active",
+            current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq("id", sub.id)
