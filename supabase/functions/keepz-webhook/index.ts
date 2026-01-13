@@ -60,8 +60,41 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
-    const body = await req.json()
-    console.log("Keepz webhook received:", JSON.stringify(body, null, 2))
+    // Log all request details first
+    console.log("=== KEEPZ WEBHOOK RECEIVED ===")
+    console.log("Method:", req.method)
+    console.log("URL:", req.url)
+    console.log("Headers:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2))
+    
+    // Get raw body text first
+    const rawBody = await req.text()
+    console.log("Raw body:", rawBody)
+    console.log("Raw body length:", rawBody.length)
+    
+    // If body is empty, return success (might be a ping/health check)
+    if (!rawBody || rawBody.trim() === '') {
+      console.log("Empty body received - returning 200 OK")
+      return new Response(JSON.stringify({ success: true, message: "Empty body acknowledged" }), {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
+    }
+    
+    // Try to parse as JSON
+    let body
+    try {
+      body = JSON.parse(rawBody)
+    } catch (parseError) {
+      console.error("Failed to parse JSON:", parseError)
+      console.log("Body content:", rawBody)
+      // Return 200 anyway so Keepz doesn't retry
+      return new Response(JSON.stringify({ success: true, message: "Body received but not JSON" }), {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
+    }
+    
+    console.log("Keepz webhook parsed body:", JSON.stringify(body, null, 2))
 
     const { encryptedData, encryptedKeys, aes } = body
 
@@ -97,13 +130,26 @@ serve(async (req) => {
 })
 
 async function handlePlainCallback(data: any) {
-  const { integratorOrderId, status, orderId, subscriptionId } = data
+  const { integratorOrderId, status, orderId, subscriptionId, cardToken, cardInfo } = data
 
   if (!integratorOrderId) {
     return new Response(JSON.stringify({ error: "Missing integratorOrderId" }), {
       status: 400,
       headers: { ...cors, "Content-Type": "application/json" }
     })
+  }
+
+  // FIRST: Check if this is a CARD SAVE callback
+  const { data: pendingCard, error: pendingErr } = await supabase
+    .from("user_payment_methods")
+    .select("*")
+    .eq("card_token", integratorOrderId)
+    .eq("card_mask", "pending")
+    .single()
+
+  if (pendingCard && !pendingErr) {
+    console.log("Plain callback: This is a CARD SAVE callback")
+    return await handleCardSaveCallback(data, pendingCard)
   }
 
   // Find subscription by keepz_order_id
@@ -333,27 +379,41 @@ async function handleCardSaveCallback(data: any, pendingCard: any) {
     integratorOrderId, 
     status, 
     cardInfo,
-    cardToken
+    cardToken,
+    // Sometimes Keepz sends these at top level
+    card,
+    token,
+    savedCardToken
   } = data
 
   console.log("Processing card save callback for user:", pendingCard.user_id)
+  console.log("Full callback data:", JSON.stringify(data, null, 2))
   console.log("Card info received:", cardInfo)
+  console.log("Card token received:", cardToken)
+  console.log("Status:", status)
 
   // Check if payment/card save was successful
-  if (status === "SUCCESS" || status === "COMPLETED") {
-    // Get actual card token from cardInfo or cardToken field
-    const actualCardToken = cardInfo?.token || cardToken
+  // Keepz might send different status values
+  const isSuccess = status === "SUCCESS" || status === "COMPLETED" || status === "ACTIVE" || status === "PAID"
+  
+  if (isSuccess) {
+    // Get actual card token from various possible fields
+    const actualCardToken = cardInfo?.token || cardToken || savedCardToken || token || card?.token
+    
+    // Get card mask from various possible fields
+    const cardMask = cardInfo?.cardMask || cardInfo?.maskedPan || card?.cardMask || card?.maskedPan || data.maskedPan
+    const cardBrand = cardInfo?.cardBrand || cardInfo?.brand || card?.cardBrand || card?.brand || data.cardBrand
+
+    console.log("Extracted card token:", actualCardToken)
+    console.log("Extracted card mask:", cardMask)
+    console.log("Extracted card brand:", cardBrand)
 
     if (!actualCardToken) {
-      console.error("No card token received from Keepz!")
-      // Delete the pending record
-      await supabase
-        .from("user_payment_methods")
-        .delete()
-        .eq("id", pendingCard.id)
-      
-      return new Response(JSON.stringify({ error: "No card token received" }), {
-        status: 400,
+      console.error("No card token received from Keepz! Full data:", JSON.stringify(data))
+      // Don't delete - keep as pending, maybe callback will come again
+      // Just log and return success to Keepz
+      return new Response(JSON.stringify({ success: true, warning: "No card token received yet" }), {
+        status: 200,
         headers: { ...cors, "Content-Type": "application/json" }
       })
     }
@@ -363,10 +423,10 @@ async function handleCardSaveCallback(data: any, pendingCard: any) {
       .from("user_payment_methods")
       .update({
         card_token: actualCardToken,  // Replace temp token with real one
-        card_mask: cardInfo?.cardMask || null,
-        card_brand: cardInfo?.cardBrand || null,
-        last_4_digits: cardInfo?.cardMask ? cardInfo.cardMask.slice(-4) : null,
-        expiration_date: cardInfo?.expirationDate || null,
+        card_mask: cardMask || "Card saved",
+        card_brand: cardBrand || "Unknown",
+        last_4_digits: cardMask ? cardMask.slice(-4) : null,
+        expiration_date: cardInfo?.expirationDate || card?.expirationDate || null,
         updated_at: new Date().toISOString()
       })
       .eq("id", pendingCard.id)

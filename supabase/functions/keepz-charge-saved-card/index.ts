@@ -145,7 +145,15 @@ serve(async (req) => {
     }
 
     const price = billingPlan.price_cents / 100
-    console.log(`Charging saved card for ${plan_type}: ${price} GEL`)
+    
+    // Determine subscription interval from billing plan
+    // Keepz supports: MONTHLY, WEEKLY
+    let keepzInterval = "MONTHLY"
+    if (billingPlan.interval === "week" || billingPlan.interval === "weekly") {
+      keepzInterval = "WEEKLY"
+    }
+    
+    console.log(`Charging saved card for ${plan_type}: ${price} GEL (${keepzInterval})`)
 
     // Generate unique order ID
     const integratorOrderId = crypto.randomUUID()
@@ -190,7 +198,7 @@ serve(async (req) => {
       currency: "GEL",
       cardToken: paymentMethod.card_token,  // Use saved card - no user interaction needed!
       subscriptionPlan: {
-        interval: "MONTHLY",
+        interval: keepzInterval,
         intervalCount: 1,
         amount: price,
       },

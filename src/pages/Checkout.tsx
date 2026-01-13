@@ -39,18 +39,22 @@ export default function Checkout() {
   const [selectedCardId, setSelectedCardId] = useState<string>("");
   const [loadingCards, setLoadingCards] = useState(true);
 
-  // Fetch plans from database
-  const { plans: paypalPlans, loading: plansLoading } = useBillingPlans('paypal');
+  // Fetch plans from database (both PayPal and Keepz)
+  const { plans: paypalPlans, loading: paypalPlansLoading } = useBillingPlans('paypal');
+  const { plans: keepzPlans, loading: keepzPlansLoading } = useBillingPlans('keepz');
+  const plansLoading = paypalPlansLoading || keepzPlansLoading;
   
-  // Find the selected plan from database
-  const selectedPlan = paypalPlans.find(p => p.plan_type === planType);
+  // Find the selected plan from database (check Keepz first, then PayPal)
+  const selectedPlan = keepzPlans.find(p => p.plan_type === planType) || paypalPlans.find(p => p.plan_type === planType);
   
   // Plan details from database
   const plan = selectedPlan ? {
     name: selectedPlan.plan_name,
     price: selectedPlan.price_cents / 100,
+    currency: selectedPlan.currency || 'USD',
+    interval: selectedPlan.interval || 'month',
     features: selectedPlan.features || []
-  } : { name: "Loading...", price: 0, features: [] };
+  } : { name: "Loading...", price: 0, currency: 'USD', interval: 'month', features: [] };
 
   // Fetch saved cards
   useEffect(() => {
@@ -249,11 +253,11 @@ export default function Checkout() {
                 <div className="flex justify-between items-center pb-4 border-b border-slate-700">
                   <div>
                     <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
-                    <p className="text-sm text-slate-400">Monthly subscription</p>
+                    <p className="text-sm text-slate-400">{plan.interval === 'week' ? 'Weekly' : 'Monthly'} subscription</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-white">${plan.price}</p>
-                    <p className="text-sm text-slate-400">/month</p>
+                    <p className="text-2xl font-bold text-white">{plan.currency === 'GEL' ? '₾' : '$'}{plan.price}</p>
+                    <p className="text-sm text-slate-400">/{plan.interval === 'week' ? 'week' : 'month'}</p>
                   </div>
                 </div>
 
@@ -272,10 +276,10 @@ export default function Checkout() {
                 <div className="pt-4 border-t border-slate-700">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-300">Total today</span>
-                    <span className="text-xl font-bold text-white">${plan.price}</span>
+                    <span className="text-xl font-bold text-white">{plan.currency === 'GEL' ? '₾' : '$'}{plan.price}</span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    You'll be charged ${plan.price} monthly. Cancel anytime.
+                    You'll be charged {plan.currency === 'GEL' ? '₾' : '$'}{plan.price} {plan.interval === 'week' ? 'weekly' : 'monthly'}. Cancel anytime.
                   </p>
                 </div>
               </div>
@@ -437,7 +441,7 @@ export default function Checkout() {
                       Processing...
                     </>
                   ) : (
-                    <>Pay ${plan.price}</>
+                    <>Pay {plan.currency === 'GEL' ? '₾' : '$'}{plan.price}</>
                   )}
                 </Button>
 
