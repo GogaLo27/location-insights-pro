@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { publicEncrypt, createCipheriv, randomBytes, constants, createPublicKey } from "node:crypto"
+import { publicEncrypt, createCipheriv, randomBytes, constants } from "node:crypto"
 import { Buffer } from "node:buffer"
 
 const cors = {
@@ -21,11 +21,11 @@ const KEEPZ_BASE_URL = Deno.env.get('KEEPZ_MODE') === 'live'
 const KEEPZ_INTEGRATOR_ID = Deno.env.get('KEEPZ_INTEGRATOR_ID') ?? ''
 const KEEPZ_PUBLIC_KEY = Deno.env.get('KEEPZ_PUBLIC_KEY') ?? ''
 
-// Encrypt function for Keepz API - Following exact documentation example
-function encryptKeepzPayload(data: object): { encryptedData: string; encryptedKeys: string } {
+// Encrypt function for Keepz API - supports both padding modes
+function encryptKeepzPayload(data: object, paddingMode: 'PKCS1' | 'OAEP'): { encryptedData: string; encryptedKeys: string } {
   // 1. Generate AES-256 key and IV
-  const aesKey = randomBytes(32) // 256-bit key
-  const iv = randomBytes(16) // 128-bit IV
+  const aesKey = randomBytes(32)
+  const iv = randomBytes(16)
 
   // 2. Encrypt data with AES-CBC
   const cipher = createCipheriv('aes-256-cbc', aesKey, iv)
@@ -39,19 +39,15 @@ function encryptKeepzPayload(data: object): { encryptedData: string; encryptedKe
   const encodedIV = iv.toString('base64')
   const concat = `${encodedKey}.${encodedIV}`
 
-  // Create public key from DER format (Base64 encoded) - EXACTLY as documentation shows
-  const rsaPublicKey = createPublicKey({
-    key: Buffer.from(KEEPZ_PUBLIC_KEY, 'base64'),
-    format: 'der',
-    type: 'spki',
-  })
+  // Create PEM format public key
+  const pemKey = `-----BEGIN PUBLIC KEY-----\n${KEEPZ_PUBLIC_KEY.match(/.{1,64}/g)?.join('\n')}\n-----END PUBLIC KEY-----`
 
-  // Encrypt with RSA OAEP padding + SHA-256 - EXACTLY as documentation shows
+  // Encrypt with specified padding mode
   const encryptedKeys = publicEncrypt(
     {
-      key: rsaPublicKey,
-      padding: constants.RSA_PKCS1_OAEP_PADDING,
-      oaepHash: 'sha256',
+      key: pemKey,
+      padding: paddingMode === 'PKCS1' ? constants.RSA_PKCS1_PADDING : constants.RSA_PKCS1_OAEP_PADDING,
+      ...(paddingMode === 'OAEP' ? { oaepHash: 'sha256' } : {})
     },
     Buffer.from(concat, 'utf8')
   )
@@ -127,66 +123,83 @@ serve(async (req) => {
 
     console.log("Revoking Keepz subscription:", revokePayload)
 
-    const encrypted = encryptKeepzPayload(revokePayload)
+    // Try both padding modes
+    const paddingModes: Array<'PKCS1' | 'OAEP'> = ['PKCS1', 'OAEP']
+    let lastError: Error | null = null
 
-    const keepzResponse = await fetch(`${KEEPZ_BASE_URL}/api/v1/integrator/subscription/revoke`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        identifier: KEEPZ_INTEGRATOR_ID,
-        encryptedData: encrypted.encryptedData,
-        encryptedKeys: encrypted.encryptedKeys,
-        aes: true,
-      }),
-    })
+    for (const paddingMode of paddingModes) {
+      console.log(`Trying ${paddingMode} padding mode...`)
+      
+      const encrypted = encryptKeepzPayload(revokePayload, paddingMode)
 
-    const responseText = await keepzResponse.text()
-    console.log("Keepz revoke response:", responseText)
+      const keepzResponse = await fetch(`${KEEPZ_BASE_URL}/api/v1/integrator/subscription/revoke`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identifier: KEEPZ_INTEGRATOR_ID,
+          encryptedData: encrypted.encryptedData,
+          encryptedKeys: encrypted.encryptedKeys,
+          aes: true,
+        }),
+      })
 
-    if (!keepzResponse.ok) {
-      let errorData
-      try {
-        errorData = JSON.parse(responseText)
-      } catch {
-        errorData = { message: responseText }
+      const responseText = await keepzResponse.text()
+      console.log(`Keepz revoke response (${paddingMode}):`, responseText)
+
+      // Check for decrypt error
+      if (responseText.includes('decrypt') || responseText.includes('6010')) {
+        console.log(`${paddingMode} failed with decrypt error, trying next...`)
+        lastError = new Error(`Decryption failed with ${paddingMode}`)
+        continue
       }
-      throw new Error(`Keepz API error: ${errorData.message || responseText}`)
+
+      if (!keepzResponse.ok) {
+        let errorData
+        try {
+          errorData = JSON.parse(responseText)
+        } catch {
+          errorData = { message: responseText }
+        }
+        throw new Error(`Keepz API error: ${errorData.message || responseText}`)
+      }
+
+      // Success - update local subscription
+      const { error: updateErr } = await supabase
+        .from("subscriptions")
+        .update({ 
+          status: "cancelled",
+          cancelled_at: new Date().toISOString()
+        })
+        .eq("id", subscription_id)
+
+      if (updateErr) throw updateErr
+
+      // Log the event
+      await supabase
+        .from("subscription_events")
+        .insert({
+          subscription_id: subscription.id,
+          event_type: "subscription_cancelled",
+          keepz_event_id: subscription.keepz_subscription_id,
+          event_data: {
+            cancelled_at: new Date().toISOString(),
+            cancelled_by: user.id,
+            provider: "keepz"
+          }
+        })
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: "Subscription cancelled successfully" 
+      }), {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
     }
 
-    // Success - update local subscription
-    const { error: updateErr } = await supabase
-      .from("subscriptions")
-      .update({ 
-        status: "cancelled",
-        cancelled_at: new Date().toISOString()
-      })
-      .eq("id", subscription_id)
-
-    if (updateErr) throw updateErr
-
-    // Log the event
-    await supabase
-      .from("subscription_events")
-      .insert({
-        subscription_id: subscription.id,
-        event_type: "subscription_cancelled",
-        keepz_event_id: subscription.keepz_subscription_id,
-        event_data: {
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: user.id,
-          provider: "keepz"
-        }
-      })
-
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Subscription cancelled successfully" 
-    }), {
-      status: 200,
-      headers: { ...cors, "Content-Type": "application/json" }
-    })
+    throw lastError || new Error("Failed to cancel subscription")
 
   } catch (error) {
     console.error("Error cancelling Keepz subscription:", error)
