@@ -145,15 +145,7 @@ serve(async (req) => {
     }
 
     const price = billingPlan.price_cents / 100
-    
-    // Determine subscription interval from billing plan
-    // Keepz supports: MONTHLY, WEEKLY
-    let keepzInterval = "MONTHLY"
-    if (billingPlan.interval === "week" || billingPlan.interval === "weekly") {
-      keepzInterval = "WEEKLY"
-    }
-    
-    console.log(`Charging saved card for ${plan_type}: ${price} GEL (${keepzInterval})`)
+    console.log(`Charging saved card for ${plan_type}: ${price} GEL`)
 
     // Generate unique order ID
     const integratorOrderId = crypto.randomUUID()
@@ -188,20 +180,16 @@ serve(async (req) => {
     }
 
     // Build Keepz order payload using saved card token
-    // This charges the card directly without user interaction!
+    // Per documentation: cardToken is for one-time charges, NOT combined with subscriptionPlan
+    // Subscriptions are created during card save, this just charges the saved card
     const orderPayload = {
-      amount: price,  // Actual amount to charge NOW
+      amount: price,
       receiverId: KEEPZ_RECEIVER_ID,
       receiverType: "BRANCH",
       integratorId: KEEPZ_INTEGRATOR_ID,
       integratorOrderId: integratorOrderId,
       currency: "GEL",
-      cardToken: paymentMethod.card_token,  // Use saved card - no user interaction needed!
-      subscriptionPlan: {
-        interval: keepzInterval,
-        intervalCount: 1,
-        amount: price,
-      },
+      cardToken: paymentMethod.card_token,
       callbackUri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/keepz-webhook`,
       language: "EN",
     }
@@ -291,11 +279,12 @@ serve(async (req) => {
         const decrypted = JSON.parse(decryptedData.toString('utf8'))
         console.log("Decrypted Keepz response:", decrypted)
 
+        // Payment initiated - webhook will activate subscription when Keepz confirms
         return new Response(JSON.stringify({
           success: true,
           subscription_id: sub.id,
           order_id: integratorOrderId,
-          message: "Payment processing. You will be charged shortly.",
+          message: "Payment initiated. Waiting for confirmation.",
           payment_url: decrypted.urlForQR || null
         }), {
           status: 200,

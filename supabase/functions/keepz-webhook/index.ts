@@ -285,10 +285,14 @@ async function handleCallback(data: any) {
     updateData.keepz_card_token = cardToken
   }
 
-  // If activating, set period dates
+  // If activating, set period dates based on plan interval
   if (newStatus === "active" && subscription.status !== "active") {
     updateData.current_period_start = new Date().toISOString()
-    updateData.current_period_end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // +30 days
+    
+    // Check if it's a weekly plan (for test_weekly)
+    const isWeekly = subscription.plan_type?.includes('weekly') || subscription.plan_type?.includes('week')
+    const periodDays = isWeekly ? 7 : 30
+    updateData.current_period_end = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString()
   }
 
   const { error: updateErr } = await supabase
