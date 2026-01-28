@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { publicEncrypt, createCipheriv, randomBytes, constants, privateDecrypt, createDecipheriv } from "node:crypto"
+import { publicEncrypt, createCipheriv, randomBytes, constants, privateDecrypt, createDecipheriv, createPublicKey, createPrivateKey } from "node:crypto"
 import { Buffer } from "node:buffer"
 
 const cors = {
@@ -24,8 +24,9 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
 
-// Encryption for Keepz API - supports both padding modes
-function encryptForKeepz(data: object, publicKey: string, paddingMode: 'PKCS1' | 'OAEP'): { encryptedData: string; encryptedKeys: string } {
+// Encryption for Keepz API - uses OAEP padding only
+// Keys must be Base64 DER encoded (as per Keepz documentation)
+function encryptForKeepz(data: object, publicKey: string): { encryptedData: string; encryptedKeys: string } {
   // 1. Generate AES-256 key and IV
   const aesKey = randomBytes(32)
   const iv = randomBytes(16)
@@ -42,15 +43,24 @@ function encryptForKeepz(data: object, publicKey: string, paddingMode: 'PKCS1' |
   const encodedIV = iv.toString('base64')
   const concat = `${encodedKey}.${encodedIV}`
 
-  // Create PEM format public key
-  const pemKey = `-----BEGIN PUBLIC KEY-----\n${publicKey.match(/.{1,64}/g)?.join('\n')}\n-----END PUBLIC KEY-----`
+  // Create public key from Base64 DER format (as per Keepz documentation)
+  // Keys are expected to be Base64 DER encoded
+  const cleanKey = publicKey.replace(/\s/g, '')
+  const rsaPublicKeyObj = createPublicKey({
+    key: Buffer.from(cleanKey, 'base64'),
+    format: 'der',
+    type: 'spki'
+  })
 
-  // Encrypt with specified padding mode
+  // For Deno compatibility, export to PEM (but still use OAEP padding)
+  const rsaPublicKey = rsaPublicKeyObj.export({ type: 'spki', format: 'pem' }) as string
+
+  // Encrypt with OAEP padding only
   const encryptedKeys = publicEncrypt(
     {
-      key: pemKey,
-      padding: paddingMode === 'PKCS1' ? constants.RSA_PKCS1_PADDING : constants.RSA_PKCS1_OAEP_PADDING,
-      ...(paddingMode === 'OAEP' ? { oaepHash: 'sha256' } : {})
+      key: rsaPublicKey,
+      padding: constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256'
     },
     Buffer.from(concat, 'utf8')
   )
@@ -145,7 +155,6 @@ serve(async (req) => {
     }
 
     const price = billingPlan.price_cents / 100
-    console.log(`Charging saved card for ${plan_type}: ${price} GEL`)
 
     // Generate unique order ID
     const integratorOrderId = crypto.randomUUID()
@@ -194,146 +203,126 @@ serve(async (req) => {
       language: "EN",
     }
 
-    console.log("Charging saved card with payload:", JSON.stringify(orderPayload, null, 2))
 
-    // Try both padding modes
-    const paddingModes: Array<'PKCS1' | 'OAEP'> = ['PKCS1', 'OAEP']
-    let lastError: Error | null = null
+    // Encrypt with OAEP padding only
+    const encrypted = encryptForKeepz(orderPayload, KEEPZ_PUBLIC_KEY)
 
-    for (const paddingMode of paddingModes) {
-      console.log(`Trying ${paddingMode} padding mode...`)
-      
-      const encrypted = encryptForKeepz(orderPayload, KEEPZ_PUBLIC_KEY, paddingMode)
-
-      const requestBody = {
-        identifier: KEEPZ_INTEGRATOR_ID,
-        encryptedData: encrypted.encryptedData,
-        encryptedKeys: encrypted.encryptedKeys,
-        aes: true
-      }
-
-      const response = await fetch(`${KEEPZ_BASE_URL}/api/integrator/order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      })
-
-      const responseText = await response.text()
-      console.log(`Keepz response (${paddingMode}):`, responseText)
-
-      let responseData
-      try {
-        responseData = JSON.parse(responseText)
-      } catch {
-        throw new Error(`Invalid response from Keepz: ${responseText}`)
-      }
-
-      // Check for decrypt error - try other padding mode
-      if (responseData.message?.includes('decrypt')) {
-        console.log(`${paddingMode} failed with decrypt error, trying next...`)
-        lastError = new Error(`Keepz API error: ${responseData.message}`)
-        continue
-      }
-
-      // Any other error - throw it
-      if (responseData.message && responseData.statusCode) {
-        throw new Error(`Keepz API error: ${responseData.message}`)
-      }
-
-      // Success - decrypt response
-      if (responseData.encryptedData && responseData.encryptedKeys) {
-        const privateKeyPem = `-----BEGIN PRIVATE KEY-----\n${KEEPZ_PRIVATE_KEY.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`
-
-        let decryptedConcat
-        try {
-          decryptedConcat = privateDecrypt(
-            {
-              key: privateKeyPem,
-              padding: paddingMode === 'PKCS1' ? constants.RSA_PKCS1_PADDING : constants.RSA_PKCS1_OAEP_PADDING,
-              ...(paddingMode === 'OAEP' ? { oaepHash: 'sha256' } : {})
-            },
-            Buffer.from(responseData.encryptedKeys, 'base64')
-          ).toString('utf8')
-        } catch {
-          const otherPadding = paddingMode === 'PKCS1' ? 'OAEP' : 'PKCS1'
-          decryptedConcat = privateDecrypt(
-            {
-              key: privateKeyPem,
-              padding: otherPadding === 'PKCS1' ? constants.RSA_PKCS1_PADDING : constants.RSA_PKCS1_OAEP_PADDING,
-              ...(otherPadding === 'OAEP' ? { oaepHash: 'sha256' } : {})
-            },
-            Buffer.from(responseData.encryptedKeys, 'base64')
-          ).toString('utf8')
-        }
-
-        const [encodedKey, encodedIV] = decryptedConcat.split('.')
-        const aesKey = Buffer.from(encodedKey, 'base64')
-        const iv = Buffer.from(encodedIV, 'base64')
-
-        const decipher = createDecipheriv('aes-256-cbc', aesKey, iv)
-        const decryptedData = Buffer.concat([
-          decipher.update(Buffer.from(responseData.encryptedData, 'base64')),
-          decipher.final()
-        ])
-
-        const decrypted = JSON.parse(decryptedData.toString('utf8'))
-        console.log("Decrypted Keepz response:", decrypted)
-
-        // Payment accepted by Keepz - activate subscription NOW
-        
-        // 1. Activate this subscription
-        const isWeekly = plan_type?.includes('weekly') || plan_type?.includes('week')
-        const periodDays = isWeekly ? 7 : 30
-        
-        const { error: activateErr } = await supabase
-          .from("subscriptions")
-          .update({
-            status: "active",
-            current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", sub.id)
-
-        if (activateErr) {
-          console.error("Failed to activate subscription:", activateErr)
-        }
-
-        // 2. Update user_plans
-        const { error: planErr } = await supabase
-          .from("user_plans")
-          .upsert({
-            user_id: user.id,
-            plan_type: plan_type,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' })
-
-        if (planErr) {
-          console.error("Failed to update user_plans:", planErr)
-        }
-
-        // 3. Cancel other active subscriptions
-        await supabase
-          .from('subscriptions')
-          .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .neq('id', sub.id)
-
-        console.log(`Subscription ${sub.id} activated, plan_type: ${plan_type}`)
-
-        return new Response(JSON.stringify({
-          success: true,
-          subscription_id: sub.id,
-          plan_type: plan_type,
-          message: "Subscription activated"
-        }), {
-          status: 200,
-          headers: { ...cors, "Content-Type": "application/json" }
-        })
-      }
+    const requestBody = {
+      identifier: KEEPZ_INTEGRATOR_ID,
+      encryptedData: encrypted.encryptedData,
+      encryptedKeys: encrypted.encryptedKeys,
+      aes: true
     }
 
-    throw lastError || new Error("Failed to communicate with Keepz")
+    const response = await fetch(`${KEEPZ_BASE_URL}/api/integrator/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    })
+
+    const responseText = await response.text()
+
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+    } catch {
+      throw new Error(`Invalid response from Keepz: ${responseText}`)
+    }
+
+    // Any error - throw it
+    if (responseData.message && responseData.statusCode) {
+      throw new Error(`Keepz API error: ${responseData.message}`)
+    }
+
+    // Success - decrypt response with OAEP
+    if (responseData.encryptedData && responseData.encryptedKeys) {
+      // Create private key from Base64 DER format (as per Keepz documentation)
+      // Keys are expected to be Base64 DER encoded
+      const cleanPrivateKey = KEEPZ_PRIVATE_KEY.replace(/\s/g, '')
+      const rsaPrivateKeyObj = createPrivateKey({
+        key: Buffer.from(cleanPrivateKey, 'base64'),
+        format: 'der',
+        type: 'pkcs8'
+      })
+
+      // For Deno compatibility, export to PEM (but still use OAEP padding)
+      const rsaPrivateKey = rsaPrivateKeyObj.export({ type: 'pkcs8', format: 'pem' }) as string
+
+      // Decrypt with OAEP padding only
+      const decryptedConcat = privateDecrypt(
+        {
+          key: rsaPrivateKey,
+          padding: constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256'
+        },
+        Buffer.from(responseData.encryptedKeys, 'base64')
+      ).toString('utf8')
+
+      const [encodedKey, encodedIV] = decryptedConcat.split('.')
+      const aesKey = Buffer.from(encodedKey, 'base64')
+      const iv = Buffer.from(encodedIV, 'base64')
+
+      const decipher = createDecipheriv('aes-256-cbc', aesKey, iv)
+      const decryptedData = Buffer.concat([
+        decipher.update(Buffer.from(responseData.encryptedData, 'base64')),
+        decipher.final()
+      ])
+
+      const decrypted = JSON.parse(decryptedData.toString('utf8'))
+
+      // Payment accepted by Keepz - activate subscription NOW
+      
+      // 1. Activate this subscription
+      const isWeekly = plan_type?.includes('weekly') || plan_type?.includes('week')
+      const periodDays = isWeekly ? 7 : 30
+      
+      const { error: activateErr } = await supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+          current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", sub.id)
+
+      if (activateErr) {
+        console.error("Failed to activate subscription:", activateErr)
+      }
+
+      // 2. Update user_plans
+      const { error: planErr } = await supabase
+        .from("user_plans")
+        .upsert({
+          user_id: user.id,
+          plan_type: plan_type,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+
+      if (planErr) {
+        console.error("Failed to update user_plans:", planErr)
+      }
+
+      // 3. Cancel other active subscriptions
+      await supabase
+        .from('subscriptions')
+        .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .neq('id', sub.id)
+
+
+      return new Response(JSON.stringify({
+        success: true,
+        subscription_id: sub.id,
+        plan_type: plan_type,
+        message: "Subscription activated"
+      }), {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" }
+      })
+    }
+
+    throw new Error("Failed to communicate with Keepz")
 
   } catch (error) {
     console.error("Error charging saved card:", error)

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { privateDecrypt, createDecipheriv, constants } from "node:crypto"
+import { privateDecrypt, createDecipheriv, constants, createPrivateKey } from "node:crypto"
 import { Buffer } from "node:buffer"
 
 const cors = {
@@ -15,31 +15,31 @@ const supabase = createClient(
 
 const KEEPZ_PRIVATE_KEY = Deno.env.get('KEEPZ_PRIVATE_KEY') ?? ''
 
-// Decrypt function for Keepz callbacks
-function decryptKeepzPayload(encryptedDataB64: string, encryptedKeysB64: string, paddingMode: 'PKCS1' | 'OAEP' = 'PKCS1'): object {
-  // 1. Create RSA private key PEM from Base64
-  const privateKeyPem = `-----BEGIN PRIVATE KEY-----\n${KEEPZ_PRIVATE_KEY.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`
+// Helper function to convert PEM to DER or use DER directly
+// Decrypt function for Keepz callbacks - uses OAEP padding only
+// Keys must be Base64 DER encoded (as per Keepz documentation)
+function decryptKeepzPayload(encryptedDataB64: string, encryptedKeysB64: string): object {
+  // 1. Create private key from Base64 DER format (as per Keepz documentation)
+  // Keys are expected to be Base64 DER encoded
+  const cleanKey = KEEPZ_PRIVATE_KEY.replace(/\s/g, '')
+  const rsaPrivateKeyObj = createPrivateKey({
+    key: Buffer.from(cleanKey, 'base64'),
+    format: 'der',
+    type: 'pkcs8'
+  })
 
-  // 2. Decrypt the encryptedKeys with RSA
-  let decryptedConcat: Buffer
-  if (paddingMode === 'PKCS1') {
-    decryptedConcat = privateDecrypt(
-      {
-        key: privateKeyPem,
-        padding: constants.RSA_PKCS1_PADDING
-      },
-      Buffer.from(encryptedKeysB64, 'base64')
-    )
-  } else {
-    decryptedConcat = privateDecrypt(
-      {
-        key: privateKeyPem,
-        padding: constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256'
-      },
-      Buffer.from(encryptedKeysB64, 'base64')
-    )
-  }
+  // For Deno compatibility, export to PEM (but still use OAEP padding)
+  const rsaPrivateKey = rsaPrivateKeyObj.export({ type: 'pkcs8', format: 'pem' }) as string
+
+  // 2. Decrypt the encryptedKeys with RSA using OAEP padding only
+  const decryptedConcat = privateDecrypt(
+    {
+      key: rsaPrivateKey,
+      padding: constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256'
+    },
+    Buffer.from(encryptedKeysB64, 'base64')
+  )
 
   // 3. Split to get AES key and IV
   const [encodedKey, encodedIV] = decryptedConcat.toString('utf8').split('.')
@@ -60,20 +60,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
-    // Log all request details first
-    console.log("=== KEEPZ WEBHOOK RECEIVED ===")
-    console.log("Method:", req.method)
-    console.log("URL:", req.url)
-    console.log("Headers:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2))
-    
-    // Get raw body text first
     const rawBody = await req.text()
-    console.log("Raw body:", rawBody)
-    console.log("Raw body length:", rawBody.length)
     
     // If body is empty, return success (might be a ping/health check)
     if (!rawBody || rawBody.trim() === '') {
-      console.log("Empty body received - returning 200 OK")
       return new Response(JSON.stringify({ success: true, message: "Empty body acknowledged" }), {
         status: 200,
         headers: { ...cors, "Content-Type": "application/json" }
@@ -85,35 +75,22 @@ serve(async (req) => {
     try {
       body = JSON.parse(rawBody)
     } catch (parseError) {
-      console.error("Failed to parse JSON:", parseError)
-      console.log("Body content:", rawBody)
       // Return 200 anyway so Keepz doesn't retry
       return new Response(JSON.stringify({ success: true, message: "Body received but not JSON" }), {
         status: 200,
         headers: { ...cors, "Content-Type": "application/json" }
       })
     }
-    
-    console.log("Keepz webhook parsed body:", JSON.stringify(body, null, 2))
 
     const { encryptedData, encryptedKeys, aes } = body
 
     if (!encryptedData || !encryptedKeys) {
       // Plain callback (not encrypted) - handle status update
-      console.log("Plain callback received:", body)
       return await handlePlainCallback(body)
     }
 
-    // Try to decrypt with PKCS1 first, then OAEP
-    let callbackData: any
-    try {
-      callbackData = decryptKeepzPayload(encryptedData, encryptedKeys, 'PKCS1')
-    } catch (e) {
-      console.log("PKCS1 decryption failed, trying OAEP...")
-      callbackData = decryptKeepzPayload(encryptedData, encryptedKeys, 'OAEP')
-    }
-
-    console.log("Decrypted callback data:", JSON.stringify(callbackData, null, 2))
+    // Decrypt with OAEP padding only
+    const callbackData = decryptKeepzPayload(encryptedData, encryptedKeys)
 
     // Handle the callback based on status
     return await handleCallback(callbackData)
@@ -148,7 +125,6 @@ async function handlePlainCallback(data: any) {
     .single()
 
   if (pendingCard && !pendingErr) {
-    console.log("Plain callback: This is a CARD SAVE callback")
     return await handleCardSaveCallback(data, pendingCard)
   }
 
@@ -203,7 +179,6 @@ async function handlePlainCallback(data: any) {
       event_data: data
     })
 
-  console.log(`Subscription ${subscription.id} updated to ${newStatus}`)
 
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
@@ -240,7 +215,6 @@ async function handleCallback(data: any) {
     .single()
 
   if (pendingCard && !pendingErr) {
-    console.log("This is a CARD SAVE callback, not subscription")
     return await handleCardSaveCallback(data, pendingCard)
   }
 
@@ -318,11 +292,9 @@ async function handleCallback(data: any) {
       if (listError) {
         console.error('Error fetching other active subscriptions:', listError)
       } else if (otherSubs && otherSubs.length > 0) {
-        console.log('Cancelling other active subscriptions for user (upgrade/downgrade):', otherSubs.map(s => s.id))
-        
         for (const oldSub of otherSubs) {
           // Mark old subscription as cancelled
-          const { error: markErr } = await supabase
+          await supabase
             .from('subscriptions')
             .update({ 
               status: 'cancelled', 
@@ -330,20 +302,14 @@ async function handleCallback(data: any) {
               updated_at: new Date().toISOString() 
             })
             .eq('id', oldSub.id)
-
-          if (markErr) {
-            console.error('Failed to mark old subscription as cancelled:', markErr)
-          } else {
-            console.log(`Old subscription ${oldSub.id} cancelled due to upgrade/downgrade`)
-          }
         }
       }
     } catch (e) {
-      console.error('Error while auto-cancelling previous subscriptions:', e)
+      // Silent fail
     }
 
     // Update user_plans to reflect the new plan
-    const { error: planError } = await supabase
+    await supabase
       .from('user_plans')
       .upsert({
         user_id: subscription.user_id,
@@ -351,12 +317,6 @@ async function handleCallback(data: any) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' })
-
-    if (planError) {
-      console.error('Error updating user_plans:', planError)
-    } else {
-      console.log(`User plan updated to ${subscription.plan_type}`)
-    }
   }
 
   // Log the event
@@ -369,7 +329,6 @@ async function handleCallback(data: any) {
       event_data: data
     })
 
-  console.log(`Subscription ${subscription.id} updated to ${newStatus}`)
 
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
@@ -390,11 +349,6 @@ async function handleCardSaveCallback(data: any, pendingCard: any) {
     savedCardToken
   } = data
 
-  console.log("Processing card save callback for user:", pendingCard.user_id)
-  console.log("Full callback data:", JSON.stringify(data, null, 2))
-  console.log("Card info received:", cardInfo)
-  console.log("Card token received:", cardToken)
-  console.log("Status:", status)
 
   // Check if payment/card save was successful
   // Keepz might send different status values
@@ -408,14 +362,8 @@ async function handleCardSaveCallback(data: any, pendingCard: any) {
     const cardMask = cardInfo?.cardMask || cardInfo?.maskedPan || card?.cardMask || card?.maskedPan || data.maskedPan
     const cardBrand = cardInfo?.cardBrand || cardInfo?.brand || card?.cardBrand || card?.brand || data.cardBrand
 
-    console.log("Extracted card token:", actualCardToken)
-    console.log("Extracted card mask:", cardMask)
-    console.log("Extracted card brand:", cardBrand)
-
     if (!actualCardToken) {
-      console.error("No card token received from Keepz! Full data:", JSON.stringify(data))
       // Don't delete - keep as pending, maybe callback will come again
-      // Just log and return success to Keepz
       return new Response(JSON.stringify({ success: true, warning: "No card token received yet" }), {
         status: 200,
         headers: { ...cors, "Content-Type": "application/json" }
@@ -454,10 +402,7 @@ async function handleCardSaveCallback(data: any, pendingCard: any) {
         .update({ is_default: true })
         .eq("id", pendingCard.id)
       
-      console.log("Set as default card (first card for user)")
     }
-
-    console.log(`Card saved successfully for user ${pendingCard.user_id}`)
     
     return new Response(JSON.stringify({ success: true, card_saved: true }), {
       status: 200,
@@ -466,8 +411,6 @@ async function handleCardSaveCallback(data: any, pendingCard: any) {
 
   } else {
     // Card save failed - delete the pending record
-    console.log("Card save failed with status:", status)
-    
     await supabase
       .from("user_payment_methods")
       .delete()
