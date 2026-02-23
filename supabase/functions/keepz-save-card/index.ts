@@ -50,21 +50,13 @@ function encryptForKeepz(data: object, publicKey: string): { encryptedData: stri
     type: 'spki'
   })
 
-  // Try using KeyObject directly first (as per Keepz example)
-  // If this fails in Deno, we'll catch and try PEM export
+  // Deno requires PEM format for publicEncrypt - always export to PEM
   let encryptedKeys: Buffer
+  let usedPemForEncryption = true
   try {
-    encryptedKeys = publicEncrypt(
-      {
-        key: rsaPublicKey,
-        padding: constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256'
-      },
-      Buffer.from(concat, 'utf8')
-    )
-  } catch (keyError: any) {
-    // Fallback: export to PEM if KeyObject doesn't work in Deno
+    console.log("🔐 ENCRYPTION: Exporting key to PEM format...")
     const rsaPublicKeyPem = rsaPublicKey.export({ type: 'spki', format: 'pem' }) as string
+    console.log("🔐 ENCRYPTION: Encrypting with PEM key...")
     encryptedKeys = publicEncrypt(
       {
         key: rsaPublicKeyPem,
@@ -73,29 +65,69 @@ function encryptForKeepz(data: object, publicKey: string): { encryptedData: stri
       },
       Buffer.from(concat, 'utf8')
     )
+    console.log("✅ ENCRYPTION: Success with PEM format")
+  } catch (keyError: any) {
+    console.error("❌ ENCRYPTION: Failed with PEM format:", keyError.message)
+    console.error("Key error details:", keyError)
+    throw new Error(`Encryption failed: ${keyError.message}`)
   }
 
   return {
     encryptedData: encryptedData.toString('base64'),
-    encryptedKeys: encryptedKeys.toString('base64')
+    encryptedKeys: encryptedKeys.toString('base64'),
+    _usedPem: usedPemForEncryption // Internal flag for debugging
   }
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
+  // Log incoming request
+  const requestId = crypto.randomUUID()
+  const requestTimestamp = new Date().toISOString()
+  console.log("=".repeat(80))
+  console.log(`📥 INCOMING REQUEST [${requestId}] - ${requestTimestamp}`)
+  console.log("=".repeat(80))
+  console.log("Request Method:", req.method)
+  console.log("Request URL:", req.url)
+  console.log("Request Headers:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2))
+  
+  // Parse request body
+  let requestBody: any = null
+  try {
+    const bodyText = await req.text()
+    if (bodyText) {
+      requestBody = JSON.parse(bodyText)
+    }
+    console.log("Request Body:", JSON.stringify(requestBody, null, 2))
+  } catch (e) {
+    console.log("Request Body: (could not parse)", e)
+    requestBody = null
+  }
+  console.log("-".repeat(80))
+
   try {
     // Authenticate user
     const auth = req.headers.get("Authorization")?.replace("Bearer ", "")
     const { data: { user } } = await supabase.auth.getUser(auth || "")
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+      const errorResponse = { error: "Unauthorized" }
+      console.log("=".repeat(80))
+      console.log(`📤 OUTGOING RESPONSE [${requestId}]`)
+      console.log("=".repeat(80))
+      console.log("Status: 401")
+      console.log("Response Body:", JSON.stringify(errorResponse, null, 2))
+      console.log("=".repeat(80))
+      return new Response(JSON.stringify(errorResponse), { 
         status: 401, 
         headers: cors 
       })
     }
 
-    const { return_url, cancel_url, nickname } = await req.json()
+    // Extract request parameters
+    const return_url = requestBody?.return_url
+    const cancel_url = requestBody?.cancel_url
+    const nickname = requestBody?.nickname
 
     // Validate Keepz configuration
     if (!KEEPZ_PUBLIC_KEY || !KEEPZ_PRIVATE_KEY) {
@@ -137,23 +169,239 @@ serve(async (req) => {
       language: "EN",
     }
 
+    console.log("Creating Keepz card save with payload:", JSON.stringify(orderPayload, null, 2))
+    console.log("Public key length:", KEEPZ_PUBLIC_KEY.length)
+    console.log("Public key first 50 chars:", KEEPZ_PUBLIC_KEY.substring(0, 50))
+    console.log("Private key length:", KEEPZ_PRIVATE_KEY.length)
+    console.log("Private key first 50 chars:", KEEPZ_PRIVATE_KEY.substring(0, 50))
+
+    // Verify keys are a matching pair by testing encryption/decryption
+    try {
+      console.log("🔑 KEY VERIFICATION: Testing if keys match...")
+      const cleanPrivateKey = KEEPZ_PRIVATE_KEY.replace(/\s/g, '')
+      const cleanPublicKey = KEEPZ_PUBLIC_KEY.replace(/\s/g, '')
+      
+      const privateKeyObj = createPrivateKey({
+        key: Buffer.from(cleanPrivateKey, 'base64'),
+        format: 'der',
+        type: 'pkcs8'
+      })
+      const publicKeyObj = createPublicKey({
+        key: Buffer.from(cleanPublicKey, 'base64'),
+        format: 'der',
+        type: 'spki'
+      })
+      
+      // Test: Encrypt with public key, decrypt with private key
+      const testData = "test123"
+      let testEncrypted: Buffer
+      try {
+        const publicKeyPem = publicKeyObj.export({ type: 'spki', format: 'pem' }) as string
+        testEncrypted = publicEncrypt(
+          { key: publicKeyPem, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+          Buffer.from(testData, 'utf8')
+        )
+      } catch (e: any) {
+        throw new Error(`Encryption test failed: ${e.message}`)
+      }
+      
+      let testDecrypted: string
+      try {
+        const privateKeyPem = privateKeyObj.export({ type: 'pkcs8', format: 'pem' }) as string
+        testDecrypted = privateDecrypt(
+          { key: privateKeyPem, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+          testEncrypted
+        ).toString('utf8')
+      } catch (e: any) {
+        throw new Error(`Decryption test failed: ${e.message}`)
+      }
+      
+      const keysMatch = testDecrypted === testData
+      console.log("🔑 KEY VERIFICATION RESULT:")
+      console.log("Keys are matching pair:", keysMatch)
+      if (!keysMatch) {
+        console.error("❌ CRITICAL: Public and private keys do NOT appear to be a matching pair!")
+        console.error("Expected:", testData)
+        console.error("Got:", testDecrypted)
+        console.error("This will cause all decryption to fail!")
+      } else {
+        console.log("✅ Keys are a matching pair - encryption/decryption test passed")
+      }
+    } catch (keyCheckError: any) {
+      console.error("❌ Failed to verify key pair:", keyCheckError.message)
+      console.error("This suggests the keys may not be a matching pair!")
+    }
+
     // Encrypt with OAEP
     const encrypted = encryptForKeepz(orderPayload, KEEPZ_PUBLIC_KEY)
+    
+    console.log("Encrypted data length:", encrypted.encryptedData.length)
+    console.log("Encrypted keys length:", encrypted.encryptedKeys.length)
+    
+    // Self-test: Try to decrypt what we encrypted to verify encryption works
+    try {
+      console.log("=== SELF-TEST START ===")
+      const cleanPrivateKey = KEEPZ_PRIVATE_KEY.replace(/\s/g, '')
+      console.log("Private key length:", cleanPrivateKey.length)
+      console.log("Private key first 50 chars:", cleanPrivateKey.substring(0, 50))
+      
+      const rsaPrivateKey = createPrivateKey({
+        key: Buffer.from(cleanPrivateKey, 'base64'),
+        format: 'der',
+        type: 'pkcs8'
+      })
+      console.log("✅ Private key created successfully")
+      
+      let decryptedTest: string
+      let usedPem = false
+      // Use same method as encryption (check if encryption used PEM)
+      const encryptionUsedPem = (encrypted as any)._usedPem || false
+      console.log("Encryption used PEM:", encryptionUsedPem)
+      
+      // Try multiple approaches to find what works
+      let decryptionSuccess = false
+      
+      // Approach 1: Try KeyObject directly (even if encryption used PEM, sometimes this works)
+      if (!decryptionSuccess) {
+        try {
+          console.log("🔓 DECRYPTION: Attempt 1 - Trying KeyObject directly...")
+          decryptedTest = privateDecrypt(
+            { key: rsaPrivateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+            Buffer.from(encrypted.encryptedKeys, 'base64')
+          ).toString('utf8')
+          console.log("✅ DECRYPTION: Success with KeyObject directly")
+          decryptionSuccess = true
+        } catch (keyError: any) {
+          console.log("❌ DECRYPTION: KeyObject direct failed:", keyError.message)
+        }
+      }
+      
+      // Approach 2: Try PEM export
+      if (!decryptionSuccess) {
+        try {
+          console.log("🔓 DECRYPTION: Attempt 2 - Trying PEM export...")
+          const rsaPrivateKeyPem = rsaPrivateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+          usedPem = true
+          decryptedTest = privateDecrypt(
+            { key: rsaPrivateKeyPem, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+            Buffer.from(encrypted.encryptedKeys, 'base64')
+          ).toString('utf8')
+          console.log("✅ DECRYPTION: Success with PEM export")
+          decryptionSuccess = true
+        } catch (keyError: any) {
+          console.log("❌ DECRYPTION: PEM export failed:", keyError.message)
+        }
+      }
+      
+      // Approach 3: Try DER format directly as string (if keys are already DER)
+      if (!decryptionSuccess) {
+        try {
+          console.log("🔓 DECRYPTION: Attempt 3 - Trying DER format directly...")
+          const cleanPrivateKey = KEEPZ_PRIVATE_KEY.replace(/\s/g, '')
+          const derKey = Buffer.from(cleanPrivateKey, 'base64')
+          decryptedTest = privateDecrypt(
+            { key: derKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+            Buffer.from(encrypted.encryptedKeys, 'base64')
+          ).toString('utf8')
+          console.log("✅ DECRYPTION: Success with DER format")
+          decryptionSuccess = true
+        } catch (keyError: any) {
+          console.log("❌ DECRYPTION: DER format failed:", keyError.message)
+        }
+      }
+      
+      if (!decryptionSuccess) {
+        throw new Error("All decryption attempts failed - keys may not be a matching pair")
+      }
+      
+      console.log("Decrypted concat length:", decryptedTest.length)
+      console.log("Decrypted concat first 100 chars:", decryptedTest.substring(0, 100))
+      
+      const [testKey, testIV] = decryptedTest.split('.')
+      if (!testKey || !testIV) {
+        throw new Error(`Failed to split decrypted data. Got: ${decryptedTest.substring(0, 200)}`)
+      }
+      console.log("✅ Split key and IV successfully")
+      
+      const testAesKey = Buffer.from(testKey, 'base64')
+      const testIV_buf = Buffer.from(testIV, 'base64')
+      console.log("AES key length:", testAesKey.length, "(should be 32)")
+      console.log("IV length:", testIV_buf.length, "(should be 16)")
+      
+      const decipher = createDecipheriv('aes-256-cbc', testAesKey, testIV_buf)
+      const decryptedData = Buffer.concat([
+        decipher.update(Buffer.from(encrypted.encryptedData, 'base64')),
+        decipher.final()
+      ])
+      console.log("✅ AES decryption successful")
+      
+      const decryptedPayload = JSON.parse(decryptedData.toString('utf8'))
+      console.log("✅ JSON parsing successful")
+      console.log("Decrypted payload:", JSON.stringify(decryptedPayload, null, 2))
+      
+      const matches = JSON.stringify(decryptedPayload) === JSON.stringify(orderPayload)
+      console.log("✅ SELF-TEST PASSED: Can decrypt our own encryption")
+      console.log("Decrypted payload matches:", matches)
+      console.log("Used PEM for decryption:", usedPem)
+    } catch (testError: any) {
+      console.error("❌ SELF-TEST FAILED: Cannot decrypt our own encryption")
+      console.error("Error message:", testError.message)
+      console.error("Error stack:", testError.stack)
+      console.error("This means our encryption is broken!")
+    }
 
-    const requestBody = {
+    const keepzRequestBody = {
       identifier: KEEPZ_INTEGRATOR_ID,
       encryptedData: encrypted.encryptedData,
       encryptedKeys: encrypted.encryptedKeys,
       aes: true
     }
 
+    // Debug logging
+    console.log("=== KEEPZ REQUEST PAYLOAD ===")
+    console.log("Request URL:", `${KEEPZ_BASE_URL}/api/integrator/order`)
+    console.log("Request Body (FULL):", JSON.stringify(keepzRequestBody, null, 2))
+    console.log("---")
+    console.log("FULL ENCRYPTED DATA (copy this):")
+    console.log(encrypted.encryptedData)
+    console.log("---")
+    console.log("FULL ENCRYPTED KEYS (copy this):")
+    console.log(encrypted.encryptedKeys)
+    console.log("---")
+    console.log("Original Payload (before encryption):", JSON.stringify(orderPayload, null, 2))
+    console.log("Public Key Format:", KEEPZ_PUBLIC_KEY.includes('BEGIN') ? 'PEM' : 'DER')
+    console.log("Public Key Length:", KEEPZ_PUBLIC_KEY.length)
+    console.log("Public Key First 50 chars:", KEEPZ_PUBLIC_KEY.substring(0, 50))
+    console.log("Encrypted Data Length:", encrypted.encryptedData.length)
+    console.log("Encrypted Keys Length:", encrypted.encryptedKeys.length)
+    console.log("=============================")
+
+    // Log Keepz API request
+    console.log("=".repeat(80))
+    console.log(`📤 KEEPZ API REQUEST [${requestId}]`)
+    console.log("=".repeat(80))
+    console.log("Keepz API URL:", `${KEEPZ_BASE_URL}/api/integrator/order`)
+    console.log("Keepz Request Method: POST")
+    console.log("Keepz Request Headers:", JSON.stringify({ 'Content-Type': 'application/json' }, null, 2))
+    console.log("Keepz Request Body:", JSON.stringify(keepzRequestBody, null, 2))
+    console.log("-".repeat(80))
+
     const response = await fetch(`${KEEPZ_BASE_URL}/api/integrator/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(keepzRequestBody)
     })
 
     const responseText = await response.text()
+    
+    // Log Keepz API response
+    console.log("=".repeat(80))
+    console.log(`📥 KEEPZ API RESPONSE [${requestId}]`)
+    console.log("=".repeat(80))
+    console.log("Keepz Response Status:", response.status, response.statusText)
+    console.log("Keepz Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    console.log("Keepz Response Body:", responseText)
+    console.log("=".repeat(80))
 
     let responseData
     try {
@@ -192,6 +440,7 @@ serve(async (req) => {
         ).toString('utf8')
       } catch (keyError: any) {
         // Fallback: export to PEM if KeyObject doesn't work in Deno
+        console.log("KeyObject direct failed, trying PEM export:", keyError.message)
         const rsaPrivateKeyPem = rsaPrivateKey.export({ type: 'pkcs8', format: 'pem' }) as string
         decryptedConcat = privateDecrypt(
           {
@@ -214,12 +463,23 @@ serve(async (req) => {
       ])
 
       const decrypted = JSON.parse(decryptedData.toString('utf8'))
+      console.log("Decrypted Keepz response:", decrypted)
 
-      return new Response(JSON.stringify({
+      const successResponse = {
         success: true,
         payment_url: decrypted.urlForQR,
         order_id: integratorOrderId
-      }), {
+      }
+
+      // Log final response
+      console.log("=".repeat(80))
+      console.log(`📤 OUTGOING RESPONSE [${requestId}]`)
+      console.log("=".repeat(80))
+      console.log("Status: 200")
+      console.log("Response Body:", JSON.stringify(successResponse, null, 2))
+      console.log("=".repeat(80))
+
+      return new Response(JSON.stringify(successResponse), {
         status: 200,
         headers: { ...cors, "Content-Type": "application/json" }
       })
@@ -227,11 +487,28 @@ serve(async (req) => {
 
     throw new Error("Failed to communicate with Keepz")
 
-  } catch (error) {
-    console.error("Error saving card:", error)
-    return new Response(JSON.stringify({ 
+  } catch (error: any) {
+    console.error("=".repeat(80))
+    console.error(`❌ ERROR [${requestId}]`)
+    console.error("=".repeat(80))
+    console.error("Error Message:", error.message || "Unknown error")
+    console.error("Error Stack:", error.stack || "No stack trace")
+    console.error("Error Details:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    console.error("=".repeat(80))
+
+    const errorResponse = { 
       error: error.message || "Failed to save card" 
-    }), { 
+    }
+
+    // Log error response
+    console.log("=".repeat(80))
+    console.log(`📤 OUTGOING RESPONSE [${requestId}]`)
+    console.log("=".repeat(80))
+    console.log("Status: 400")
+    console.log("Response Body:", JSON.stringify(errorResponse, null, 2))
+    console.log("=".repeat(80))
+
+    return new Response(JSON.stringify(errorResponse), { 
       status: 400, 
       headers: { ...cors, "Content-Type": "application/json" }
     })
