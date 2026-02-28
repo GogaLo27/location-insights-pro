@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { publicEncrypt, createCipheriv, randomBytes, constants, createPublicKey } from "node:crypto"
+import { createCipheriv, randomBytes } from "node:crypto"
 import { Buffer } from "node:buffer"
 
 const cors = {
@@ -8,64 +8,59 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-)
-
-// Keepz configuration
-const KEEPZ_BASE_URL = Deno.env.get('KEEPZ_MODE') === 'live' 
+const KEEPZ_MODE = Deno.env.get('KEEPZ_MODE') || 'dev'
+const KEEPZ_BASE_URL = KEEPZ_MODE === 'live' 
   ? 'https://gateway.keepz.me/ecommerce-service'
   : 'https://gateway.dev.keepz.me/ecommerce-service'
 
 const KEEPZ_INTEGRATOR_ID = Deno.env.get('KEEPZ_INTEGRATOR_ID') ?? ''
 const KEEPZ_PUBLIC_KEY = Deno.env.get('KEEPZ_PUBLIC_KEY') ?? ''
 
-// Helper function to convert PEM to DER or use DER directly
-// Encrypt function for Keepz API - uses OAEP padding only
-// Keys must be Base64 DER encoded (as per Keepz documentation)
-function encryptKeepzPayload(data: object): { encryptedData: string; encryptedKeys: string } {
-  // 1. Generate AES-256 key and IV
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+)
+
+function b64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+function arrayBufferToB64(ab: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(ab)))
+}
+
+async function encryptForKeepz(data: object, publicKeyB64: string): Promise<{ encryptedData: string; encryptedKeys: string }> {
   const aesKey = randomBytes(32)
   const iv = randomBytes(16)
 
-  // 2. Encrypt data with AES-CBC
   const cipher = createCipheriv('aes-256-cbc', aesKey, iv)
   const encryptedData = Buffer.concat([
     cipher.update(Buffer.from(JSON.stringify(data), 'utf8')),
     cipher.final()
   ])
 
-  // 3. Prepare encryptedKeys (AES key + IV)
-  const encodedKey = aesKey.toString('base64')
-  const encodedIV = iv.toString('base64')
-  const concat = `${encodedKey}.${encodedIV}`
+  const concat = `${aesKey.toString('base64')}.${iv.toString('base64')}`
 
-  // Create public key from Base64 DER format (as per Keepz documentation)
-  // Keys are expected to be Base64 DER encoded
-  const cleanKey = KEEPZ_PUBLIC_KEY.replace(/\s/g, '')
-  const rsaPublicKeyObj = createPublicKey({
-    key: Buffer.from(cleanKey, 'base64'),
-    format: 'der',
-    type: 'spki'
-  })
+  const rsaPublicKey = await crypto.subtle.importKey(
+    'spki',
+    b64ToArrayBuffer(publicKeyB64),
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['encrypt']
+  )
 
-  // For Deno compatibility, export to PEM (but still use OAEP padding)
-  const rsaPublicKey = rsaPublicKeyObj.export({ type: 'spki', format: 'pem' }) as string
-
-  // Encrypt with OAEP padding only
-  const encryptedKeys = publicEncrypt(
-    {
-      key: rsaPublicKey,
-      padding: constants.RSA_PKCS1_OAEP_PADDING,
-      oaepHash: 'sha256'
-    },
-    Buffer.from(concat, 'utf8')
+  const encryptedKeysBuffer = await crypto.subtle.encrypt(
+    { name: 'RSA-OAEP' },
+    rsaPublicKey,
+    new TextEncoder().encode(concat)
   )
 
   return {
     encryptedData: encryptedData.toString('base64'),
-    encryptedKeys: encryptedKeys.toString('base64'),
+    encryptedKeys: arrayBufferToB64(encryptedKeysBuffer),
   }
 }
 
@@ -73,7 +68,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
-    // Authenticate user
     const auth = req.headers.get("Authorization")?.replace("Bearer ", "")
     const { data: { user } } = await supabase.auth.getUser(auth || "")
     if (!user) {
@@ -84,12 +78,8 @@ serve(async (req) => {
     }
 
     const { subscription_id } = await req.json()
+    if (!subscription_id) throw new Error("subscription_id is required")
 
-    if (!subscription_id) {
-      throw new Error("subscription_id is required")
-    }
-
-    // Get the subscription
     const { data: subscription, error: subErr } = await supabase
       .from("subscriptions")
       .select("*")
@@ -97,50 +87,31 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single()
 
-    if (subErr || !subscription) {
-      throw new Error("Subscription not found")
-    }
-
-    if (subscription.provider !== "keepz") {
-      throw new Error("This subscription is not a Keepz subscription")
-    }
+    if (subErr || !subscription) throw new Error("Subscription not found")
+    if (subscription.provider !== "keepz") throw new Error("This subscription is not a Keepz subscription")
 
     if (!subscription.keepz_subscription_id) {
-      // No Keepz subscription ID yet, just cancel locally
-      const { error: updateErr } = await supabase
+      await supabase
         .from("subscriptions")
-        .update({ 
-          status: "cancelled",
-          cancelled_at: new Date().toISOString()
-        })
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
         .eq("id", subscription_id)
 
-      if (updateErr) throw updateErr
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: "Subscription cancelled" 
-      }), {
+      return new Response(JSON.stringify({ success: true, message: "Subscription cancelled" }), {
         status: 200,
         headers: { ...cors, "Content-Type": "application/json" }
       })
     }
 
-    // Build revoke payload
     const revokePayload = {
       subscriptionId: subscription.keepz_subscription_id,
       integratorId: KEEPZ_INTEGRATOR_ID,
     }
 
-
-    // Encrypt with OAEP padding only
-    const encrypted = encryptKeepzPayload(revokePayload)
+    const encrypted = await encryptForKeepz(revokePayload, KEEPZ_PUBLIC_KEY)
 
     const keepzResponse = await fetch(`${KEEPZ_BASE_URL}/api/v1/integrator/subscription/revoke`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: KEEPZ_INTEGRATOR_ID,
         encryptedData: encrypted.encryptedData,
@@ -150,29 +121,17 @@ serve(async (req) => {
     })
 
     const responseText = await keepzResponse.text()
-
     if (!keepzResponse.ok) {
       let errorData
-      try {
-        errorData = JSON.parse(responseText)
-      } catch {
-        errorData = { message: responseText }
-      }
+      try { errorData = JSON.parse(responseText) } catch { errorData = { message: responseText } }
       throw new Error(`Keepz API error: ${errorData.message || responseText}`)
     }
 
-    // Success - update local subscription
-    const { error: updateErr } = await supabase
+    await supabase
       .from("subscriptions")
-      .update({ 
-        status: "cancelled",
-        cancelled_at: new Date().toISOString()
-      })
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
       .eq("id", subscription_id)
 
-    if (updateErr) throw updateErr
-
-    // Log the event
     await supabase
       .from("subscription_events")
       .insert({
@@ -186,16 +145,12 @@ serve(async (req) => {
         }
       })
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Subscription cancelled successfully" 
-    }), {
+    return new Response(JSON.stringify({ success: true, message: "Subscription cancelled successfully" }), {
       status: 200,
       headers: { ...cors, "Content-Type": "application/json" }
     })
 
-  } catch (error) {
-    console.error("Error cancelling Keepz subscription:", error)
+  } catch (error: any) {
     return new Response(JSON.stringify({ 
       error: error.message || "Failed to cancel subscription" 
     }), { 
@@ -204,4 +159,3 @@ serve(async (req) => {
     })
   }
 })
-
