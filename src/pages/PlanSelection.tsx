@@ -19,21 +19,18 @@ export default function PlanSelection() {
   const navigate = useNavigate();
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
-  // Use dynamic billing plans from database (PayPal, LemonSqueezy, and Keepz)
+  // Use dynamic billing plans from database (PayPal and Keepz)
   const { plans: paypalPlans, loading: paypalLoading, error: paypalError, refetch: refetchPaypal } = useBillingPlans('paypal');
-  const { plans: lemonPlans, loading: lemonLoading, error: lemonError, refetch: refetchLemon } = useBillingPlans('lemonsqueezy');
   const { plans: keepzPlans, loading: keepzLoading, error: keepzError, refetch: refetchKeepz } = useBillingPlans('keepz');
   
-  // Combine all plans - Keepz test plans + PayPal/LemonSqueezy main plans
-  const mainPlans = paypalPlans.length > 0 ? paypalPlans : lemonPlans;
-  const plans = [...keepzPlans, ...mainPlans];
-  const loading = paypalLoading || lemonLoading || keepzLoading;
-  const error = paypalError || lemonError || keepzError;
+  // Combine all plans - Keepz test plans + PayPal main plans
+  const plans = [...keepzPlans, ...paypalPlans];
+  const loading = paypalLoading || keepzLoading;
+  const error = paypalError || keepzError;
   
   // Manual refresh function
   const handleRefresh = async () => {
     await refetchPaypal();
-    await refetchLemon();
     await refetchKeepz();
     toast({
       title: "Plans refreshed",

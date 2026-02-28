@@ -29,7 +29,6 @@ serve(async (req) => {
       billing_period_end
     } = body;
 
-    console.log('📄 Generating invoice for:', { user_id, subscription_id, plan_type });
 
     // Get user details
     const { data: userProfile } = await supabase
@@ -63,7 +62,7 @@ serve(async (req) => {
         subscription_id,
         invoice_number: invoiceNumber,
         paypal_transaction_id: payment_method === 'paypal' ? transaction_id : null,
-        lemonsqueezy_order_id: payment_method === 'lemonsqueezy' ? transaction_id : null,
+        lemonsqueezy_order_id: null,
         payment_method,
         amount_cents,
         currency: 'USD',
@@ -86,7 +85,6 @@ serve(async (req) => {
       throw invoiceError;
     }
 
-    console.log('✅ Invoice created:', invoice.invoice_number);
 
     return new Response(
       JSON.stringify({ 

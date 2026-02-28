@@ -226,9 +226,7 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
             const meta = await getV4LocationMetadata(accountId, id!, accessToken);
             averageRating = meta.averageRating;
             totalReviewCount = meta.totalReviewCount;
-            console.log(`Location ${id} metadata:`, { averageRating, totalReviewCount });
           } catch (e) {
-            console.log(`v4 metadata not available for ${accountId}/locations/${id}:`, e.message);
             // Try to get review count from reviews API as fallback
             try {
               const reviewsData = await fetchLocationReviews(id!, accessToken);
@@ -239,7 +237,6 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
                 const totalRating = reviews.reviews.reduce((sum: number, review: any) => sum + review.rating, 0);
                 averageRating = totalRating / totalReviewCount;
               }
-              console.log(`Fallback data for ${id}:`, { averageRating, totalReviewCount });
             } catch (fallbackError) {
               console.log(`Fallback also failed for ${id}:`, fallbackError.message);
             }
@@ -266,7 +263,6 @@ async function fetchUserLocations(_userId: string, accessToken: string) {
         }
 
         nextPageToken = data.nextPageToken ?? null;
-        console.log(`Fetched ${locations.length} locations from ${accountId}`);
       } while (nextPageToken);
     }
 
@@ -361,10 +357,6 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
           nextPageToken = data.nextPageToken ?? null;
           pageCount++;
           
-          // Progress logging every 10 pages
-          if (pageCount % 10 === 0) {
-            console.log(`📊 Progress: Fetched ${allReviews.length} reviews (page ${pageCount}/${maxPages}) for location ${locationId}`);
-          }
           
           // Rate limiting - small delay between requests
           if (nextPageToken) {
@@ -373,16 +365,13 @@ async function fetchLocationReviews(locationId: string, accessToken: string) {
           
         } while (nextPageToken);
 
-        console.log(`✅ Successfully fetched ALL ${allReviews.length} reviews for location ${locationId} (${pageCount} pages)`);
         break; // owning account found
       } catch (error) {
-        console.log(`Error fetching reviews for location ${locationId} in ${accountId}:`, error);
         // Continue to next account instead of breaking
         continue;
       }
     }
 
-    console.log(`🎉 FINAL: Successfully fetched ${allReviews.length} total reviews for location ${locationId}`);
     return json({ reviews: allReviews });
   } catch (error) {
     console.error("Error fetching reviews:", error);
@@ -815,7 +804,6 @@ async function extractCompetitorFromUrl(url: string) {
 
 async function syncReviewsIncremental(userId: string, locationId: string, accessToken: string) {
   try {
-    console.log(`🔄 Starting incremental sync for location: ${locationId}`);
     
     // Update sync status to 'syncing'
     await supabase.rpc('update_sync_status', {
@@ -833,7 +821,6 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
       .single();
     
     const lastSyncDate = syncStatus?.last_synced_at || '2020-01-01';
-    console.log(`📅 Last synced: ${lastSyncDate}`);
     
     // Get existing review IDs to avoid duplicates
     // Check existing reviews by user (not narrowed to location) because
@@ -849,7 +836,6 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
       existingReviews?.map(r => r.google_review_id) || []
     );
     
-    console.log(`📊 Found ${existingReviewIds.size} existing reviews`);
     
     // Fetch ALL reviews from Google (we'll filter new ones)
     const accountIds = await getAllAccountIds(accessToken);
@@ -865,13 +851,11 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
         do {
           // Safety check for infinite pagination
           if (pageCount >= maxPages) {
-            console.warn(`⚠️ SAFETY LIMIT: Reached maximum page limit (${maxPages}) during incremental sync for location ${locationId}. Fetched ${allReviews.length} reviews so far.`);
             break;
           }
 
           // Check for infinite loop with duplicate tokens
           if (nextPageToken && seenTokens.has(nextPageToken)) {
-            console.error(`🔴 ERROR: Detected infinite loop with duplicate pagination token during sync for location ${locationId}`);
             break;
           }
           
@@ -901,11 +885,6 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
           nextPageToken = data.nextPageToken ?? null;
           pageCount++;
           
-          // Progress logging every 10 pages during sync
-          if (pageCount % 10 === 0) {
-            console.log(`📊 Sync Progress: Fetched ${allReviews.length} reviews (page ${pageCount}/${maxPages}) for location ${locationId}`);
-          }
-          
           // Small delay to prevent rate limiting
           if (nextPageToken) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -913,7 +892,6 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
           
         } while (nextPageToken);
         
-        console.log(`✅ Incremental sync: Fetched ALL ${allReviews.length} reviews for location ${locationId} (${pageCount} pages)`);
         break; // owning account found
         
       } catch (error) {
@@ -927,7 +905,6 @@ async function syncReviewsIncremental(userId: string, locationId: string, access
       review => !existingReviewIds.has(review.google_review_id)
     );
     
-    console.log(`✨ Found ${newReviews.length} NEW reviews out of ${allReviews.length} total`);
     
     // Save only new reviews to database
     if (newReviews.length > 0) {

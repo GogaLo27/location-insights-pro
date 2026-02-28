@@ -68,14 +68,12 @@ const Upgrade = () => {
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [pendingPlanName, setPendingPlanName] = useState<string | null>(null);
   
-  // Fetch dynamic billing plans (PayPal, LemonSqueezy, and Keepz)
+  // Fetch dynamic billing plans (PayPal and Keepz)
   const { plans: paypalPlans, loading: plansLoading } = useBillingPlans('paypal');
-  const { plans: lemonPlans } = useBillingPlans('lemonsqueezy');
   const { plans: keepzPlans, loading: keepzLoading } = useBillingPlans('keepz');
   
-  // Combine all plans - Keepz test plans + PayPal/LemonSqueezy main plans
-  const mainPlans = paypalPlans.length > 0 ? paypalPlans : lemonPlans;
-  const dynamicPlans = [...keepzPlans, ...mainPlans];
+  // Combine all plans - Keepz test plans + PayPal main plans
+  const dynamicPlans = [...keepzPlans, ...paypalPlans];
 
   const features: PlanFeature[] = [
     { name: "Locations", description: "Number of business locations", icon: Users },

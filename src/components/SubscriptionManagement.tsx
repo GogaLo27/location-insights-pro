@@ -12,6 +12,7 @@ interface Subscription {
   plan_type: string
   status: string
   provider_subscription_id: string | null
+  payment_method: string | null
   created_at: string
   updated_at: string | null
   current_period_end: string | null
@@ -71,7 +72,12 @@ export default function SubscriptionManagement() {
 
     try {
       setCancelling(true)
-      const { data, error } = await supabase.functions.invoke('lemonsqueezy-cancel-subscription', {
+      const cancelFunction = subscription.payment_method === 'paypal'
+        ? 'paypal-cancel-subscription'
+        : subscription.payment_method === 'keepz' || subscription.payment_method?.includes('keepz')
+        ? 'keepz-cancel-subscription'
+        : 'paypal-cancel-subscription' // fallback for legacy/unknown
+      const { data, error } = await supabase.functions.invoke(cancelFunction, {
         body: {
           subscription_id: subscription.id,
           reason: 'User requested cancellation'
@@ -107,7 +113,10 @@ export default function SubscriptionManagement() {
 
     try {
       setRefunding(true)
-      const { data, error } = await supabase.functions.invoke('lemonsqueezy-refund', {
+      if (subscription.payment_method !== 'paypal') {
+        throw new Error('Refunds are only available for PayPal subscriptions. Please contact support for other payment methods.')
+      }
+      const { data, error } = await supabase.functions.invoke('paypal-refund', {
         body: {
           subscription_id: subscription.id,
           refund_reason: 'User requested refund'
@@ -161,6 +170,7 @@ export default function SubscriptionManagement() {
   }
 
   const isRefundEligible = () => {
+    if (subscription?.payment_method !== 'paypal') return false
     if (!subscription?.can_refund) return false
     if (!subscription?.refund_eligible_until) return false
     return new Date(subscription.refund_eligible_until) > new Date()

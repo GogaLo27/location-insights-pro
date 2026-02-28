@@ -18,7 +18,6 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log('🤖 AI Analysis Request:', body);
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
@@ -36,7 +35,6 @@ serve(async (req) => {
         throw new Error('Reviews array is required');
       }
 
-      console.log(`📦 Batch analyzing ${reviews.length} reviews`);
       
       const results = await analyzeBatchReviews(reviews);
       
@@ -62,7 +60,6 @@ serve(async (req) => {
     // LEGACY: Single review processing (for backwards compatibility)
     // ============================================
     if (body.reviews && Array.isArray(body.reviews)) {
-      console.log(`⚠️ Legacy mode: Processing ${body.reviews.length} reviews sequentially`);
       const analyzedReviews = [];
 
       // Process in batches of 10
@@ -80,7 +77,6 @@ serve(async (req) => {
     throw new Error('Invalid request format');
     
   } catch (error) {
-    console.error('❌ Error in ai-review-analysis:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -123,11 +119,9 @@ async function analyzeBatchReviews(reviews: any[]) {
     // Add reviews without text to results (no AI needed)
     results.push(...reviewsWithoutText);
     
-    console.log(`📊 Batch ${Math.floor(i/BATCH_SIZE) + 1}: ${reviewsWithText.length} with text, ${reviewsWithoutText.length} rating-only`);
     
     // If no reviews with text, skip AI call
     if (reviewsWithText.length === 0) {
-      console.log('⚡ Skipping AI call - all reviews are rating-only');
       continue;
     }
     
@@ -156,7 +150,6 @@ async function analyzeBatchReviews(reviews: any[]) {
       });
 
       if (!response.ok) {
-        console.error(`❌ OpenAI API error: ${response.status}`);
         // Fallback: Use rating-based sentiment for reviews with text
         reviewsWithText.forEach(review => {
           results.push({
@@ -188,7 +181,6 @@ async function analyzeBatchReviews(reviews: any[]) {
           });
         });
       } catch (parseError) {
-        console.error('❌ Failed to parse batch response:', parseError);
         // Fallback for reviews with text
         reviewsWithText.forEach(review => {
           results.push({
@@ -202,7 +194,6 @@ async function analyzeBatchReviews(reviews: any[]) {
       }
       
     } catch (error) {
-      console.error('❌ Batch analysis error:', error);
       // Fallback for reviews with text only
       reviewsWithText.forEach(review => {
         results.push({

@@ -55,18 +55,6 @@ serve(async (req) => {
       console.error('Error deleting user plan:', planError)
     }
 
-    // Delete any other user-related data (add more tables as needed)
-    // For example, if you have user_locations table:
-    // const { error: locationsError } = await supabaseClient
-    //   .from('user_locations')
-    //   .delete()
-    //   .eq('user_id', userId)
-
-    // Delete the user from Supabase Auth
-    // Note: This requires admin privileges, so we'll handle it differently
-    // The user will need to be deleted manually from the Supabase dashboard
-    // or through a separate admin function
-
     return new Response(
       JSON.stringify({ 
         success: true,

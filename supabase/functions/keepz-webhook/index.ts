@@ -55,16 +55,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
-    console.log("WEBHOOK HIT - method:", req.method, "url:", req.url)
-    console.log("WEBHOOK HEADERS:", JSON.stringify(Object.fromEntries(req.headers.entries())))
     
     if (req.method === "GET") {
       const url = new URL(req.url)
-      console.log("WEBHOOK GET PARAMS:", url.searchParams.toString())
     }
 
     const rawBody = await req.text()
-    console.log("WEBHOOK BODY:", rawBody?.substring(0, 500))
     
     if (!rawBody || rawBody.trim() === '') {
       return new Response(JSON.stringify({ success: true }), {

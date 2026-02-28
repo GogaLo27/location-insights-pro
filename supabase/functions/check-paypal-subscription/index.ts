@@ -73,7 +73,6 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error("Error checking PayPal subscription:", error)
     return new Response(JSON.stringify({ 
       error: error.message || "Failed to check subscription" 
     }), { 
