@@ -26,6 +26,8 @@ interface Invoice {
   customer_email: string;
   billing_period_start: string;
   billing_period_end: string;
+  paypal_transaction_id?: string | null;
+  keepz_order_id?: string | null;
 }
 
 const Invoices = () => {
@@ -66,15 +68,16 @@ const Invoices = () => {
   };
 
   const downloadInvoice = (invoice: Invoice) => {
-    // Open invoice in new window for printing/saving as PDF
-    const invoiceWindow = window.open('', '_blank');
-    if (invoiceWindow) {
-      invoiceWindow.document.write(generateInvoiceHTML(invoice));
-      invoiceWindow.document.close();
-      setTimeout(() => {
-        invoiceWindow.print();
-      }, 250);
-    }
+    const html = generateInvoiceHTML(invoice);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice-${invoice.invoice_number}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const generateInvoiceHTML = (invoice: Invoice) => {
@@ -133,7 +136,7 @@ const Invoices = () => {
             <div class="info-line"><span class="info-label">Payment Date:</span> ${invoice.paid_date ? format(new Date(invoice.paid_date), 'MMM dd, yyyy') : 'Pending'}</div>
             <div class="info-line"><span class="info-label">Payment Method:</span> ${invoice.payment_method.toUpperCase()}</div>
             <div class="info-line"><span class="info-label">Status:</span> <span class="status-paid">${invoice.status.toUpperCase()}</span></div>
-            ${invoice.paypal_transaction_id ? `<div class="info-line"><span class="info-label">Transaction ID:</span> ${invoice.paypal_transaction_id}</div>` : ''}
+            ${(invoice.paypal_transaction_id || invoice.keepz_order_id) ? `<div class="info-line"><span class="info-label">Transaction ID:</span> ${invoice.paypal_transaction_id || invoice.keepz_order_id || ''}</div>` : ''}
           </div>
         </div>
 
@@ -176,12 +179,6 @@ const Invoices = () => {
         <div class="footer">
           <p>Dibiex - Review Management Platform</p>
           <p>Questions? Contact us at support@dibiex.com</p>
-        </div>
-
-        <div class="no-print" style="text-align: center; margin-top: 30px;">
-          <button onclick="window.print()" style="background: #3b82f6; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px;">
-            Print / Save as PDF
-          </button>
         </div>
       </body>
       </html>
@@ -307,7 +304,7 @@ const Invoices = () => {
                             onClick={() => downloadInvoice(invoice)}
                           >
                             <Download className="h-4 w-4 mr-2" />
-                            Download PDF
+                            Download invoice
                           </Button>
                         </div>
                       </div>
@@ -343,7 +340,7 @@ const Invoices = () => {
                           onClick={() => downloadInvoice(viewingInvoice)}
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Download PDF
+                          Download invoice
                         </Button>
                         <Button
                           variant="outline"
