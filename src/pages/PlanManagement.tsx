@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "next-themes";
@@ -10,6 +10,16 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Check, Crown, Zap, Building } from "lucide-react";
 
 interface UserPlan {
@@ -45,11 +55,14 @@ const currencyFmt = (amountCents: number, currency: string) =>
 const PlanManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<BillingPlanRow[]>([]);
-  const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingPlanType, setPendingPlanType] = useState<BillingPlanRow["plan_type"] | null>(null);
+  const [pendingPlanName, setPendingPlanName] = useState<string>("");
 
   useEffect(() => {
     if (user) {
@@ -97,51 +110,19 @@ const PlanManagement = () => {
     }
   };
 
-  const handleSubscribe = async (planType: BillingPlanRow["plan_type"]) => {
+  const requestSwitchPlan = (planType: BillingPlanRow["plan_type"], planName: string) => {
     if (!user) return;
-    try {
-      setSubmittingPlan(planType);
-      const { data: authData } = await supabase.auth.getSession();
-      const jwt = authData.session?.access_token || "";
+    setPendingPlanType(planType);
+    setPendingPlanName(planName);
+    setConfirmOpen(true);
+  };
 
-      const paypalRes = await supabase.functions.invoke("paypal-create-subscription", {
-        body: {
-          plan_type: planType,
-          return_url: `${window.location.origin}/billing-success`,
-          cancel_url: `${window.location.origin}/plan-management`,
-        },
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-      if (paypalRes.error) {
-        throw new Error(paypalRes.error.message || "PayPal edge function error");
-      }
-
-      let paypalPayload: any = paypalRes.data;
-      if (typeof paypalPayload === "string") {
-        try {
-          paypalPayload = JSON.parse(paypalPayload);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (paypalPayload?.checkout_url) {
-        window.location.href = paypalPayload.checkout_url;
-        return;
-      }
-
-      throw new Error("Failed to create PayPal subscription");
-
-    } catch (e: any) {
-      console.error(e);
-      toast({
-        title: "Payment error",
-        description: e.message || "Failed to process payment",
-        variant: "destructive",
-      });
-      setSubmittingPlan(null);
-    }
+  const confirmSwitchPlan = () => {
+    if (!pendingPlanType) return;
+    setConfirmOpen(false);
+    navigate(`/checkout?plan=${pendingPlanType}&upgrade=true`);
+    setPendingPlanType(null);
+    setPendingPlanName("");
   };
 
   const featureMap: Record<
@@ -258,16 +239,14 @@ const PlanManagement = () => {
                       </ul>
 
                       <div className="space-y-2">
-                        {/* PayPal/Card button per plan */}
-                                                 <Button
-                           className="w-full"
-                           variant={isCurrent ? "outline" : "default"}
-                           disabled={submittingPlan === p.plan_type}
-                           onClick={() => handleSubscribe(p.plan_type)}
-                         >
-                           {submittingPlan === p.plan_type ? "Processing..." : "Activate Plan (Free Demo)"}
-                         </Button>
-
+                        <Button
+                          className="w-full"
+                          variant={isCurrent ? "outline" : "default"}
+                          disabled={isCurrent}
+                          onClick={() => requestSwitchPlan(p.plan_type, p.plan_type.charAt(0).toUpperCase() + p.plan_type.slice(1))}
+                        >
+                          {isCurrent ? "Current plan" : "Switch to this plan"}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -275,7 +254,22 @@ const PlanManagement = () => {
               })}
             </div>
 
-            {/* Theme selector moved to header toggle */}
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Switch to {pendingPlanName}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You will be taken to checkout where you can choose your payment method (card or PayPal) and complete the plan change. Your current subscription may be replaced. Proceed?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmSwitchPlan}>
+                    Go to checkout
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </SidebarInset>
       </div>
