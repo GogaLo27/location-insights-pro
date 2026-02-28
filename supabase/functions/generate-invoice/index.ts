@@ -62,7 +62,7 @@ serve(async (req) => {
         subscription_id,
         invoice_number: invoiceNumber,
         paypal_transaction_id: payment_method === 'paypal' ? transaction_id : null,
-        lemonsqueezy_order_id: null,
+        keepz_order_id: payment_method === 'keepz' ? transaction_id : null,
         payment_method,
         amount_cents,
         currency: 'USD',
