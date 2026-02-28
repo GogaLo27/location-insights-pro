@@ -34,7 +34,7 @@ export default function Checkout() {
   const isUpgrade = searchParams.get("upgrade") === "true";
   
   const [loading, setLoading] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<"keepz" | "paypal" | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<"keepz" | "paypal">("keepz");
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string>("");
   const [loadingCards, setLoadingCards] = useState(true);
@@ -429,7 +429,6 @@ export default function Checkout() {
                   className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   size="lg"
                   disabled={
-                    !selectedPayment || 
                     loading || 
                     (selectedPayment === "keepz" && !canPayWithKeepz)
                   }
