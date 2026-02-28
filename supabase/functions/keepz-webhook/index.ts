@@ -98,6 +98,51 @@ serve(async (req) => {
   }
 })
 
+async function generateInvoiceForKeepzPayment(subscription: any, integratorOrderId: string) {
+  try {
+    const { data: billingPlan } = await supabase
+      .from('billing_plans')
+      .select('price_cents')
+      .eq('plan_type', subscription.plan_type)
+      .eq('provider', 'keepz')
+      .eq('is_active', true)
+      .single()
+
+    const plan = billingPlan || (await supabase
+      .from('billing_plans')
+      .select('price_cents')
+      .eq('plan_type', subscription.plan_type)
+      .eq('provider', 'paypal')
+      .eq('is_active', true)
+      .single()).data
+
+    if (!plan?.price_cents) {
+      console.error('No billing plan found for Keepz invoice:', subscription.plan_type)
+      return
+    }
+
+    const billingPeriodStart = new Date()
+    const billingPeriodEnd = new Date()
+    billingPeriodEnd.setMonth(billingPeriodEnd.getMonth() + 1)
+
+    await supabase.functions.invoke('generate-invoice', {
+      body: {
+        user_id: subscription.user_id,
+        subscription_id: subscription.id,
+        payment_method: 'keepz',
+        transaction_id: integratorOrderId,
+        amount_cents: plan.price_cents,
+        plan_type: subscription.plan_type,
+        billing_period_start: billingPeriodStart.toISOString(),
+        billing_period_end: billingPeriodEnd.toISOString()
+      }
+    })
+    console.log('Invoice generated for Keepz payment:', integratorOrderId)
+  } catch (err) {
+    console.error('Failed to generate invoice for Keepz payment:', err)
+  }
+}
+
 async function handlePlainCallback(data: any) {
   const { integratorOrderId, status, orderId, subscriptionId } = data
 
@@ -152,6 +197,10 @@ async function handlePlainCallback(data: any) {
     .eq("id", subscription.id)
 
   if (updateErr) throw updateErr
+
+  if (newStatus === 'active' && subscription.status !== 'active') {
+    await generateInvoiceForKeepzPayment(subscription, integratorOrderId)
+  }
 
   await supabase
     .from("subscription_events")
@@ -265,6 +314,8 @@ async function handleCallback(data: any) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' })
+
+    await generateInvoiceForKeepzPayment(subscription, integratorOrderId)
   }
 
   await supabase
