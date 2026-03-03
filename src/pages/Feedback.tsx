@@ -3,6 +3,7 @@ import { useAuth } from "@/components/ui/auth-provider";
 import { useLocation } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -139,27 +140,23 @@ const Feedback = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Feedback</h1>
             </div>
           </header>
 
-          <div className="flex-1 space-y-6 p-8 pt-6">
+          <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-6">
             <div className="max-w-4xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold mb-2">Share Your Feedback</h2>
-                <p className="text-muted-foreground">
-                  Help us improve by sharing your thoughts, reporting bugs, or suggesting new features.
-                </p>
-              </div>
+              <PageTitle title="Share Your Feedback" subtitle="Help us improve by sharing your thoughts, reporting bugs, or suggesting new features." />
 
               {submitted ? (
-                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20">
+                <Card className={`rounded-2xl border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20 ${fancyCardClass}`}>
                   <CardContent className="p-8 text-center">
                     <CheckCircle className="h-16 w-16 text-green-600 dark:text-green-400 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold mb-2 text-green-800 dark:text-green-200">
@@ -174,7 +171,7 @@ const Feedback = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <Card>
+                <Card className={`rounded-2xl ${fancyCardClass}`}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <MessageCircle className="w-5 h-5" />

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/AppSidebar";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 import { Search, Star, Filter, RefreshCw, MessageSquare, Bot, Loader2, Trash2, CheckSquare, Square, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -1055,12 +1056,12 @@ Keep the response under 150 words.`;
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
           <TooltipProvider>
-          {/* --- your UI below is unchanged --- */}
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Reviews</h1>
@@ -1248,10 +1249,11 @@ Keep the response under 150 words.`;
           </header>
           </TooltipProvider>
 
-          <div className="flex-1 space-y-6 p-8 pt-6">
+          <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle title="Reviews" subtitle="Manage and analyze your Google Business reviews" />
             {/* Fetch Progress Bar */}
             {(isFetching && fetchProgressValue < 100) && (
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardContent className="p-6">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -1269,7 +1271,7 @@ Keep the response under 150 words.`;
 
             {/* Stuck Progress Bar - Emergency Reset */}
             {(fetchProgressValue >= 100 && isFetching && allReviewsLoaded) && (
-              <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+              <Card className={`${fancyCardClass} border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950`}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1299,7 +1301,7 @@ Keep the response under 150 words.`;
 
             {/* Analysis Progress Bar */}
             {(isAnalyzing || (progress > 0 && progress < 100)) && (
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardContent className="p-6">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-sm">
@@ -1327,7 +1329,7 @@ Keep the response under 150 words.`;
 
             {/* Bulk Operations Progress Bars */}
             {(isBulkAnalyzing || (bulkProgress > 0 && bulkProgress < bulkTotal)) && (
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardContent className="p-6">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -1344,7 +1346,7 @@ Keep the response under 150 words.`;
             )}
 
             {(isBulkReplying || (bulkProgress > 0 && bulkProgress < bulkTotal)) && (
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardContent className="p-6">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -1361,7 +1363,7 @@ Keep the response under 150 words.`;
             )}
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card>
+              <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: '50ms' }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -1373,7 +1375,7 @@ Keep the response under 150 words.`;
                   </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: '100ms' }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
                   <Star className="h-4 w-4 text-muted-foreground" />
@@ -1385,7 +1387,7 @@ Keep the response under 150 words.`;
                   </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: '150ms' }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Positive</CardTitle>
                   <div className="h-4 w-4 bg-success rounded-full" />
@@ -1397,7 +1399,7 @@ Keep the response under 150 words.`;
                   </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: '200ms' }}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Negative</CardTitle>
                   <div className="h-4 w-4 bg-destructive rounded-full" />
@@ -1412,7 +1414,7 @@ Keep the response under 150 words.`;
             </div>
 
             {/* Filters */}
-            <Card>
+            <Card className={fancyCardClass}>
               <CardHeader>
                 <CardTitle>Filter Reviews</CardTitle>
                 <CardDescription>Filter reviews by search, sentiment, rating, and tags</CardDescription>
@@ -1483,7 +1485,7 @@ Keep the response under 150 words.`;
 
             {/* Loading indicator for large datasets */}
             {loading && !allReviewsLoaded && (
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-4">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -1501,7 +1503,7 @@ Keep the response under 150 words.`;
             {/* Reviews List */}
             <div className="space-y-4">
               {reviewsDeleted && reviews.length === 0 ? (
-                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                <Card className={`${fancyCardClass} border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950`}>
                   <CardContent className="p-8 text-center">
                     <div className="flex items-center justify-center mb-4">
                       <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
@@ -1527,7 +1529,7 @@ Keep the response under 150 words.`;
                   </CardContent>
                 </Card>
               ) : filteredReviews.length === 0 ? (
-                <Card>
+                <Card className={fancyCardClass}>
                   <CardContent className="p-8 text-center">
                     <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-2">No reviews found</h3>
@@ -1541,7 +1543,7 @@ Keep the response under 150 words.`;
               ) : (
                 <>
                   {filteredReviews.length > maxDisplayedReviews && (
-                    <Card>
+                    <Card className={fancyCardClass}>
                       <CardContent className="p-4">
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                           <MessageSquare className="w-4 h-4" />
@@ -1556,7 +1558,7 @@ Keep the response under 150 words.`;
                   
                   {/* Bulk Selection Header */}
                   {canBulkOperate && filteredReviews.length > 0 && (
-                    <Card>
+                    <Card className={fancyCardClass}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -1595,7 +1597,7 @@ Keep the response under 150 words.`;
                     </Card>
                   )}
                   {pagedReviews.map((review) => (
-                  <Card key={review.id} className={selectedReviews.includes(review.id) ? "ring-2 ring-primary" : ""}>
+                  <Card key={review.id} className={selectedReviews.includes(review.id) ? `ring-2 ring-primary ${fancyCardClass}` : fancyCardClass}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-3">

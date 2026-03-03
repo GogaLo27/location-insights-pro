@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 const Tutorial = () => {
   const { user, loading: authLoading } = useAuth();
@@ -317,10 +318,11 @@ const Tutorial = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
@@ -328,17 +330,16 @@ const Tutorial = () => {
             </div>
           </header>
 
-          <div className="flex-1 p-8">
-            {/* Header */}
-            <div className="mb-8 text-center">
-              <h1 className="text-4xl font-bold mb-2">Welcome to Dibiex! 🎉</h1>
-              <p className="text-lg text-muted-foreground">
+          <div className="flex-1 p-4 sm:p-6 lg:p-8">
+            <div className="mb-6 sm:mb-8 text-center opacity-0 animate-fade-in-up">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent dark:to-primary/90">Welcome to Dibiex! 🎉</h1>
+              <p className="text-sm sm:text-lg text-muted-foreground max-w-2xl mx-auto">
                 Your complete guide to managing reviews and understanding customer sentiment
               </p>
             </div>
 
             {/* Quick Links */}
-            <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
+            <Card className={`mb-6 sm:mb-8 rounded-2xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800 ${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: "80ms" }}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Zap className="h-6 w-6 text-blue-600" />
@@ -388,7 +389,7 @@ const Tutorial = () => {
                 const isActive = activeSection === section.id;
                 
                 return (
-                  <Card key={section.id} className={isActive ? getSectionColor(section.color) : ''}>
+                  <Card key={section.id} className={`rounded-2xl ${fancyCardClass} ${isActive ? getSectionColor(section.color) : ""}`}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">

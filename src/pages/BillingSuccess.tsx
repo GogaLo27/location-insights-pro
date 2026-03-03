@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/components/ui/auth-provider'
 import { supabase } from '@/integrations/supabase/client'
+import { PageOrbs, fancyCardClass } from '@/components/PageLayout'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 export default function BillingSuccess() {
   const navigate = useNavigate()
@@ -128,31 +131,31 @@ export default function BillingSuccess() {
   }, [user, navigate])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+    <div className="min-h-screen relative overflow-x-hidden flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10 p-4">
+      <PageOrbs />
+      <Card className={`max-w-md w-full ${fancyCardClass}`}>
+        <CardContent className="pt-6">
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-            <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+            <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-lg font-medium text-gray-900 mb-2">Payment Successful!</h1>
-          <p className="text-sm text-gray-600 mb-4">{message}</p>
+          <h1 className="text-lg font-semibold mb-2 bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Payment Successful!</h1>
+          <p className="text-sm text-muted-foreground mb-4">{message}</p>
           {loading && (
             <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
             </div>
           )}
           <div className="mt-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-            >
+            <Button onClick={() => navigate('/dashboard')} className="w-full">
               Go to Dashboard
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

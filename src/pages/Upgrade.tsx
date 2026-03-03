@@ -40,6 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageOrbs } from "@/components/PageLayout";
 
 interface PlanFeature {
   name: string;
@@ -155,19 +156,20 @@ const Upgrade = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Upgrade Plan</h1>
             </div>
           </header>
 
-          <div className="flex-1 space-y-6 p-8 pt-6">
+          <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-6">
             {/* Current Plan Status */}
-            <Card className="border-primary/20 bg-primary/5">
+            <Card className="rounded-2xl border-primary/20 bg-primary/5 dark:bg-primary/10 shadow-soft opacity-0 animate-fade-in-up">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -197,17 +199,18 @@ const Upgrade = () => {
             </Card>
 
             {/* Plans Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {plans.map((planItem) => (
-                <Card 
-                  key={planItem.id} 
-                  className={`relative ${
-                    planItem.popular 
-                      ? 'border-primary shadow-lg scale-105' 
-                      : planItem.current 
-                        ? 'border-green-500 bg-green-50/50' 
-                        : 'border-border'
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              {plans.map((planItem, i) => (
+                <Card
+                  key={planItem.id}
+                  className={`relative rounded-2xl border bg-card/80 backdrop-blur-sm shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-elegant hover:border-primary/20 opacity-0 animate-fade-in-up ${
+                    planItem.popular
+                      ? "border-primary shadow-lg scale-105 dark:bg-primary/5"
+                      : planItem.current
+                      ? "border-green-500 bg-green-50/50 dark:bg-green-950/20"
+                      : "border-border"
                   }`}
+                  style={{ animationDelay: `${100 + i * 80}ms` }}
                 >
                   {planItem.popular && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Download, FileText, Calendar, CreditCard, Loader2, Eye } from "lucide-react";
 import { format } from "date-fns";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 interface Invoice {
   id: string;
@@ -210,18 +211,25 @@ const Invoices = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5">
+        <div className="text-center animate-fade-in">
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-pulse" />
+            <Loader2 className="absolute inset-0 m-auto w-8 h-8 text-primary animate-spin" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">Loading invoices...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -229,30 +237,26 @@ const Invoices = () => {
             </div>
           </header>
 
-          <div className="flex-1 p-8">
-            {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold mb-2">Your Invoices</h1>
-              <p className="text-muted-foreground">
-                View and download all your payment invoices
-              </p>
-            </div>
+          <div className="flex-1 p-4 sm:p-6 lg:p-8">
+            <PageTitle title="Your Invoices" subtitle="View and download all your payment invoices" />
 
             {/* Invoices List */}
             {invoices.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: "80ms" }}>
+                <CardContent className="text-center py-12 sm:py-16">
+                  <div className="inline-flex p-4 rounded-2xl bg-primary/10 dark:bg-primary/20 mb-4">
+                    <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-primary" />
+                  </div>
                   <h3 className="text-lg font-semibold mb-2">No invoices yet</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
                     Invoices will appear here after your first payment
                   </p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-4">
-                {invoices.map((invoice) => (
-                  <Card key={invoice.id} className="hover:shadow-lg transition-shadow">
+                {invoices.map((invoice, i) => (
+                  <Card key={invoice.id} className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: `${80 + i * 60}ms` }}>
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
@@ -322,12 +326,12 @@ const Invoices = () => {
 
             {/* Invoice Preview Modal */}
             {viewingInvoice && (
-              <div 
-                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              <div
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                 onClick={() => setViewingInvoice(null)}
               >
-                <Card 
-                  className="max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-background"
+                <Card
+                  className="max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-background rounded-2xl shadow-elegant border"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <CardHeader className="bg-background">

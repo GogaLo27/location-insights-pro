@@ -17,6 +17,7 @@ import { FeatureGate } from "@/components/UpgradePrompt";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 interface ReviewTemplate {
   id: string;
@@ -379,10 +380,13 @@ const ReviewTemplates = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading templates...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5">
+        <div className="text-center animate-fade-in">
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-pulse" />
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+          </div>
+          <p className="text-sm text-muted-foreground">Loading templates...</p>
         </div>
       </div>
     );
@@ -394,10 +398,11 @@ const ReviewTemplates = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Review Templates</h1>
@@ -420,10 +425,11 @@ const ReviewTemplates = () => {
             </div>
           </header>
 
-          <div className="flex-1 space-y-6 p-8 pt-6">
+          <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle title="Review Templates" subtitle="Pre-built and custom templates for replying to reviews" />
             <FeatureGate feature="Review Templates" variant="card">
               {/* Filters */}
-              <Card>
+              <Card className={`rounded-2xl ${fancyCardClass}`}>
                 <CardContent className="p-6">
                   <div className="flex flex-col lg:flex-row gap-4">
                     <div className="flex-1">
@@ -469,7 +475,7 @@ const ReviewTemplates = () => {
                   
                   {/* Bulk Operations */}
                   {selectedTemplates.length > 0 && (
-                    <Card className="border-primary/20 bg-primary/5">
+                    <Card className={`${fancyCardClass} border-primary/20 bg-primary/5`}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -558,7 +564,7 @@ const ReviewTemplates = () => {
                         return (
                           <Card 
                             key={template.id} 
-                            className={`relative ${selectedTemplates.includes(template.id) ? 'ring-2 ring-primary' : ''}`}
+                            className={`${fancyCardClass} relative ${selectedTemplates.includes(template.id) ? 'ring-2 ring-primary' : ''}`}
                           >
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between">
@@ -671,7 +677,7 @@ const ReviewTemplates = () => {
                     .map((template) => {
                       const IconComponent = categoryIcons[template.category];
                       return (
-                        <Card key={template.id} className="relative">
+                        <Card key={template.id} className={`${fancyCardClass} relative`}>
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between">
                               <div className="flex items-center space-x-2">
@@ -734,7 +740,7 @@ const ReviewTemplates = () => {
               </div>
 
               {filteredTemplates.length === 0 && (
-                <Card>
+                <Card className={fancyCardClass}>
                   <CardContent className="p-8 text-center">
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-2">No templates found</h3>

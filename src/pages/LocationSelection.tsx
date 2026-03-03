@@ -18,6 +18,7 @@ import {
 import { AppSidebar } from '@/components/AppSidebar';
 import { MapPin, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { PageOrbs, PageTitle, fancyCardClass } from '@/components/PageLayout';
 import { usePlan } from '@/hooks/usePlan';
 
 const LocationSelection = () => {
@@ -69,26 +70,21 @@ const LocationSelection = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-lg font-semibold">Select a Location</h1>
           </header>
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold mb-4">
-                Choose Your Default Location
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Please select which Google Business location you want to use as
-                your default. You can change this later from the location
-                selector.
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Locations: {locations.length} of {allowedLocations === Infinity ? 'unlimited' : allowedLocations} allowed
-              </p>
+          <div className="flex-1 space-y-4 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle
+              title="Choose Your Default Location"
+              subtitle="Please select which Google Business location you want to use as your default. You can change this later from the location selector."
+            />
+            <div className="text-center mb-6 text-sm text-muted-foreground">
+              Locations: {locations.length} of {allowedLocations === Infinity ? "unlimited" : allowedLocations} allowed
             </div>
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
@@ -96,7 +92,7 @@ const LocationSelection = () => {
                 <p className="text-muted-foreground">Loading locations…</p>
               </div>
             ) : locations.length === 0 ? (
-              <Card className="mx-auto max-w-xl">
+              <Card className={`mx-auto max-w-xl rounded-2xl ${fancyCardClass}`}>
                 <CardHeader>
                   <CardTitle>No Locations Found</CardTitle>
                   <CardDescription>
@@ -116,9 +112,9 @@ const LocationSelection = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-6xl mx-auto">
                 {locations.map((loc) => (
-                  <Card key={loc.id} className="cursor-pointer hover:shadow-lg transition-all">
+                  <Card key={loc.id} className={`cursor-pointer rounded-2xl ${fancyCardClass}`}>
                     <CardHeader>
                       <CardTitle>{loc.name}</CardTitle>
                       {loc.address && (

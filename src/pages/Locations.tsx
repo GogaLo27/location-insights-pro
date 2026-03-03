@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MapPin, Search, Plus, RefreshCw, Star, Phone, Globe, Palette, Edit } from "lucide-react";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DEMO_EMAIL, mockLocations } from "@/utils/mockData";
@@ -608,10 +609,15 @@ const Locations = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading locations...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5">
+        <div className="text-center animate-fade-in">
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-pulse" />
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+            <MapPin className="absolute inset-0 m-auto w-8 h-8 text-primary animate-glow-pulse" />
+          </div>
+          <p className="text-lg font-medium text-foreground">Loading locations</p>
+          <p className="text-sm text-muted-foreground mt-1">Fetching your business data...</p>
         </div>
       </div>
     );
@@ -619,41 +625,45 @@ const Locations = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
-            <div className="flex items-center space-x-4 ml-auto">
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4 ml-auto">
               <Badge variant="secondary" className="capitalize">
-                {planType || 'starter'} Plan
+                {planType || "starter"} Plan
               </Badge>
-              <span className="text-sm text-muted-foreground">
-                {locations.length} of {maxLocations === -1 ? '∞' : maxLocations} locations used
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                {locations.length} of {maxLocations === -1 ? "∞" : maxLocations} locations
               </span>
             </div>
           </header>
 
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Business Locations</h1>
-                <p className="text-muted-foreground">
-                  Manage your Google Business locations and track their performance
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button 
+          <div className="flex-1 space-y-6 sm:space-y-8 p-4 sm:p-6 lg:p-8 pt-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
+              <PageTitle
+                title="Business Locations"
+                subtitle="Manage your Google Business locations and track their performance"
+              />
+              <div className="flex gap-2 flex-shrink-0">
+                <Button
                   onClick={handleRefreshLocations}
                   disabled={isRefreshing || loading}
                   variant="outline"
                   size="sm"
+                  className="rounded-xl hover:-translate-y-0.5 transition-all duration-300"
                 >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  Refresh Locations
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                  Refresh
                 </Button>
                 {canAddMoreLocations(locations.length) && (
-                  <Button onClick={() => navigate('/location-selection')} size="sm">
+                  <Button
+                    onClick={() => navigate("/location-selection")}
+                    size="sm"
+                    className="rounded-xl bg-gradient-to-r from-primary to-accent hover:shadow-elegant hover:-translate-y-0.5 transition-all duration-300"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Location
                   </Button>
@@ -661,7 +671,7 @@ const Locations = () => {
               </div>
             </div>
 
-            <Card className="mb-8">
+            <Card className={`mb-6 sm:mb-8 ${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: "80ms" }}>
               <CardHeader>
                 <CardTitle>Find Location</CardTitle>
                 <CardDescription>
@@ -710,11 +720,13 @@ const Locations = () => {
             </Card>
 
             {locations.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <MapPin className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: "160ms" }}>
+                <CardContent className="text-center py-12 sm:py-16">
+                  <div className="inline-flex p-4 rounded-2xl bg-primary/10 dark:bg-primary/20 mb-4">
+                    <MapPin className="w-12 h-12 sm:w-16 sm:h-16 text-primary" />
+                  </div>
                   <h3 className="text-lg font-semibold mb-2">No locations found</h3>
-                  <p className="text-muted-foreground mb-6">
+                  <p className="text-muted-foreground mb-6 text-sm sm:text-base max-w-md mx-auto">
                     Search and add your Google Business locations to get started with review management and analytics.
                   </p>
                 </CardContent>
@@ -751,7 +763,7 @@ const Locations = () => {
                   </div>
                 )}
 
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {locations
                   .filter((l) => {
                     const q = searchTerm.trim().toLowerCase();
@@ -766,8 +778,8 @@ const Locations = () => {
                     
                     return matchesSearch && matchesBrand;
                   })
-                  .map((location) => (
-                  <Card key={location.id} className="hover:shadow-lg transition-shadow">
+                  .map((location, idx) => (
+                  <Card key={location.id} className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: `${180 + idx * 40}ms` }}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-3 flex-1">

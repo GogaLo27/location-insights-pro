@@ -34,6 +34,7 @@ import {
   Clock,
   Trash2
 } from "lucide-react";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 interface UserPlan {
   id: string;
@@ -490,10 +491,15 @@ const Settings = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading settings...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-accent/5">
+        <div className="text-center animate-fade-in">
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-pulse" />
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+            <SettingsIcon className="absolute inset-0 m-auto w-8 h-8 text-primary animate-glow-pulse" />
+          </div>
+          <p className="text-lg font-medium text-foreground">Loading settings</p>
+          <p className="text-sm text-muted-foreground mt-1">Almost there...</p>
         </div>
       </div>
     );
@@ -501,27 +507,23 @@ const Settings = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
-              <SettingsIcon className="w-5 h-5" />
+              <SettingsIcon className="w-5 h-5 text-primary" />
               <h1 className="text-xl font-semibold">Settings</h1>
             </div>
           </header>
 
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Settings</h1>
-              <p className="text-muted-foreground">
-                Manage your account, subscription, and preferences
-              </p>
-            </div>
+          <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle title="Settings" subtitle="Manage your account, subscription, and preferences" />
 
-                         <Tabs defaultValue="account" className="space-y-6">
-               <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue="account" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2 p-1 rounded-xl bg-muted/50">
                  <TabsTrigger value="account" className="flex items-center gap-2">
                    <User className="w-4 h-4" />
                    Account
@@ -538,7 +540,7 @@ const Settings = () => {
 
               {/* Account Settings */}
               <TabsContent value="account" className="space-y-6">
-                <Card>
+                <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: "80ms" }}>
                   <CardHeader>
                     <CardTitle>Profile Information</CardTitle>
                     <CardDescription>
@@ -594,7 +596,7 @@ const Settings = () => {
 
               {/* Subscription Settings */}
               <TabsContent value="subscription" className="space-y-6">
-                <Card>
+                <Card className={`${fancyCardClass} opacity-0 animate-fade-in-up`} style={{ animationDelay: "80ms" }}>
                   <CardHeader>
                     <CardTitle>Current Subscription</CardTitle>
                     <CardDescription>
@@ -718,7 +720,7 @@ const Settings = () => {
 
               {/* Security Settings */}
               <TabsContent value="security" className="space-y-6">
-                <Card>
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle>Security Settings</CardTitle>
                     <CardDescription>

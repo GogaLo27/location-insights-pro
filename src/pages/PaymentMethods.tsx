@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 interface PaymentMethod {
   id: string;
@@ -219,32 +220,29 @@ const PaymentMethods = () => {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="flex items-center justify-between pt-6">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Payment Methods</h1>
-              <p className="text-muted-foreground mt-1">
-                Manage your saved payment methods for subscriptions
-              </p>
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
+        <AppSidebar />
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8 pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4">
+              <PageTitle title="Payment Methods" subtitle="Manage your saved payment methods for subscriptions" />
+              <Button
+                onClick={handleAddCard}
+                disabled={addingCard}
+                className="gap-2 rounded-xl shrink-0"
+              >
+                {addingCard ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Add New Card
+              </Button>
             </div>
-            <Button 
-              onClick={handleAddCard} 
-              disabled={addingCard}
-              className="gap-2"
-            >
-              {addingCard ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Add New Card
-            </Button>
-          </div>
 
-          {/* Security Notice */}
-          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50">
+            {/* Security Notice */}
+            <Card className={`rounded-2xl border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50 ${fancyCardClass}`}>
             <CardContent className="flex items-center gap-3 py-4">
               <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <p className="text-sm text-blue-800 dark:text-blue-200">
@@ -258,7 +256,7 @@ const PaymentMethods = () => {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : paymentMethods.length === 0 ? (
-            <Card className="border-dashed">
+            <Card className={`rounded-2xl border-dashed ${fancyCardClass}`}>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Payment Methods</h3>
@@ -278,10 +276,10 @@ const PaymentMethods = () => {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {paymentMethods.map((card) => (
-                <Card 
-                  key={card.id} 
-                  className={`relative transition-all ${
-                    card.is_default ? 'ring-2 ring-primary border-primary' : ''
+                <Card
+                  key={card.id}
+                  className={`relative rounded-2xl ${fancyCardClass} ${
+                    card.is_default ? "ring-2 ring-primary border-primary" : ""
                   }`}
                 >
                   {card.is_default && (
@@ -342,7 +340,8 @@ const PaymentMethods = () => {
             </div>
           )}
         </div>
-      </SidebarInset>
+        </SidebarInset>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!cardToDelete} onOpenChange={() => setCardToDelete(null)}>

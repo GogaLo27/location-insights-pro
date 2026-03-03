@@ -4,14 +4,16 @@ import { ArrowLeft, Cookie, Eye, Target, BarChart, Shield, Settings, Mail } from
 import { Link } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { PageOrbs, fancyCardClass } from "@/components/PageLayout";
 
 const DashboardCookie = () => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <Link
@@ -24,7 +26,7 @@ const DashboardCookie = () => {
             </div>
           </header>
 
-          <div className="flex-1 space-y-4 p-8 pt-6">
+          <div className="flex-1 space-y-4 p-4 sm:p-6 lg:p-8 pt-6">
             {/* Hero Section */}
             <div className="text-center mb-8">
               <Cookie className="w-16 h-16 mx-auto mb-4 text-primary" />
@@ -40,7 +42,7 @@ const DashboardCookie = () => {
             <div className="max-w-4xl mx-auto">
               <div className="grid gap-8">
                 {/* Header Info */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardContent className="prose prose-sm max-w-none text-muted-foreground pt-6">
                     <p><strong>Effective Date:</strong> January 23, 2025</p>
                     <p><strong>Last Updated:</strong> January 23, 2025</p>
@@ -51,7 +53,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* What Are Cookies */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Cookie className="w-5 h-5 text-primary" />
@@ -66,7 +68,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* Types of Cookies */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Eye className="w-5 h-5 text-primary" />
@@ -101,7 +103,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* Third-Party Cookies */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Target className="w-5 h-5 text-primary" />
@@ -119,7 +121,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* How We Use Cookies */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <BarChart className="w-5 h-5 text-primary" />
@@ -138,7 +140,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* Your Cookie Choices */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Settings className="w-5 h-5 text-primary" />
@@ -161,7 +163,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* Cookie Duration */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Shield className="w-5 h-5 text-primary" />
@@ -178,7 +180,7 @@ const DashboardCookie = () => {
                 </Card>
 
                 {/* Updates to Policy */}
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <Card className={fancyCardClass}>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Cookie className="w-5 h-5 text-primary" />

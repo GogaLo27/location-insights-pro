@@ -22,6 +22,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 import LocationSelector from "@/components/LocationSelector";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import {
@@ -1028,9 +1029,9 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
   }
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
           <p className="text-lg text-muted-foreground">Loading analytics…</p>
         </div>
       </div>
@@ -1039,10 +1040,11 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <LocationSelector />
@@ -1071,19 +1073,13 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
             </div>
           </header>
 
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
-                <p className="text-muted-foreground">
-                  Track your Google Business Profile performance and insights
-                </p>
-              </div>
+          <div className="flex-1 space-y-4 p-4 sm:p-6 lg:p-8 pt-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+              <PageTitle title="Analytics Dashboard" subtitle="Track your Google Business Profile performance and insights" />
             </div>
 
             {/* Filters Section */}
-            <Card className="mb-6">
+            <Card className={`mb-6 ${fancyCardClass}`}>
               <CardHeader>
                 <CardTitle>Date Range Selection</CardTitle>
                 <CardDescription>
@@ -1248,7 +1244,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Key metrics */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Impressions</CardTitle>
                   <Eye className="h-4 w-4 text-muted-foreground" />
@@ -1270,7 +1266,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   )}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
                   <MousePointer className="h-4 w-4 text-muted-foreground" />
@@ -1292,7 +1288,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   )}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Click-through Rate</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -1317,7 +1313,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                   )}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
                   <CalendarIcon className="h-4 w-4 text-muted-foreground" />
@@ -1343,7 +1339,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Comparison Summary */}
             {showComparison && previousAnalyticsData.length > 0 && (
-              <Card className="mb-6">
+              <Card className={`mb-6 ${fancyCardClass}`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <TrendingUp className="w-5 h-5" />
@@ -1398,7 +1394,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Charts for impressions & actions */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1455,7 +1451,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1507,7 +1503,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Pie chart and food orders/menu views */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1552,7 +1548,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1598,7 +1594,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Advanced Analytics Charts */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1652,7 +1648,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1701,7 +1697,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
 
             {/* Performance Insights */}
             <div className="grid gap-4 md:grid-cols-3">
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1753,7 +1749,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
@@ -1785,7 +1781,7 @@ const processAnalyticsData = (raw: any): AnalyticsData[] => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={fancyCardClass}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>

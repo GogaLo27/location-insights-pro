@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Check, Crown, Zap, Building } from "lucide-react";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 interface UserPlan {
   id: string;
@@ -160,26 +161,22 @@ const PlanManagement = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-4">
               <h1 className="text-xl font-semibold">Plan Management</h1>
             </div>
           </header>
 
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Manage Your Plan</h1>
-              <p className="text-muted-foreground">
-                Upgrade or downgrade your plan to fit your business needs
-              </p>
-            </div>
+          <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle title="Manage Your Plan" subtitle="Upgrade or downgrade your plan to fit your business needs" />
 
             {currentPlan && (
-              <Card className="mb-6 border-accent">
+              <Card className={`mb-6 rounded-2xl border-accent ${fancyCardClass}`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Badge variant="default" className="bg-accent text-white">
@@ -194,15 +191,15 @@ const PlanManagement = () => {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plans.map((p) => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+              {plans.map((p, i) => {
                 const IconComponent = icons[p.plan_type] || Zap;
                 const bullets = featureMap[p.plan_type]?.features || [];
                 const price = currencyFmt(p.price_cents, p.currency);
                 const isCurrent = currentPlan?.plan_type === p.plan_type;
 
                 return (
-                  <Card key={p.id} className={`relative ${isCurrent ? "bg-accent/5" : ""}`}>
+                  <Card key={p.id} className={`relative rounded-2xl ${fancyCardClass} opacity-0 animate-fade-in-up ${isCurrent ? "bg-accent/5" : ""}`} style={{ animationDelay: `${80 + i * 100}ms` }}>
                     {p.plan_type === "professional" && (
                       <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-accent text-white">
                         Most Popular

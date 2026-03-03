@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import LocationSelector from "@/components/LocationSelector";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Clock } from "lucide-react";
 import { Navigate } from "react-router-dom";
@@ -15,9 +16,9 @@ export default function CompetitorAnalysis() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
           <p className="text-lg text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -31,16 +32,17 @@ export default function CompetitorAnalysis() {
   if (!canUseCompetitorAnalysis) {
     return (
       <SidebarProvider>
-        <div className="min-h-screen flex w-full">
+        <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
           <AppSidebar />
-          <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarInset className="relative overflow-x-hidden">
+            <PageOrbs />
+            <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
               <SidebarTrigger className="-ml-1" />
               <div className="flex items-center space-x-4 ml-auto">
                 <LocationSelector />
               </div>
             </header>
-            <div className="flex-1 space-y-4 p-8 pt-6">
+            <div className="flex-1 space-y-4 p-4 sm:p-6 lg:p-8 pt-6">
               <UpgradePrompt 
                 feature="Competitor Analysis"
                 title="Unlock Competitor Analysis"
@@ -56,28 +58,21 @@ export default function CompetitorAnalysis() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-4 ml-auto">
               <LocationSelector />
             </div>
           </header>
 
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">Competitor Analysis Dashboard</h1>
-                <p className="text-muted-foreground">
-                  Compare your performance against competitors and gain market insights
-                </p>
-              </div>
-            </div>
+          <div className="flex-1 space-y-4 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle title="Competitor Analysis Dashboard" subtitle="Compare your performance against competitors and gain market insights" />
 
-            {/* Coming Soon Section */}
-            <Card className="mb-8">
+            <Card className={`mb-8 ${fancyCardClass}`}>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <BarChart3 className="w-5 h-5" />

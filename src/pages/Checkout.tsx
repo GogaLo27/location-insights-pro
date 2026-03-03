@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageOrbs } from "@/components/PageLayout";
 
 interface SavedCard {
   id: string;
@@ -217,18 +218,19 @@ export default function Checkout() {
 
   if (plansLoading || loadingCards) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading checkout...</p>
+          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading checkout...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen relative overflow-x-hidden bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10 py-12 px-4">
+      <PageOrbs />
+      <div className="max-w-4xl mx-auto relative">
         {/* Back Button */}
         <Button
           variant="ghost"

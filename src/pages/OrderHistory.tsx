@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEMO_EMAIL } from "@/utils/mockData";
+import { PageOrbs, PageTitle, fancyCardClass } from "@/components/PageLayout";
 
 interface SubscriptionRow {
   id: string;
@@ -142,18 +143,20 @@ export default function OrderHistory() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10">
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarInset className="relative overflow-x-hidden">
+          <PageOrbs />
+          <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md px-3 sm:px-6">
             <SidebarTrigger className="-ml-1" />
             <div className="flex items-center space-x-2">
               <h1 className="text-lg font-semibold">Order History</h1>
             </div>
           </header>
 
-          <main className="flex-1 space-y-8 p-8 pt-6">
-            <section>
+          <main className="flex-1 space-y-8 p-4 sm:p-6 lg:p-8 pt-6">
+            <PageTitle title="Order History" subtitle="Subscriptions and billing events" />
+            <section className="opacity-0 animate-fade-in-up" style={{ animationDelay: "80ms" }}>
               <h2 className="text-xl font-semibold mb-4">Subscriptions</h2>
               <Table>
                 <TableHeader>
