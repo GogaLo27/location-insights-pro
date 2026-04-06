@@ -260,8 +260,6 @@ const Dashboard = () => {
     }
   };
 
-  };
-
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
   }
