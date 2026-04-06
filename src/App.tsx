@@ -231,7 +231,7 @@ const App = () => (
               }
             />
 
-            {/* ✅ PayPal return routes */}
+            {/* PayPal return routes */}
             <Route
               path="/billing/success"
               element={

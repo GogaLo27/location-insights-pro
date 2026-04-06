@@ -131,6 +131,7 @@ serve(async (req) => {
         card_brand: 'pending'
       })
 
+    console.log("INSERT RESULT - pendingError:", JSON.stringify(pendingError))
 
     if (pendingError && !pendingError.message.includes('duplicate')) {
       throw new Error("Failed to create pending card record: " + pendingError.message)
@@ -142,7 +143,7 @@ serve(async (req) => {
       receiverType: "BRANCH",
       integratorId: KEEPZ_INTEGRATOR_ID,
       integratorOrderId: integratorOrderId,
-      currency: "GEL",
+      currency: "EUR",
       saveCard: true,
       directLinkProvider: "CREDO",
       successRedirectUri: return_url || `${req.headers.get('origin')}/payment-methods?saved=true`,
@@ -151,6 +152,8 @@ serve(async (req) => {
       language: "EN",
     }
 
+    console.log("CALLBACK URL:", `${Deno.env.get('SUPABASE_URL')}/functions/v1/keepz-webhook`)
+    console.log("ORDER PAYLOAD:", JSON.stringify(orderPayload))
 
     const encrypted = await encryptForKeepz(orderPayload, KEEPZ_PUBLIC_KEY)
 
@@ -173,6 +176,7 @@ serve(async (req) => {
       throw new Error(`Invalid response from Keepz: ${responseText}`)
     }
 
+    console.log("KEEPZ RESPONSE:", JSON.stringify(responseData))
 
     if (responseData.message && responseData.statusCode) {
       throw new Error(`Keepz API error: ${responseData.message}`)

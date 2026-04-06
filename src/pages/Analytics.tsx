@@ -41,14 +41,11 @@ import {
   Cell,
   AreaChart,
   Area,
-  ComposedChart,
-  ScatterChart,
-  Scatter,
 } from "recharts";
-import { TrendingUp, Eye, MousePointer, RefreshCw, Download, Filter, TrendingDown, ArrowUpRight, ArrowDownRight, CalendarIcon, HelpCircle } from "lucide-react";
+import { TrendingUp, Eye, MousePointer, RefreshCw, Download, ArrowUpRight, ArrowDownRight, CalendarIcon, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format, subDays, subMonths, subYears } from "date-fns";
+import { format, subDays } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";

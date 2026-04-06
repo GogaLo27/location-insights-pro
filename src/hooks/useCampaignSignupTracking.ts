@@ -16,11 +16,11 @@ export const useCampaignSignupTracking = () => {
         const campaignData = getCampaignDataFromStorage();
         
         if (!campaignData?.campaign_code) {
-          console.log('🔵 No campaign data to track for signup');
+          console.log('No campaign data to track for signup');
           return;
         }
 
-        console.log('🔵 User authenticated, checking if we need to track signup...', user.id);
+        console.log('User authenticated, checking if we need to track signup...', user.id);
 
         // Check if user profile already has campaign data
         const { data: profile, error: profileError } = await supabase
@@ -30,17 +30,17 @@ export const useCampaignSignupTracking = () => {
           .single();
 
         if (profileError) {
-          console.error('🔴 Error checking user profile:', profileError);
+          console.error(' Error checking user profile:', profileError);
           return;
         }
 
         // If user already has campaign data, don't override
         if (profile?.signup_campaign_code) {
-          console.log('🔵 User already has campaign data, skipping');
+          console.log('User already has campaign data, skipping');
           return;
         }
 
-        console.log('🔵 Updating user profile with campaign data:', campaignData);
+        console.log('Updating user profile with campaign data:', campaignData);
 
         // Update user profile with campaign data
         const { error: updateError } = await supabase
@@ -58,13 +58,13 @@ export const useCampaignSignupTracking = () => {
           .eq('id', user.id);
 
         if (updateError) {
-          console.error('🔴 Error updating user profile:', updateError);
+          console.error('Error updating user profile:', updateError);
         } else {
-          console.log('✅ Signup tracked! User attributed to campaign:', campaignData.campaign_code);
+          console.log('Signup tracked! User attributed to campaign:', campaignData.campaign_code);
         }
 
       } catch (error) {
-        console.error('🔴 Error in signup tracking:', error);
+        console.error('Error in signup tracking:', error);
       }
     };
 

@@ -76,7 +76,7 @@ export function AppSidebar() {
           <img 
             src="/logo.png" 
             alt="Dibiex Logo" 
-            className="h-6 w-auto"
+            className="h-[2.5em] w-auto"
           />
         </div>
       </SidebarHeader>
