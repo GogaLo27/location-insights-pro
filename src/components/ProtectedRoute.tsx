@@ -4,9 +4,13 @@ import { useAuth } from '@/components/ui/auth-provider';
 import { usePlan } from '@/hooks/usePlan';
 import { useLocation as useLocationContext } from '@/contexts/LocationContext';
 
+type PlanTier = 'starter' | 'professional' | 'enterprise';
+const TIER_ORDER: Record<PlanTier, number> = { starter: 1, professional: 2, enterprise: 3 };
+
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiresPlan?: boolean;
+  /** true = any active plan required; 'starter'|'professional'|'enterprise' = minimum tier required */
+  requiresPlan?: boolean | PlanTier;
   /**
    * When true, the route will only render if the user has a selected location.
    * If a location is required but missing, the user will be redirected to
@@ -48,9 +52,18 @@ export const ProtectedRoute = ({
     return <Navigate to="/" replace />;
   }
   
-  // Requires a plan → go to plan selection if none exists OR subscription is expired
-  if (requiresPlan && !planLoading && (!plan || isSubscriptionExpired)) {
-    return <Navigate to="/plan-selection" replace />;
+  // Requires a plan → check existence and optionally minimum tier
+  if (requiresPlan && !planLoading) {
+    if (!plan || isSubscriptionExpired) {
+      return <Navigate to="/plan-selection" replace />;
+    }
+    if (typeof requiresPlan === 'string') {
+      const userTier = TIER_ORDER[plan.plan_type as PlanTier] ?? 0;
+      const requiredTier = TIER_ORDER[requiresPlan] ?? 0;
+      if (userTier < requiredTier) {
+        return <Navigate to="/plan-selection" replace />;
+      }
+    }
   }
 
   // Requires a location → go to location selection if none selected

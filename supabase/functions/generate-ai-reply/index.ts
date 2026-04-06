@@ -1,13 +1,9 @@
 // /supabase/functions/generate-ai-reply/index.ts
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
 
 function pickPrompt(obj: any): string | null {
   if (!obj || typeof obj !== "object") return null;
@@ -18,7 +14,26 @@ function pickPrompt(obj: any): string | null {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get("Origin") ?? "";
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } }
+  });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
 
   try {
     const rawKey = Deno.env.get("OPENAI_API_KEY") ?? "";

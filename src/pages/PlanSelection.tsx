@@ -20,19 +20,12 @@ export default function PlanSelection() {
   const navigate = useNavigate();
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
-  // Use dynamic billing plans from database (PayPal and Keepz)
-  const { plans: paypalPlans, loading: paypalLoading, error: paypalError, refetch: refetchPaypal } = useBillingPlans('paypal');
-  const { plans: keepzPlans, loading: keepzLoading, error: keepzError, refetch: refetchKeepz } = useBillingPlans('keepz');
-  
-  // Combine all plans - Keepz test plans + PayPal main plans
-  const plans = [...keepzPlans, ...paypalPlans];
-  const loading = paypalLoading || keepzLoading;
-  const error = paypalError || keepzError;
-  
+  // Keepz only — PayPal has been removed as a payment option
+  const { plans, loading, error, refetch } = useBillingPlans('keepz');
+
   // Manual refresh function
   const handleRefresh = async () => {
-    await refetchPaypal();
-    await refetchKeepz();
+    await refetch();
     toast({
       title: "Plans refreshed",
       description: "Latest plans loaded from database",

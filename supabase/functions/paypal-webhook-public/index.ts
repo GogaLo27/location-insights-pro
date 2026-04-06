@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, paypal-transmission-id, paypal-cert-id, paypal-auth-algo',
-}
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+
 
 // Create Supabase client with service role key for admin operations
 const supabase = createClient(
@@ -26,6 +24,11 @@ interface PayPalWebhookEvent {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') ?? ''
+  const cors = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, paypal-transmission-id, paypal-cert-id, paypal-auth-algo',
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
@@ -74,9 +77,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("Error processing PayPal webhook:", error)
-    return new Response(JSON.stringify({ error: error.message || "Failed to process webhook" }), { 
-      status: 400, 
-      headers: { ...cors, "Content-Type": "application/json" } 
+    return new Response(JSON.stringify({ error: "Failed to process webhook" }), {
+      status: 400,
+      headers: { ...cors, "Content-Type": "application/json" }
     })
   }
 })

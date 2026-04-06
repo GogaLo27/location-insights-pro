@@ -3,10 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createDecipheriv } from "node:crypto"
 import { Buffer } from "node:buffer"
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+
 
 const KEEPZ_PRIVATE_KEY = Deno.env.get('KEEPZ_PRIVATE_KEY') ?? ''
 
@@ -52,6 +50,11 @@ async function decryptFromKeepz(encryptedDataB64: string, encryptedKeysB64: stri
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') ?? ''
+  const cors = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {

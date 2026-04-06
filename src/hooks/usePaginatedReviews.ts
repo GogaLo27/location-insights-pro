@@ -159,9 +159,12 @@ export function usePaginatedReviews({
     }
   }, [locationId]); // Only refetch when locationId changes
 
-  // Refetch when filters change
+  // Refetch when filters change — invalidate cache first to avoid stale filtered data
   useEffect(() => {
     if (locationId && currentPage === 0) {
+      if (cache.enabled) {
+        cache.invalidateLocation(locationId);
+      }
       fetchReviews(0, false);
     }
   }, [sentimentFilter, ratingFilter, searchTerm]);

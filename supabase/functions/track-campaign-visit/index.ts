@@ -1,12 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') ?? ''
+  const cors = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {

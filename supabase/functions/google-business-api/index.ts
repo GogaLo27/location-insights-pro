@@ -3,11 +3,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-google-token",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+;
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -16,6 +13,12 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') ?? ''
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-google-token',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -63,13 +66,26 @@ async function handleRequest(req: Request) {
     // Actions that require Google access token
     const actionsRequiringGoogleToken = [
       "get_user_locations",
-      "fetch_user_locations", 
+      "fetch_user_locations",
       "search_locations",
       "fetch_location_analytics",
       "fetch_location_reviews",
+      "fetch_reviews",
+      "sync_reviews_incremental",
       "reply_to_review",
       "fetch_competitor_data"
     ];
+
+    const validActions = [
+      "get_user_locations", "fetch_user_locations", "search_locations",
+      "fetch_location_analytics", "fetch_location_reviews", "fetch_reviews",
+      "sync_reviews_incremental", "reply_to_review", "search_competitors",
+      "fetch_competitor_data", "find_nearby_competitors", "extract_competitor_from_url",
+      "fetch_analytics"
+    ];
+    if (!action || !validActions.includes(action)) {
+      return jsonError("Invalid or missing action", 400);
+    }
     
     if (actionsRequiringGoogleToken.includes(action) && !googleAccessToken) {
       return jsonError(
@@ -103,6 +119,8 @@ async function handleRequest(req: Request) {
         if (!locationId) return jsonError("Missing 'locationId' for reply_to_review", 400);
         if (!review_id) return jsonError("Missing 'review_id' (Google reviewId) for reply_to_review", 400);
         if (!replyText) return jsonError("Missing 'replyText' for reply_to_review", 400);
+        if (replyText.trim().length === 0) return jsonError("Reply text cannot be empty", 400);
+        if (replyText.length > 5000) return jsonError("Reply text exceeds maximum length of 5000 characters", 400);
         return await replyToReview(locationId, review_id, replyText, googleAccessToken, user.id);
 
       case "search_competitors":

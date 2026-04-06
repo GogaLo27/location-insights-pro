@@ -3,10 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createCipheriv, randomBytes, createDecipheriv } from "node:crypto"
 import { Buffer } from "node:buffer"
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+
 
 const KEEPZ_MODE = Deno.env.get('KEEPZ_MODE') || 'dev'
 const KEEPZ_BASE_URL = KEEPZ_MODE === 'live' 
@@ -96,6 +94,11 @@ async function decryptFromKeepz(encryptedDataB64: string, encryptedKeysB64: stri
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') ?? ''
+  const cors = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
@@ -124,6 +127,13 @@ serve(async (req) => {
     } = await req.json()
 
     if (!plan_type) throw new Error("plan_type is required")
+    const validPlanTypes = ['starter', 'professional', 'enterprise']
+    if (!validPlanTypes.includes(plan_type)) {
+      return new Response(JSON.stringify({ error: `Invalid plan_type. Must be one of: ${validPlanTypes.join(', ')}` }), {
+        status: 400,
+        headers: { ...cors, 'Content-Type': 'application/json' }
+      })
+    }
     if (!payment_method_id) throw new Error("payment_method_id is required - please select a saved card")
 
     const { data: paymentMethod, error: pmError } = await supabase

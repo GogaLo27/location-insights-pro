@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +90,7 @@ const Sentiment = () => {
   };
 
   // Chart data preparation
+  const sentimentTrendData = useMemo(() => {
   const getSentimentTrendData = () => {
     const currentDateRange = getDateRange();
     // Filter sentiment data by the selected date range
@@ -148,6 +149,9 @@ const Sentiment = () => {
       };
     });
   };
+  return getSentimentTrendData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentimentData, dateRange, selectedPreset]);
 
   const getSentimentPieData = () => {
     if (!stats) return [];
@@ -158,6 +162,7 @@ const Sentiment = () => {
     ];
   };
 
+  const topTagsData = useMemo(() => {
   const getTopTagsData = () => {
     const currentDateRange = getDateRange();
     // Filter sentiment data by the selected date range
@@ -207,6 +212,9 @@ const Sentiment = () => {
       negative: negativeTags
     };
   };
+  return getTopTagsData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentimentData, dateRange, selectedPreset]);
 
   // Export functionality
   const exportToCSV = () => {
@@ -887,14 +895,14 @@ const Sentiment = () => {
                   </CardContent>
                 </Card>
 
-                {getSentimentTrendData().length > 0 && (
+                {sentimentTrendData.length > 0 && (
                   <Card className={fancyCardClass}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Rating over time</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={260}>
-                        <AreaChart data={getSentimentTrendData()}>
+                        <AreaChart data={sentimentTrendData}>
                           <defs>
                             <linearGradient id="ratingGradient" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
@@ -962,8 +970,8 @@ const Sentiment = () => {
                   <div>
                     <p className="text-xs font-medium text-emerald-600 mb-2">Positive</p>
                     <div className="space-y-1.5">
-                      {getTopTagsData().positive.length > 0 ? (
-                        getTopTagsData().positive.map((tag, index) => (
+                      {topTagsData?.positive.length > 0 ? (
+                        topTagsData?.positive.map((tag, index) => (
                           <div key={index} className="flex items-center justify-between py-1.5 text-sm">
                             <span className="text-foreground">{tag.tag}</span>
                             <span className="text-muted-foreground text-xs">{tag.count}</span>

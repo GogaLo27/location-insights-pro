@@ -4,6 +4,7 @@ import { AuthProvider } from '@/components/ui/auth-provider';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { CampaignProvider } from '@/contexts/CampaignContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { ConditionalThemeProvider } from '@/components/ui/conditional-theme-provider';
 import CookieConsent from '@/components/CookieConsent';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
@@ -90,7 +91,7 @@ const App = () => (
               path="/dashboard"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
-                  <Dashboard />
+                  <ErrorBoundary><Dashboard /></ErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -98,7 +99,7 @@ const App = () => (
               path="/reviews"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
-                  <Reviews />
+                  <ErrorBoundary><Reviews /></ErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -122,7 +123,7 @@ const App = () => (
               path="/analytics"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
-                  <Analytics />
+                  <ErrorBoundary><Analytics /></ErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -130,7 +131,7 @@ const App = () => (
               path="/sentiment"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={true}>
-                  <Sentiment />
+                  <ErrorBoundary><Sentiment /></ErrorBoundary>
                 </ProtectedRoute>
               }
             />

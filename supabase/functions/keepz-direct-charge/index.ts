@@ -5,9 +5,8 @@ import { Buffer } from "node:buffer"
 
 const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
 
-
 const KEEPZ_MODE = Deno.env.get('KEEPZ_MODE') || 'dev'
-const KEEPZ_BASE_URL = KEEPZ_MODE === 'live' 
+const KEEPZ_BASE_URL = KEEPZ_MODE === 'live'
   ? 'https://gateway.keepz.me/ecommerce-service'
   : 'https://gateway.dev.keepz.me/ecommerce-service'
 
@@ -99,64 +98,81 @@ serve(async (req) => {
     'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors })
+
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
 
   try {
-    const requestBody = await req.json().catch(() => null)
-
-    const auth = req.headers.get("Authorization")?.replace("Bearer ", "")
-    const { data: { user } } = await supabase.auth.getUser(auth || "")
+    // JWT auth required
+    const auth = req.headers.get('Authorization')?.replace('Bearer ', '')
+    if (!auth) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors })
+    }
+    const { data: { user } } = await supabase.auth.getUser(auth)
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { 
-        status: 401, 
-        headers: cors 
-      })
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors })
     }
 
-    const return_url = requestBody?.return_url
-    const cancel_url = requestBody?.cancel_url
-    const nickname = requestBody?.nickname
+    const body = await req.json().catch(() => null)
+    const { plan_type, billing_plan_id } = body || {}
+
+    if (!plan_type) throw new Error('plan_type is required')
+    const validPlanTypes = ['starter', 'professional', 'enterprise']
+    if (!validPlanTypes.includes(plan_type)) {
+      return new Response(JSON.stringify({ error: `Invalid plan_type. Must be one of: ${validPlanTypes.join(', ')}` }), {
+        status: 400,
+        headers: { ...cors, 'Content-Type': 'application/json' }
+      })
+    }
+    if (!billing_plan_id) throw new Error('billing_plan_id is required')
 
     if (!KEEPZ_PUBLIC_KEY || !KEEPZ_PRIVATE_KEY) {
-      throw new Error("Keepz configuration missing")
+      throw new Error('Keepz configuration missing')
     }
 
-    const integratorOrderId = crypto.randomUUID()
+    // Fetch billing plan
+    const { data: billingPlan, error: planErr } = await supabase
+      .from('billing_plans')
+      .select('*')
+      .eq('id', billing_plan_id)
+      .eq('provider', 'keepz')
+      .eq('is_active', true)
+      .single()
 
-    const { error: pendingError } = await supabase
-      .from('user_payment_methods')
+    if (planErr || !billingPlan) throw new Error('Billing plan not found or not available')
+
+    const price = billingPlan.price_cents / 100
+    const currency = billingPlan.currency ?? 'GEL'
+    const keepzOrderId = crypto.randomUUID()
+
+    // Create pending subscription record
+    const { data: sub, error: subErr } = await supabase
+      .from('subscriptions')
       .insert({
         user_id: user.id,
+        plan_type,
+        status: 'pending',
         provider: 'keepz',
-        card_token: integratorOrderId,
-        nickname: nickname || null,
-        card_mask: 'pending',
-        card_brand: 'pending'
+        payment_method: 'keepz_direct',
+        keepz_order_id: keepzOrderId,
+        refund_eligible_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
       })
+      .select('*')
+      .single()
 
-    console.log("INSERT RESULT - pendingError:", JSON.stringify(pendingError))
+    if (subErr) throw subErr
 
-    if (pendingError && !pendingError.message.includes('duplicate')) {
-      throw new Error("Failed to create pending card record: " + pendingError.message)
-    }
-
+    // Build order payload — NO saveCard flag, just a direct charge via QR
     const orderPayload = {
-      amount: 0,
+      amount: price,
       receiverId: KEEPZ_RECEIVER_ID,
-      receiverType: "BRANCH",
+      receiverType: 'BRANCH',
       integratorId: KEEPZ_INTEGRATOR_ID,
-      integratorOrderId: integratorOrderId,
-      currency: "EUR",
-      saveCard: true,
-      directLinkProvider: "CREDO",
-      successRedirectUri: return_url || `${req.headers.get('origin')}/payment-methods?saved=true`,
-      failRedirectUri: cancel_url || `${req.headers.get('origin')}/payment-methods?saved=false`,
+      integratorOrderId: keepzOrderId,
+      currency,
+      saveCard: false,
       callbackUri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/keepz-webhook`,
-      language: "EN",
+      language: 'EN',
     }
-
-    console.log("CALLBACK URL:", `${Deno.env.get('SUPABASE_URL')}/functions/v1/keepz-webhook`)
-    console.log("ORDER PAYLOAD:", JSON.stringify(orderPayload))
 
     const encrypted = await encryptForKeepz(orderPayload, KEEPZ_PUBLIC_KEY)
 
@@ -179,8 +195,6 @@ serve(async (req) => {
       throw new Error(`Invalid response from Keepz: ${responseText}`)
     }
 
-    console.log("KEEPZ RESPONSE:", JSON.stringify(responseData))
-
     if (responseData.message && responseData.statusCode) {
       throw new Error(`Keepz API error: ${responseData.message}`)
     }
@@ -190,22 +204,37 @@ serve(async (req) => {
 
       return new Response(JSON.stringify({
         success: true,
-        payment_url: decrypted.urlForQR,
-        order_id: integratorOrderId
+        qr_url: decrypted.urlForQR,
+        subscription_id: sub.id,
+        order_id: keepzOrderId,
       }), {
         status: 200,
-        headers: { ...cors, "Content-Type": "application/json" }
+        headers: { ...cors, 'Content-Type': 'application/json' }
       })
     }
 
-    throw new Error("Failed to communicate with Keepz")
+    // Plain (unencrypted) response
+    if (responseData.urlForQR) {
+      return new Response(JSON.stringify({
+        success: true,
+        qr_url: responseData.urlForQR,
+        subscription_id: sub.id,
+        order_id: keepzOrderId,
+      }), {
+        status: 200,
+        headers: { ...cors, 'Content-Type': 'application/json' }
+      })
+    }
+
+    throw new Error('Keepz did not return a QR URL')
 
   } catch (error: any) {
-    return new Response(JSON.stringify({ 
-      error: error.message || "Failed to save card" 
-    }), { 
-      status: 400, 
-      headers: { ...cors, "Content-Type": "application/json" }
+    console.error('keepz-direct-charge error:', error)
+    return new Response(JSON.stringify({
+      error: error.message || 'Failed to initiate payment'
+    }), {
+      status: 400,
+      headers: { ...cors, 'Content-Type': 'application/json' }
     })
   }
 })

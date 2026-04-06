@@ -1,3 +1,4 @@
+import { getSessionTokens } from "@/lib/auth";
 // /src/components/ReplyDialog.tsx
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -182,16 +183,6 @@ Keep the response under 150 words.`.trim();
     }
   };
 
-  const getSessionTokens = async () => {
-    let { data: { session } } = await supabase.auth.getSession();
-    if (!session?.provider_token) {
-      await supabase.auth.refreshSession();
-      ({ data: { session } } = await supabase.auth.getSession());
-    }
-    return {
-      supabaseJwt: session?.access_token || "",
-      googleAccessToken: session?.provider_token || "",
-    };
   };
 
   const handleSubmit = async () => {

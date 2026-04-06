@@ -1,3 +1,4 @@
+import { getSessionTokens } from "@/lib/auth";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -148,7 +149,7 @@ const Dashboard = () => {
       while (hasMore) {
         const { data: chunk, error: chunkError } = await supabase
           .from('saved_reviews')
-          .select('*')
+          .select('id, rating, ai_sentiment, review_date')
           .eq('location_id', locationId)
           .range(offset, offset + chunkSize - 1);
 
@@ -245,7 +246,7 @@ const Dashboard = () => {
       const locationId = selectedLocation.google_place_id.split('/').pop();
       const { data: reviews, error } = await supabase
         .from('saved_reviews')
-        .select('*')
+        .select('id, author_name, rating, review_date, text, ai_sentiment')
         .eq('location_id', locationId)
         .order('review_date', { ascending: false })
         .limit(5);
@@ -259,16 +260,6 @@ const Dashboard = () => {
     }
   };
 
-  const getSessionTokens = async () => {
-    let { data: { session } } = await supabase.auth.getSession();
-    if (!session?.provider_token) {
-      await supabase.auth.refreshSession();
-      ({ data: { session } } = await supabase.auth.getSession());
-    }
-    return {
-      supabaseJwt: session?.access_token || "",
-      googleAccessToken: session?.provider_token || "",
-    };
   };
 
   if (!user && !authLoading) {

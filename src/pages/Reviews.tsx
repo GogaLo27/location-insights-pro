@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { getSessionTokens, resolveLocationId as resolveLocId } from "@/lib/auth";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -197,31 +198,9 @@ const Reviews = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user, selectedLocation, reviews.length]);
 
-  const getSessionTokens = async () => {
-    let { data: { session } } = await supabase.auth.getSession();
-    if (!session?.provider_token) {
-      await supabase.auth.refreshSession();
-      ({ data: { session } } = await supabase.auth.getSession());
-    }
-    return {
-      supabaseJwt: session?.access_token || "",
-      googleAccessToken: session?.provider_token || "",
-    };
-  };
-
-  // ✅ robustly resolve the ID Google v4 expects
   const resolveLocationId = () => {
     if (!selectedLocation) return null as string | null;
-    // prefer canonical id if present
-    // @ts-ignore different shapes depending on where it came from
-    const directId = selectedLocation.id || selectedLocation.location_id;
-    if (directId) return String(directId);
-    // fallback to parsing the BI resource name
-    // @ts-ignore
-    const gp: string | undefined = selectedLocation.google_place_id;
-    if (!gp) return null;
-    const tail = gp.split("/").pop();
-    return tail || gp;
+    return resolveLocId(selectedLocation as Record<string, unknown>) || null;
   };
 
   const fetchReviews = async (forceRefresh = false) => {
@@ -292,7 +271,7 @@ const Reviews = () => {
       while (hasMore) {
         const { data: chunk, error: chunkError } = await supabase
           .from('saved_reviews')
-          .select('*')
+          .select('id, google_review_id, location_id, user_id, author_name, rating, text, review_date, reply_text, reply_date, ai_sentiment, ai_tags, ai_analyzed_at')
           .eq('location_id', locationId)
           .order('review_date', { ascending: false })
           .range(offset, offset + chunkSize - 1);
@@ -394,7 +373,7 @@ const Reviews = () => {
           while (hasMoreUpdated) {
             const { data: chunkUpdated, error: chunkErrorUpdated } = await supabase
               .from('saved_reviews')
-              .select('*')
+              .select('id, google_review_id, location_id, user_id, author_name, rating, text, review_date, reply_text, reply_date, ai_sentiment, ai_tags, ai_analyzed_at')
               .eq('location_id', locationId)
               .order('review_date', { ascending: false })
               .range(offsetUpdated, offsetUpdated + chunkSizeUpdated - 1);
@@ -491,7 +470,8 @@ const Reviews = () => {
     });
   });
 
-  const newRecords: any[] = [];
+  // Build upsert records for ALL reviews (new + changed) in a single batch
+  const upsertRecords: any[] = [];
   let processed = 0;
 
   for (const review of googleReviews) {
@@ -501,8 +481,7 @@ const Reviews = () => {
     const existing = existingMap.get(review.google_review_id);
 
     if (!existing) {
-      // Insert new
-      newRecords.push({
+      upsertRecords.push({
         user_id: user.id,
         google_review_id: review.google_review_id,
         location_id: locationId,
@@ -516,38 +495,36 @@ const Reviews = () => {
       continue;
     }
 
-    // UPDATE if existing.text is empty but Google has text, or reply info changed
     const needText = (!existing.text || !existing.text.trim()) && (review.text && review.text.trim());
     const needReply =
       (review.reply_text && review.reply_text !== existing.reply_text) ||
       (review.reply_date && review.reply_date !== existing.reply_date);
 
     if (needText || needReply) {
-      const updates: any = {};
-      if (needText) updates.text = review.text;
-      if (needReply) {
-        updates.reply_text = review.reply_text || null;
-        updates.reply_date = review.reply_date || null;
-      }
-
-      const { error: updErr } = await supabase
-        .from("saved_reviews")
-        .update(updates)
-        .eq("google_review_id", review.google_review_id)
-        .eq("location_id", locationId);
-
-      if (updErr) console.error("Update error:", updErr);
+      upsertRecords.push({
+        user_id: user.id,
+        google_review_id: review.google_review_id,
+        location_id: locationId,
+        author_name: review.author_name,
+        rating: review.rating,
+        text: needText ? review.text : existing.text,
+        review_date: review.review_date,
+        reply_text: needReply ? (review.reply_text || null) : existing.reply_text,
+        reply_date: needReply ? (review.reply_date || null) : existing.reply_date,
+      });
     }
   }
 
-    // Batch insert new rows
+    // Single batch upsert for all new + changed records
     const chunkSize = 100;
-    for (let i = 0; i < newRecords.length; i += chunkSize) {
-      const chunk = newRecords.slice(i, i + chunkSize);
-      const { error } = await supabase.from("saved_reviews").insert(chunk);
+    for (let i = 0; i < upsertRecords.length; i += chunkSize) {
+      const chunk = upsertRecords.slice(i, i + chunkSize);
+      const { error } = await supabase
+        .from("saved_reviews")
+        .upsert(chunk, { onConflict: 'google_review_id,location_id' });
       if (error) {
-        console.error("Insert error for chunk:", error);
-        throw error; // Re-throw to trigger error handling
+        console.error("Upsert error for chunk:", error);
+        throw error;
       }
     }
   } catch (error) {
@@ -577,7 +554,7 @@ const Reviews = () => {
       while (hasMore) {
         const { data: chunk, error: fetchError } = await supabase
           .from('saved_reviews')
-          .select('*')
+          .select('id, google_review_id, location_id, user_id, author_name, rating, text, review_date')
           .eq('location_id', locationId)
           .is('ai_analyzed_at', null)
           .order('created_at', { ascending: false })
@@ -638,19 +615,24 @@ const Reviews = () => {
         });
 
         if (!analysisError && analysisData?.reviews) {
-          // Update database with AI analysis
-          for (const analyzedReview of analysisData.reviews) {
-            await supabase
-              .from('saved_reviews')
-              .update({
-                ai_sentiment: analyzedReview.ai_sentiment,
-                ai_tags: analyzedReview.ai_tags,
-                ai_issues: analyzedReview.ai_issues,
-                ai_suggestions: analyzedReview.ai_suggestions,
-                ai_analyzed_at: new Date().toISOString(),
-              })
-              .eq('google_review_id', analyzedReview.google_review_id);
-          }
+          // Batch upsert all analyzed reviews in one call instead of N individual updates
+          const analysisTimestamp = new Date().toISOString();
+          const analysisUpserts = analysisData.reviews.map((r: any) => ({
+            google_review_id: r.google_review_id,
+            location_id: resolveLocationId(),
+            user_id: user.id,
+            // preserve required fields that must exist on upsert
+            author_name: (batch.find((b: any) => b.google_review_id === r.google_review_id) as any)?.author_name ?? '',
+            rating: (batch.find((b: any) => b.google_review_id === r.google_review_id) as any)?.rating ?? 0,
+            ai_sentiment: r.ai_sentiment,
+            ai_tags: r.ai_tags,
+            ai_issues: r.ai_issues,
+            ai_suggestions: r.ai_suggestions,
+            ai_analyzed_at: analysisTimestamp,
+          }));
+          await supabase
+            .from('saved_reviews')
+            .upsert(analysisUpserts, { onConflict: 'google_review_id,location_id' });
 
           processedCount += batch.length;
           updateProgress(processedCount, unanalyzedReviews.length);
@@ -981,32 +963,25 @@ Keep the response under 150 words.`;
 
   const allTags = Array.from(new Set(reviews.flatMap(review => review.ai_tags || [])));
 
-  const filteredReviews = reviews.filter((review) => {
+  const filteredReviews = useMemo(() => reviews.filter((review) => {
     const matchesSearch =
       !searchTerm ||
       review.text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       review.author_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Use AI sentiment if available, otherwise fallback to rating-based sentiment
     let reviewSentiment = review.ai_sentiment;
     if (!reviewSentiment) {
-      // Fallback: 4-5 stars = positive, 1-2 = negative, 3 = neutral
       if (review.rating >= 4) reviewSentiment = 'positive';
       else if (review.rating <= 2) reviewSentiment = 'negative';
       else reviewSentiment = 'neutral';
     }
 
-    const matchesSentiment =
-      sentimentFilter === "all" || reviewSentiment === sentimentFilter;
-
-    const matchesRating =
-      ratingFilter === "all" || String(review.rating) === ratingFilter;
-
-    const matchesTag =
-      tagFilter === "all" || (review.ai_tags && review.ai_tags.includes(tagFilter));
+    const matchesSentiment = sentimentFilter === "all" || reviewSentiment === sentimentFilter;
+    const matchesRating = ratingFilter === "all" || String(review.rating) === ratingFilter;
+    const matchesTag = tagFilter === "all" || (review.ai_tags && review.ai_tags.includes(tagFilter));
 
     return matchesSearch && matchesSentiment && matchesRating && matchesTag;
-  });
+  }), [reviews, searchTerm, sentimentFilter, ratingFilter, tagFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredReviews.length / pageSize));
   const pagedReviews = filteredReviews.slice((page - 1) * pageSize, page * pageSize);
@@ -1018,24 +993,23 @@ Keep the response under 150 words.`;
     ? filteredReviews.slice(0, maxDisplayedReviews) 
     : filteredReviews;
 
-  const getAverageRating = () =>
-    reviews.length === 0 ? 0 : (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1);
+  const averageRating = useMemo(() =>
+    reviews.length === 0 ? 0 : (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1),
+  [reviews]);
 
-  const getSentimentCounts = () => {
+  const sentimentCounts = useMemo(() => {
     const counts = { positive: 0, negative: 0, neutral: 0 };
     reviews.forEach(r => {
-      // Use AI sentiment if available, otherwise fallback to rating-based sentiment
       let sentiment = r.ai_sentiment;
       if (!sentiment) {
-        // Fallback: 4-5 stars = positive, 1-2 = negative, 3 = neutral
         if (r.rating >= 4) sentiment = 'positive';
         else if (r.rating <= 2) sentiment = 'negative';
         else sentiment = 'neutral';
       }
-      if (sentiment) counts[sentiment]++;
+      if (sentiment) counts[sentiment as keyof typeof counts]++;
     });
     return counts;
-  };
+  }, [reviews]);
 
   if (!user && !authLoading) {
     return <Navigate to="/" replace />;
@@ -1052,7 +1026,7 @@ Keep the response under 150 words.`;
     );
   }
 
-  const sentimentCounts = getSentimentCounts();
+  // sentimentCounts and averageRating are now memoized above
 
   return (
     <SidebarProvider>
@@ -1381,7 +1355,7 @@ Keep the response under 150 words.`;
                   <Star className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{getAverageRating()}</div>
+                  <div className="text-2xl font-bold">{averageRating}</div>
                   <p className="text-xs text-muted-foreground">
                     Out of 5 stars
                   </p>

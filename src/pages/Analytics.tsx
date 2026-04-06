@@ -1,3 +1,4 @@
+import { getSessionTokens } from "@/lib/auth";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
 import { Navigate } from "react-router-dom";
@@ -123,20 +124,6 @@ const Analytics = () => {
     }
   }, [ctxSelectedLocation, dateRange, showComparison, isCustomRange, customDateRange]);
 
-  const getSessionTokens = async () => {
-    let {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.provider_token) {
-      await supabase.auth.refreshSession();
-      ({
-        data: { session },
-      } = await supabase.auth.getSession());
-    }
-    return {
-      supabaseJwt: session?.access_token || "",
-      googleAccessToken: session?.provider_token || "",
-    };
   };
 
   const fetchAnalytics = async () => {

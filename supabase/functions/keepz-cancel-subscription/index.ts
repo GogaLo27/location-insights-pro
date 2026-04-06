@@ -3,10 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createCipheriv, randomBytes } from "node:crypto"
 import { Buffer } from "node:buffer"
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+
 
 const KEEPZ_MODE = Deno.env.get('KEEPZ_MODE') || 'dev'
 const KEEPZ_BASE_URL = KEEPZ_MODE === 'live' 
@@ -65,6 +63,11 @@ async function encryptForKeepz(data: object, publicKeyB64: string): Promise<{ en
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') ?? ''
+  const cors = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: cors })
 
   try {
