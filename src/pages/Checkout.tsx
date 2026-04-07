@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CreditCard, ArrowLeft, Check, Plus, QrCode } from "lucide-react";
+import { Loader2, CreditCard, ArrowLeft, Check, Plus, QrCode, KeyRound } from "lucide-react";
 import { useBillingPlans } from "@/hooks/useBillingPlans";
 import { useAuth } from "@/components/ui/auth-provider";
 import {
@@ -26,7 +26,7 @@ interface SavedCard {
   is_default: boolean;
 }
 
-type PaymentMethod = "keepz_saved" | "keepz_direct";
+type PaymentMethod = "keepz_saved" | "keepz_direct" | "keepz_card";
 
 export default function Checkout() {
   const [searchParams] = useSearchParams();
@@ -63,7 +63,7 @@ export default function Checkout() {
       }
     : { id: '', name: 'Loading...', price: 0, currency: 'GEL', interval: 'month', features: [] };
 
-  const currencySymbol = plan.currency === 'GEL' ? '₾' : '$';
+  const currencySymbol = plan.currency === 'GEL' ? '₾' : plan.currency === 'EUR' ? '€' : '$';
 
   useEffect(() => {
     const fetchSavedCards = async () => {
@@ -80,8 +80,8 @@ export default function Checkout() {
         const defaultCard = data?.find(c => c.is_default);
         if (defaultCard) setSelectedCardId(defaultCard.id);
         else if (data && data.length > 0) setSelectedCardId(data[0].id);
-        // If no saved cards, default to direct pay
-        if (!data || data.length === 0) setSelectedPayment("keepz_direct");
+        // If no saved cards, default to card entry
+        if (!data || data.length === 0) setSelectedPayment("keepz_card");
       } catch (err) {
         console.error("Error fetching saved cards:", err);
       } finally {
@@ -189,8 +189,41 @@ export default function Checkout() {
     }
   };
 
+  const handleKeepzCardPayment = async () => {
+    if (!selectedPlan) {
+      toast({ title: "Error", description: "Plan not found", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { navigate("/login"); return; }
+
+      const { data, error } = await supabase.functions.invoke("keepz-direct-card-payment", {
+        body: {
+          plan_type: planType,
+          billing_plan_id: selectedPlan.id,
+          return_url: `${window.location.origin}/billing-success`,
+          cancel_url: `${window.location.origin}/checkout?plan=${planType}`,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+      if (!data?.payment_url) throw new Error("No payment URL returned");
+
+      window.location.href = data.payment_url;
+    } catch (error: any) {
+      toast({ title: "Payment Error", description: error.message || "Failed to initiate payment", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePayment = () => {
-    if (selectedPayment === "keepz_direct") {
+    if (selectedPayment === "keepz_card") {
+      handleKeepzCardPayment();
+    } else if (selectedPayment === "keepz_direct") {
       handleKeepzDirectPayment();
     } else {
       handleKeepzSavedCardPayment();
@@ -277,6 +310,33 @@ export default function Checkout() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Keepz Card Entry — always available, no save, redirect to Credo */}
+                <div
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    selectedPayment === "keepz_card"
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-slate-600 hover:border-slate-500"
+                  }`}
+                  onClick={() => setSelectedPayment("keepz_card")}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
+                        <KeyRound className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Pay by Card</p>
+                        <p className="text-sm text-slate-400">Enter card details — no account needed</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      selectedPayment === "keepz_card" ? "border-blue-500 bg-blue-500" : "border-slate-500"
+                    }`}>
+                      {selectedPayment === "keepz_card" && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Keepz Direct (QR scan) — always available */}
                 <div
                   className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
