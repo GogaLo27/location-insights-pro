@@ -115,13 +115,6 @@ serve(async (req) => {
     const { plan_type, billing_plan_id, return_url, cancel_url } = body || {}
 
     if (!plan_type) throw new Error('plan_type is required')
-    const validPlanTypes = ['starter', 'professional', 'enterprise']
-    if (!validPlanTypes.includes(plan_type)) {
-      return new Response(JSON.stringify({ error: `Invalid plan_type. Must be one of: ${validPlanTypes.join(', ')}` }), {
-        status: 400,
-        headers: { ...cors, 'Content-Type': 'application/json' }
-      })
-    }
     if (!billing_plan_id) throw new Error('billing_plan_id is required')
 
     if (!KEEPZ_PUBLIC_KEY || !KEEPZ_PRIVATE_KEY) {
