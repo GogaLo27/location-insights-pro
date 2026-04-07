@@ -617,19 +617,22 @@ const Reviews = () => {
         if (!analysisError && analysisData?.reviews) {
           // Batch upsert all analyzed reviews in one call instead of N individual updates
           const analysisTimestamp = new Date().toISOString();
-          const analysisUpserts = analysisData.reviews.map((r: any) => ({
-            google_review_id: r.google_review_id,
-            location_id: resolveLocationId(),
-            user_id: user.id,
-            // preserve required fields that must exist on upsert
-            author_name: (batch.find((b: any) => b.google_review_id === r.google_review_id) as any)?.author_name ?? '',
-            rating: (batch.find((b: any) => b.google_review_id === r.google_review_id) as any)?.rating ?? 0,
-            ai_sentiment: r.ai_sentiment,
-            ai_tags: r.ai_tags,
-            ai_issues: r.ai_issues,
-            ai_suggestions: r.ai_suggestions,
-            ai_analyzed_at: analysisTimestamp,
-          }));
+          const analysisUpserts = analysisData.reviews.map((r: any) => {
+            const original = batch.find((b: any) => b.google_review_id === r.google_review_id) as any;
+            return {
+              google_review_id: r.google_review_id,
+              location_id: resolveLocationId(),
+              user_id: user.id,
+              author_name: original?.author_name ?? '',
+              rating: original?.rating ?? 0,
+              review_date: original?.review_date ?? new Date().toISOString(),
+              ai_sentiment: r.ai_sentiment,
+              ai_tags: r.ai_tags,
+              ai_issues: r.ai_issues,
+              ai_suggestions: r.ai_suggestions,
+              ai_analyzed_at: analysisTimestamp,
+            };
+          });
           await supabase
             .from('saved_reviews')
             .upsert(analysisUpserts, { onConflict: 'google_review_id,location_id,user_id' });
