@@ -183,8 +183,6 @@ Keep the response under 150 words.`.trim();
     }
   };
 
-  };
-
   const handleSubmit = async () => {
     if (!replyText.trim()) {
       toast({

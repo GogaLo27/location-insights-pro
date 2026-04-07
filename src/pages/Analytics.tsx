@@ -124,8 +124,6 @@ const Analytics = () => {
     }
   }, [ctxSelectedLocation, dateRange, showComparison, isCustomRange, customDateRange]);
 
-  };
-
   const fetchAnalytics = async () => {
     // If no context-selected location yet, do nothing
     if (!ctxSelectedLocation) return;
