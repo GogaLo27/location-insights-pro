@@ -21,7 +21,7 @@ interface BillingPlan {
   updated_at: string
 }
 
-export function useBillingPlans(provider: 'paypal' | 'keepz' = 'keepz') {
+export function useBillingPlans(provider?: 'paypal' | 'keepz') {
   const [plans, setPlans] = useState<BillingPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,12 +34,18 @@ export function useBillingPlans(provider: 'paypal' | 'keepz' = 'keepz') {
     try {
       setLoading(true)
       setError(null)
-      
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('billing_plans')
         .select('*')
-        .eq('provider', provider)
+        .eq('is_active', true)
         .order('sort_order', { ascending: true })
+
+      if (provider) {
+        query = query.eq('provider', provider)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching billing plans:', error)

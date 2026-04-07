@@ -20,8 +20,7 @@ export default function PlanSelection() {
   const navigate = useNavigate();
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
-  // Keepz only — PayPal has been removed as a payment option
-  const { plans, loading, error, refetch } = useBillingPlans('keepz');
+  const { plans, loading, error, refetch } = useBillingPlans();
 
   // Manual refresh function
   const handleRefresh = async () => {
