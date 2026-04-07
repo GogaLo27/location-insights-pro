@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+const allowedOrigins = ["https://dibiex.com", "https://www.dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
 
 
 serve(async (req) => {

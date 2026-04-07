@@ -3,8 +3,13 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
-;
+const allowedOrigins = ["https://dibiex.com", "https://www.dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+
+let corsHeaders = {
+  'Access-Control-Allow-Origin': allowedOrigins[0],
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-google-token',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -14,18 +19,18 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
   const origin = req.headers.get('Origin') ?? ''
-  const corsHeaders = {
+  corsHeaders = {
     'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-google-token',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
   }
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Add overall timeout for the entire request
-  const timeoutPromise = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Function timeout')), 120000) // 2 minute timeout
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Function timeout')), 120000)
   );
 
   try {
@@ -36,7 +41,7 @@ serve(async (req) => {
     return result;
   } catch (error) {
     console.error("Function error:", error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: error.message || "Internal server error",
       timestamp: new Date().toISOString()
     }), {

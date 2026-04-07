@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createDecipheriv } from "node:crypto"
 import { Buffer } from "node:buffer"
 
-const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+const allowedOrigins = ["https://dibiex.com", "https://www.dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
 
 
 const KEEPZ_PRIVATE_KEY = Deno.env.get('KEEPZ_PRIVATE_KEY') ?? ''

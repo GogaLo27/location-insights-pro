@@ -6,7 +6,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const allowedOrigins = ["https://dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
+const allowedOrigins = ["https://dibiex.com", "https://www.dibiex.com", "https://admin.dibiex.com", "http://localhost:8080", "http://localhost:5173"];
 
 serve(async (req) => {
   const origin = req.headers.get("Origin") ?? "";

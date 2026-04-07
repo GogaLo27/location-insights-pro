@@ -521,7 +521,7 @@ const Reviews = () => {
       const chunk = upsertRecords.slice(i, i + chunkSize);
       const { error } = await supabase
         .from("saved_reviews")
-        .upsert(chunk, { onConflict: 'google_review_id,location_id' });
+        .upsert(chunk, { onConflict: 'google_review_id,location_id,user_id' });
       if (error) {
         console.error("Upsert error for chunk:", error);
         throw error;
@@ -632,7 +632,7 @@ const Reviews = () => {
           }));
           await supabase
             .from('saved_reviews')
-            .upsert(analysisUpserts, { onConflict: 'google_review_id,location_id' });
+            .upsert(analysisUpserts, { onConflict: 'google_review_id,location_id,user_id' });
 
           processedCount += batch.length;
           updateProgress(processedCount, unanalyzedReviews.length);
