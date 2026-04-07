@@ -985,8 +985,8 @@ const Sentiment = () => {
                   <div>
                     <p className="text-xs font-medium text-red-500 mb-2">To improve</p>
                     <div className="space-y-1.5">
-                      {getTopTagsData().negative.length > 0 ? (
-                        getTopTagsData().negative.map((tag, index) => (
+                      {topTagsData?.negative.length > 0 ? (
+                        topTagsData?.negative.map((tag, index) => (
                           <div key={index} className="flex items-center justify-between py-1.5 text-sm">
                             <span className="text-foreground">{tag.tag}</span>
                             <span className="text-muted-foreground text-xs">{tag.count}</span>
