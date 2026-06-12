@@ -95,6 +95,7 @@ serve(async (req) => {
         status: 'pending',
         provider: 'dodo',
         payment_method: 'dodo',
+        payer_email: user.email ?? userProfile?.email ?? null,
         can_refund: true,
         refund_eligible_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
         campaign_code: campaign_code ?? null,
