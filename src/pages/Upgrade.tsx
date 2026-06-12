@@ -108,9 +108,20 @@ const Upgrade = () => {
 
   const handleUpgrade = async (planId: string) => {
     if (!user) return;
-    
-    // Redirect to checkout page where user can choose payment method
-    navigate(`/checkout?plan=${planId}&upgrade=true`);
+    try {
+      const { data, error } = await supabase.functions.invoke('dodo-create-checkout', {
+        body: { plan_type: planId },
+      });
+      if (error) throw error;
+      if (!data?.checkout_url) throw new Error('No checkout URL returned');
+      window.location.href = data.checkout_url;
+    } catch (err: any) {
+      toast({
+        title: 'Checkout Error',
+        description: err.message || 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const requestUpgrade = (planId: string, planName: string) => {

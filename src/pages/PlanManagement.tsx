@@ -118,12 +118,26 @@ const PlanManagement = () => {
     setConfirmOpen(true);
   };
 
-  const confirmSwitchPlan = () => {
+  const confirmSwitchPlan = async () => {
     if (!pendingPlanType) return;
     setConfirmOpen(false);
-    navigate(`/checkout?plan=${pendingPlanType}&upgrade=true`);
+    const planType = pendingPlanType;
     setPendingPlanType(null);
     setPendingPlanName("");
+    try {
+      const { data, error } = await supabase.functions.invoke('dodo-create-checkout', {
+        body: { plan_type: planType },
+      });
+      if (error) throw error;
+      if (!data?.checkout_url) throw new Error('No checkout URL returned');
+      window.location.href = data.checkout_url;
+    } catch (err: any) {
+      toast({
+        title: 'Checkout Error',
+        description: err.message || 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const featureMap: Record<
@@ -256,7 +270,7 @@ const PlanManagement = () => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Switch to {pendingPlanName}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    You will be taken to checkout where you can choose your payment method (card or PayPal) and complete the plan change. Your current subscription may be replaced. Proceed?
+                    You will be redirected to a secure checkout page to complete the plan change. Your current subscription will be replaced. Proceed?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
