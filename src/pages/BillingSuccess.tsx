@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 export default function BillingSuccess() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('Processing your subscription...')
 
@@ -82,10 +82,41 @@ export default function BillingSuccess() {
       }
     }
 
-    if (user) {
+    if (!authLoading && user) {
       processSubscription()
     }
-  }, [user, navigate])
+  }, [user, authLoading, navigate])
+
+  // Auth is still initializing — don't render yet
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Session was lost (e.g. www vs non-www mismatch) — send them to sign in
+  if (!user) {
+    return (
+      <div className="min-h-screen relative overflow-x-hidden flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10 p-4">
+        <PageOrbs />
+        <Card className={`max-w-md w-full ${fancyCardClass}`}>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <h1 className="text-lg font-semibold mb-2">Payment received!</h1>
+              <p className="text-sm text-muted-foreground mb-4">
+                Please sign in to activate your subscription.
+              </p>
+              <Button onClick={() => navigate('/')} className="w-full">
+                Sign In
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen relative overflow-x-hidden flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10 p-4">

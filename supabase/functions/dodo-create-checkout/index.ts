@@ -126,7 +126,7 @@ serve(async (req) => {
           email: user.email ?? userProfile?.email,
           name: userProfile?.full_name ?? user.email ?? 'Customer',
         },
-        return_url: 'https://dibiex.com/billing-success',
+        return_url: 'https://www.dibiex.com/billing-success',
       }),
     })
 

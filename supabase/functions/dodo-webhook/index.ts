@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const DODO_WEBHOOK_SECRET = Deno.env.get('DODO_WEBHOOK_SECRET') ?? ''
+// Set DODO_SKIP_SIG_VERIFY=true in Supabase secrets to bypass signature check during debugging
+const SKIP_SIG_VERIFY = Deno.env.get('DODO_SKIP_SIG_VERIFY') === 'true'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -72,9 +74,20 @@ serve(async (req) => {
     const rawBody = await req.text()
     if (!rawBody) return new Response(JSON.stringify({ received: true }), { status: 200 })
 
-    const isValid = await verifyWebhookSignature(rawBody, req.headers)
-    if (!isValid) {
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 })
+    // Log all incoming headers for debugging
+    const allHeaders: Record<string, string> = {}
+    req.headers.forEach((v, k) => { allHeaders[k] = v })
+    console.log('Webhook headers:', JSON.stringify(allHeaders))
+    console.log('Webhook raw body length:', rawBody.length)
+
+    if (SKIP_SIG_VERIFY) {
+      console.warn('DODO_SKIP_SIG_VERIFY=true — skipping signature check')
+    } else {
+      const isValid = await verifyWebhookSignature(rawBody, req.headers)
+      if (!isValid) {
+        console.error('Signature validation failed — set DODO_SKIP_SIG_VERIFY=true in secrets to bypass for debugging')
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 })
+      }
     }
 
     const event = JSON.parse(rawBody)
@@ -263,15 +276,56 @@ async function handleSubscriptionRenewed(data: any) {
   const dodoSubscriptionId = data.subscription_id
   if (!dodoSubscriptionId) return
 
-  const { data: subscription } = await supabase
+  let { data: subscription } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('dodo_subscription_id', dodoSubscriptionId)
-    .single()
+    .maybeSingle()
 
+  // Fallback: subscription.active was missed — try to find pending sub by customer email
   if (!subscription) {
-    console.error('subscription.renewed: subscription not found:', dodoSubscriptionId)
-    return
+    console.warn('subscription.renewed: not found by dodo_subscription_id, trying email fallback')
+    const customerEmail = data.customer?.email ?? data.customer_email ?? data.email
+    if (customerEmail) {
+      const { data: { user } } = await supabase.auth.admin.getUserByEmail(customerEmail)
+      if (user) {
+        const { data: pendingSub } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('provider', 'dodo')
+          .in('status', ['pending', 'active'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (pendingSub) {
+          // Activate it now if it was still pending
+          if (pendingSub.status === 'pending') {
+            await supabase.from('subscriptions').update({
+              status: 'active',
+              dodo_subscription_id: dodoSubscriptionId,
+              updated_at: new Date().toISOString(),
+            }).eq('id', pendingSub.id)
+            await supabase.from('user_plans').upsert({
+              user_id: user.id,
+              plan_type: pendingSub.plan_type,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' })
+          } else {
+            // Already active but missing dodo_subscription_id
+            await supabase.from('subscriptions').update({
+              dodo_subscription_id: dodoSubscriptionId,
+              updated_at: new Date().toISOString(),
+            }).eq('id', pendingSub.id)
+          }
+          subscription = { ...pendingSub, dodo_subscription_id: dodoSubscriptionId }
+        }
+      }
+    }
+    if (!subscription) {
+      console.error('subscription.renewed: subscription not found:', dodoSubscriptionId)
+      return
+    }
   }
 
   const now = new Date()
