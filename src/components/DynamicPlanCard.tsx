@@ -119,15 +119,15 @@ export function DynamicPlanCard({
         
         {/* Features */}
         <div className="space-y-3">
-          {plan.features.slice(0, 5).map((feature, index) => (
+          {(plan.features ?? []).slice(0, 5).map((feature, index) => (
             <div key={index} className="flex items-center gap-3">
               <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
               <span className="text-sm text-muted-foreground">{feature}</span>
             </div>
           ))}
-          {plan.features.length > 5 && (
+          {(plan.features ?? []).length > 5 && (
             <div className="text-sm text-muted-foreground text-center">
-              +{plan.features.length - 5} more features
+              +{(plan.features ?? []).length - 5} more features
             </div>
           )}
         </div>

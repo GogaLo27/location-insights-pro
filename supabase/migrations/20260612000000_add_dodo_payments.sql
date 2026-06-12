@@ -45,6 +45,7 @@ UPDATE public.billing_plans
 INSERT INTO public.billing_plans (
   plan_type,
   provider,
+  provider_plan_id,
   dodo_product_id,
   plan_name,
   plan_description,
@@ -62,6 +63,7 @@ INSERT INTO public.billing_plans (
     'starter',
     'dodo',
     'pdt_0NguK1oaakz86IE4gnEpY',
+    'pdt_0NguK1oaakz86IE4gnEpY',
     'Starter Monthly',
     'Perfect for small businesses managing one location',
     4900,
@@ -78,6 +80,7 @@ INSERT INTO public.billing_plans (
     'professional',
     'dodo',
     'pdt_0NguKBjYU8uNUYsNgQyRB',
+    'pdt_0NguKBjYU8uNUYsNgQyRB',
     'Professional Monthly',
     'For growing businesses with multiple locations',
     9900,
@@ -93,6 +96,7 @@ INSERT INTO public.billing_plans (
   (
     'enterprise',
     'dodo',
+    'pdt_0NgtZVjNiByqEG9GrfAFs',
     'pdt_0NgtZVjNiByqEG9GrfAFs',
     'Enterprise Monthly',
     'Unlimited scale for large organizations',

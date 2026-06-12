@@ -77,7 +77,7 @@ const PlanManagement = () => {
       const { data, error } = await (supabase as any)
         .from("billing_plans")
         .select("id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at")
-        .eq("provider", "paypal")
+        .eq("provider", "dodo")
         .order("price_cents", { ascending: true });
 
       if (error) throw error;
