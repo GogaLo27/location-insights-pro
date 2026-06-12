@@ -72,12 +72,7 @@ export default function SubscriptionManagement() {
 
     try {
       setCancelling(true)
-      const cancelFunction = subscription.payment_method === 'paypal'
-        ? 'paypal-cancel-subscription'
-        : subscription.payment_method === 'keepz' || subscription.payment_method?.includes('keepz')
-        ? 'keepz-cancel-subscription'
-        : 'paypal-cancel-subscription' // fallback for legacy/unknown
-      const { data, error } = await supabase.functions.invoke(cancelFunction, {
+      const { data, error } = await supabase.functions.invoke('dodo-cancel-subscription', {
         body: {
           subscription_id: subscription.id,
           reason: 'User requested cancellation'
@@ -113,10 +108,7 @@ export default function SubscriptionManagement() {
 
     try {
       setRefunding(true)
-      if (subscription.payment_method !== 'paypal') {
-        throw new Error('Refunds are only available for PayPal subscriptions. Please contact support for other payment methods.')
-      }
-      const { data, error } = await supabase.functions.invoke('paypal-refund', {
+      const { data, error } = await supabase.functions.invoke('dodo-refund', {
         body: {
           subscription_id: subscription.id,
           refund_reason: 'User requested refund'
@@ -170,7 +162,6 @@ export default function SubscriptionManagement() {
   }
 
   const isRefundEligible = () => {
-    if (subscription?.payment_method !== 'paypal') return false
     if (!subscription?.can_refund) return false
     if (!subscription?.refund_eligible_until) return false
     return new Date(subscription.refund_eligible_until) > new Date()

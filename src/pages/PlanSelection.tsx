@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/components/ui/auth-provider";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -13,11 +13,11 @@ import { DynamicPlanCard } from "@/components/DynamicPlanCard";
 import { RefreshCw } from "lucide-react";
 import SEOHead from "@/components/SEOHead";
 import { PageOrbs } from "@/components/PageLayout";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   const { plans, loading, error, refetch } = useBillingPlans();
@@ -32,8 +32,22 @@ export default function PlanSelection() {
   };
 
   const handleSubscribe = async (planType: string) => {
-    // Redirect to checkout page where user can choose payment method
-    navigate(`/checkout?plan=${planType}`);
+    setSubmittingPlan(planType);
+    try {
+      const { data, error } = await supabase.functions.invoke('dodo-create-checkout', {
+        body: { plan_type: planType },
+      });
+      if (error) throw error;
+      if (!data?.checkout_url) throw new Error('No checkout URL returned');
+      window.location.href = data.checkout_url;
+    } catch (err: any) {
+      toast({
+        title: 'Checkout Error',
+        description: err.message || 'Failed to start checkout. Please try again.',
+        variant: 'destructive',
+      });
+      setSubmittingPlan(null);
+    }
   };
 
   if (!user && !authLoading) {

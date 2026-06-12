@@ -27,7 +27,6 @@ import PlanManagement from './pages/PlanManagement';
 import Upgrade from './pages/Upgrade';
 import LocationSelection from './pages/LocationSelection';
 import BillingSuccess from './pages/BillingSuccess';
-import BillingCancel from './pages/BillingCancel';
 import OrderHistory from './pages/OrderHistory';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
@@ -41,8 +40,6 @@ import CategoryPage from './pages/CategoryPage';
 import Settings from './pages/Settings';
 import Feedback from './pages/Feedback';
 import NotFound from './pages/NotFound';
-import Checkout from './pages/Checkout';
-import PaymentMethods from './pages/PaymentMethods';
 import DashboardPrivacy from './pages/DashboardPrivacy';
 import DashboardTerms from './pages/DashboardTerms';
 import DashboardRefund from './pages/DashboardRefund';
@@ -68,14 +65,6 @@ const App = () => (
               element={
                 <ProtectedRoute requiresPlan={false}>
                   <PlanSelection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/checkout"
-              element={
-                <ProtectedRoute requiresPlan={false}>
-                  <Checkout />
                 </ProtectedRoute>
               }
             />
@@ -208,14 +197,6 @@ const App = () => (
               }
             />
             <Route
-              path="/payment-methods"
-              element={
-                <ProtectedRoute requiresPlan={false} requiresLocation={false}>
-                  <PaymentMethods />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/feedback"
               element={
                 <ProtectedRoute requiresPlan={true} requiresLocation={false}>
@@ -232,20 +213,12 @@ const App = () => (
               }
             />
 
-            {/* PayPal return routes */}
+            {/* Dodo return route (same as billing-success) */}
             <Route
               path="/billing/success"
               element={
                 <ProtectedRoute requiresPlan={false} requiresLocation={false}>
                   <BillingSuccess />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/billing/cancel"
-              element={
-                <ProtectedRoute requiresPlan={false} requiresLocation={false}>
-                  <BillingCancel />
                 </ProtectedRoute>
               }
             />

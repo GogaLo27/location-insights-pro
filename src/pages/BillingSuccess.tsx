@@ -32,90 +32,47 @@ export default function BillingSuccess() {
 
         // Check subscription status based on provider
         if (subscription?.status === 'active') {
-          // Already active - redirect to dashboard
           setMessage('Subscription activated successfully! Redirecting to dashboard...')
-          setTimeout(() => {
-            navigate('/dashboard')
-          }, 2000)
+          setTimeout(() => navigate('/dashboard'), 2000)
           return
         }
 
-        if (subscription?.provider === 'keepz' || subscription?.keepz_order_id) {
-          // Keepz subscription - wait for webhook to update status
-          if (subscription?.status === 'pending') {
-            setMessage('Subscription is being processed. This may take a few moments...')
-            // Poll for status update
-            const checkStatus = setInterval(async () => {
-              const { data: updated } = await supabase
-                .from('subscriptions')
-                .select('status')
-                .eq('id', subscription.id)
-                .single()
-              
-              if (updated?.status === 'active') {
-                clearInterval(checkStatus)
-                setMessage('Subscription activated successfully! Redirecting to dashboard...')
-                setTimeout(() => {
-                  navigate('/dashboard')
-                }, 2000)
-              }
-            }, 3000) // Check every 3 seconds
+        if (subscription?.status === 'failed') {
+          setMessage('Payment was not completed. Please try subscribing again.')
+          setLoading(false)
+          return
+        }
 
-            // Stop checking after 2 minutes
-            setTimeout(() => {
-              clearInterval(checkStatus)
-              setMessage('Subscription is still processing. Please check your dashboard or contact support.')
-            }, 120000)
-          }
-        } else if (subscription?.paypal_subscription_id) {
-          // PayPal subscription - check status directly
-          const { data: paypalStatus, error: paypalError } = await supabase.functions.invoke('check-paypal-subscription', {
-            body: {
-              subscription_id: subscription.paypal_subscription_id
-            }
-          })
-
-          if (paypalError) {
-            console.error('Error checking PayPal subscription:', paypalError)
-            setMessage('Subscription is being processed. This may take a few minutes...')
-            setTimeout(() => {
-              window.location.reload()
-            }, 10000)
-            return
-          }
-
-          if (paypalStatus?.status === 'ACTIVE') {
-            // Update our database
-            const { error: updateError } = await supabase
+        // For Dodo (and any pending subscription): poll for webhook to activate it
+        if (subscription?.status === 'pending') {
+          setMessage('Payment received — activating your subscription...')
+          const checkStatus = setInterval(async () => {
+            const { data: updated } = await supabase
               .from('subscriptions')
-              .update({
-                status: 'active',
-                current_period_end: paypalStatus.billing_info?.next_billing_time 
-                  ? new Date(paypalStatus.billing_info.next_billing_time).toISOString()
-                  : null,
-                updated_at: new Date().toISOString()
-              })
+              .select('status')
               .eq('id', subscription.id)
+              .single()
 
-            if (updateError) {
-              console.error('Error updating subscription:', updateError)
+            if (updated?.status === 'active') {
+              clearInterval(checkStatus)
+              setMessage('Subscription activated! Redirecting to dashboard...')
+              setTimeout(() => navigate('/dashboard'), 2000)
+            } else if (updated?.status === 'failed') {
+              clearInterval(checkStatus)
+              setMessage('Payment could not be confirmed. Please contact support.')
+              setLoading(false)
             }
+          }, 3000)
 
-            setMessage('Subscription activated successfully! Redirecting to dashboard...')
-            setTimeout(() => {
-              navigate('/dashboard')
-            }, 2000)
-          } else {
-            setMessage('Subscription is being processed. This may take a few minutes...')
-            setTimeout(() => {
-              window.location.reload()
-            }, 10000)
-          }
-        } else {
-          setMessage('Subscription is being processed. This may take a few minutes...')
+          // Give up after 5 minutes
           setTimeout(() => {
-            window.location.reload()
-          }, 10000)
+            clearInterval(checkStatus)
+            setMessage('Activation is taking longer than expected. Check your dashboard or contact support.')
+            setLoading(false)
+          }, 300000)
+        } else {
+          setMessage('Subscription is being processed. Please check your dashboard.')
+          setTimeout(() => window.location.reload(), 10000)
         }
       } catch (error) {
         console.error('Error processing subscription:', error)
