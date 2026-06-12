@@ -8,28 +8,59 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
 
-// Verify HMAC-SHA256 webhook signature from Dodo.
-// NOTE: Confirm the exact header name and signature format from Dodo's webhook docs.
-// Common formats: plain hex digest, base64 digest, or "t=TIMESTAMP,v1=HASH"
-async function verifyWebhookSignature(rawBody: string, signature: string): Promise<boolean> {
-  if (!DODO_WEBHOOK_SECRET) return true // skip verification if secret not configured
-  if (!signature) return false
+// Dodo uses Svix for webhook delivery.
+// Signed message = "${webhook-id}.${webhook-timestamp}.${rawBody}"
+// Secret format: "whsec_<base64>" or plain string
+async function verifyWebhookSignature(rawBody: string, headers: Headers): Promise<boolean> {
+  if (!DODO_WEBHOOK_SECRET) {
+    console.warn('DODO_WEBHOOK_SECRET not set — skipping signature verification')
+    return true
+  }
+
+  const msgId = headers.get('webhook-id')
+  const msgTimestamp = headers.get('webhook-timestamp')
+  const msgSignature = headers.get('webhook-signature')
+
+  if (!msgId || !msgTimestamp || !msgSignature) {
+    console.error('Missing Svix webhook headers', { msgId, msgTimestamp, msgSignature })
+    return false
+  }
+
+  // Reject if timestamp is more than 5 minutes old (replay attack prevention)
+  const timestampMs = parseInt(msgTimestamp) * 1000
+  if (Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
+    console.error('Webhook timestamp too old:', msgTimestamp)
+    return false
+  }
+
   try {
+    const toSign = `${msgId}.${msgTimestamp}.${rawBody}`
     const encoder = new TextEncoder()
+
+    // Secret may be "whsec_<base64>" (Svix format) or a plain string
+    let secretBytes: Uint8Array
+    if (DODO_WEBHOOK_SECRET.startsWith('whsec_')) {
+      const b64 = DODO_WEBHOOK_SECRET.slice(6)
+      secretBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    } else {
+      secretBytes = encoder.encode(DODO_WEBHOOK_SECRET)
+    }
+
     const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(DODO_WEBHOOK_SECRET),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
+      'raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
     )
-    const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody))
-    const expectedHex = Array.from(new Uint8Array(mac))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-    const expectedB64 = btoa(String.fromCharCode(...new Uint8Array(mac)))
-    return signature === expectedHex || signature === expectedB64 || signature.includes(expectedHex)
-  } catch {
+    const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(toSign))
+    const computedB64 = btoa(String.fromCharCode(...new Uint8Array(mac)))
+    const expected = `v1,${computedB64}`
+
+    // Svix may send multiple space-separated signatures during rotation
+    const valid = msgSignature.split(' ').some(sig => sig === expected)
+    if (!valid) {
+      console.error('Signature mismatch — computed:', expected, 'received:', msgSignature)
+    }
+    return valid
+  } catch (err) {
+    console.error('Signature verification error:', err)
     return false
   }
 }
@@ -41,21 +72,14 @@ serve(async (req) => {
     const rawBody = await req.text()
     if (!rawBody) return new Response(JSON.stringify({ received: true }), { status: 200 })
 
-    // NOTE: Verify exact header name from Dodo's webhook documentation
-    const signature = req.headers.get('webhook-signature')
-      ?? req.headers.get('x-dodo-signature')
-      ?? req.headers.get('x-webhook-signature')
-      ?? ''
-
-    const isValid = await verifyWebhookSignature(rawBody, signature)
+    const isValid = await verifyWebhookSignature(rawBody, req.headers)
     if (!isValid) {
-      console.error('Invalid Dodo webhook signature')
       return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 })
     }
 
     const event = JSON.parse(rawBody)
     const { type, data } = event
-    console.log(`Dodo webhook received: ${type}`)
+    console.log(`Dodo webhook received: ${type}`, JSON.stringify(data))
 
     switch (type) {
       case 'subscription.active':
@@ -86,32 +110,29 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Dodo webhook error:', error)
-    // Return 200 to prevent Dodo from retrying on processing errors
+    // Always return 200 so Dodo doesn't retry on our processing errors
     return new Response(JSON.stringify({ received: true, error: error.message }), { status: 200 })
   }
 })
 
-// NOTE: Verify exact field names against Dodo's API reference before going live.
-// The subscription data object fields used below follow common MoR provider conventions.
-
 async function handleSubscriptionActive(data: any) {
+  console.log('handleSubscriptionActive data:', JSON.stringify(data))
+
   const dodoSubscriptionId = data.subscription_id
-  const customerEmail = data.customer?.email
-  const dodoCustomerId = data.customer?.customer_id ?? data.customer_id
+  // Dodo may nest email under customer.email or put it at the top level
+  const customerEmail = data.customer?.email ?? data.customer_email ?? data.email
 
   if (!customerEmail || !dodoSubscriptionId) {
-    console.error('subscription.active: missing subscription_id or customer.email', data)
+    console.error('subscription.active: missing subscription_id or customer email', data)
     return
   }
 
-  // Find the user account by email
   const { data: { user }, error: userErr } = await supabase.auth.admin.getUserByEmail(customerEmail)
   if (userErr || !user) {
-    console.error('subscription.active: user not found for email:', customerEmail)
+    console.error('subscription.active: user not found for email:', customerEmail, userErr)
     return
   }
 
-  // Find the pending Dodo subscription created when user initiated checkout
   const { data: subscription, error: subErr } = await supabase
     .from('subscriptions')
     .select('*')
@@ -123,7 +144,7 @@ async function handleSubscriptionActive(data: any) {
     .single()
 
   if (subErr || !subscription) {
-    console.error('subscription.active: no pending Dodo subscription for user:', user.id)
+    console.error('subscription.active: no pending Dodo subscription for user:', user.id, subErr)
     return
   }
 
@@ -132,12 +153,14 @@ async function handleSubscriptionActive(data: any) {
     ?? data.next_billing_at
     ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
+  const dodoCustomerId = data.customer?.customer_id ?? data.customer_id ?? null
+
   await supabase
     .from('subscriptions')
     .update({
       status: 'active',
       dodo_subscription_id: dodoSubscriptionId,
-      dodo_customer_id: dodoCustomerId ?? null,
+      dodo_customer_id: dodoCustomerId,
       current_period_start: data.current_period_start ?? now.toISOString(),
       current_period_end: periodEnd,
       updated_at: now.toISOString(),
@@ -162,15 +185,19 @@ async function handleSubscriptionActive(data: any) {
     }
   }
 
-  // Upsert active plan record
-  await supabase.from('user_plans').upsert({
+  const { error: upsertErr } = await supabase.from('user_plans').upsert({
     user_id: user.id,
     plan_type: subscription.plan_type,
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
   }, { onConflict: 'user_id' })
 
-  // Generate invoice (payment_id will be back-filled when payment.succeeded fires)
+  if (upsertErr) {
+    console.error('user_plans upsert failed:', upsertErr)
+  } else {
+    console.log('user_plans upserted for user:', user.id, 'plan:', subscription.plan_type)
+  }
+
   await generateInvoiceForDodo(subscription)
 
   await supabase.from('subscription_events').insert({
@@ -179,10 +206,13 @@ async function handleSubscriptionActive(data: any) {
     dodo_event_id: dodoSubscriptionId,
     event_data: data,
   })
+
+  console.log('subscription.active: completed for user:', user.id)
 }
 
 async function handlePaymentSucceeded(data: any) {
-  // NOTE: Verify field names from Dodo's payment.succeeded webhook payload docs
+  console.log('handlePaymentSucceeded data:', JSON.stringify(data))
+
   const dodoSubscriptionId = data.subscription_id
   const dodoPaymentId = data.payment_id ?? data.id
 
@@ -190,7 +220,6 @@ async function handlePaymentSucceeded(data: any) {
     console.log('payment.succeeded: no payment_id in payload, skipping')
     return
   }
-
   if (!dodoSubscriptionId) return
 
   const { data: subscription } = await supabase
@@ -201,13 +230,11 @@ async function handlePaymentSucceeded(data: any) {
 
   if (!subscription) return
 
-  // Store payment ID on subscription for refund use
   await supabase
     .from('subscriptions')
     .update({ dodo_payment_id: dodoPaymentId, updated_at: new Date().toISOString() })
     .eq('id', subscription.id)
 
-  // Back-fill the payment ID on the latest invoice that doesn't have it yet
   const { data: latestInvoice } = await supabase
     .from('invoices')
     .select('id')
@@ -254,14 +281,9 @@ async function handleSubscriptionRenewed(data: any) {
 
   await supabase
     .from('subscriptions')
-    .update({
-      status: 'active',
-      current_period_end: newPeriodEnd,
-      updated_at: now.toISOString(),
-    })
+    .update({ status: 'active', current_period_end: newPeriodEnd, updated_at: now.toISOString() })
     .eq('id', subscription.id)
 
-  // Generate renewal invoice
   await generateInvoiceForDodo(subscription)
 
   await supabase.from('subscription_events').insert({
@@ -299,7 +321,7 @@ async function handleSubscriptionOnHold(data: any) {
 
 async function handleSubscriptionFailed(data: any) {
   const dodoSubscriptionId = data.subscription_id
-  const customerEmail = data.customer?.email
+  const customerEmail = data.customer?.email ?? data.customer_email ?? data.email
 
   let subscriptionId: string | null = null
 
@@ -312,7 +334,6 @@ async function handleSubscriptionFailed(data: any) {
     if (sub) subscriptionId = sub.id
   }
 
-  // Fallback: match by customer email → pending subscription
   if (!subscriptionId && customerEmail) {
     const { data: { user } } = await supabase.auth.admin.getUserByEmail(customerEmail)
     if (user) {
@@ -379,9 +400,7 @@ async function generateInvoiceForDodo(subscription: any) {
       return
     }
 
-    const billingPeriodStart = new Date().toISOString()
-    const billingPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-
+    const now = new Date()
     await supabase.functions.invoke('generate-invoice', {
       body: {
         user_id: subscription.user_id,
@@ -390,8 +409,8 @@ async function generateInvoiceForDodo(subscription: any) {
         transaction_id: subscription.dodo_subscription_id,
         amount_cents: billingPlan.price_cents,
         plan_type: subscription.plan_type,
-        billing_period_start: billingPeriodStart,
-        billing_period_end: billingPeriodEnd,
+        billing_period_start: now.toISOString(),
+        billing_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       }
     })
   } catch (err) {

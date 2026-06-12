@@ -137,6 +137,15 @@ serve(async (req) => {
     }
 
     const checkoutData = await checkoutRes.json()
+    console.log('Dodo checkout response:', JSON.stringify(checkoutData))
+
+    // Dodo may return 'payment_link' or 'checkout_url' depending on API version
+    const checkoutUrl = checkoutData.checkout_url ?? checkoutData.payment_link ?? checkoutData.url
+
+    if (!checkoutUrl) {
+      await supabase.from('subscriptions').delete().eq('id', subscription.id)
+      throw new Error(`Dodo checkout response missing URL. Full response: ${JSON.stringify(checkoutData)}`)
+    }
 
     // Store Dodo session_id for webhook correlation
     await supabase
@@ -144,7 +153,7 @@ serve(async (req) => {
       .update({ provider_subscription_id: checkoutData.session_id })
       .eq('id', subscription.id)
 
-    return new Response(JSON.stringify({ checkout_url: checkoutData.checkout_url }), {
+    return new Response(JSON.stringify({ checkout_url: checkoutUrl }), {
       status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
     })
 
