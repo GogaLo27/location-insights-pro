@@ -10,10 +10,7 @@ const allowedOrigins = [
 ]
 
 const DODO_API_KEY = Deno.env.get('DODO_API_KEY') ?? ''
-const DODO_MODE = Deno.env.get('DODO_MODE') ?? 'test_mode'
-const DODO_BASE_URL = DODO_MODE === 'live_mode'
-  ? 'https://api.dodopayments.com'
-  : 'https://test.dodopayments.com'
+const DODO_BASE_URL = Deno.env.get('DODO_BASE_URL') ?? 'https://test.dodopayments.com'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
