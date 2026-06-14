@@ -124,6 +124,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         product_cart: [{ product_id: billingPlan.dodo_product_id, quantity: 1 }],
+        subscription_data: { trial_period_days: 0 },
         customer: {
           email: user.email ?? userProfile?.email,
           name: userProfile?.full_name ?? user.email ?? 'Customer',

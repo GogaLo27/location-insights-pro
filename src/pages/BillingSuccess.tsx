@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/components/ui/auth-provider'
 import { supabase } from '@/integrations/supabase/client'
 import { PageOrbs, fancyCardClass } from '@/components/PageLayout'
@@ -11,10 +11,13 @@ type Stage = 'pending' | 'active' | 'failed'
 
 export default function BillingSuccess() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const [stage, setStage] = useState<Stage>('pending')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(3)
+
+  const dodoStatus = searchParams.get('status')
 
   useEffect(() => {
     if (stage !== 'active') return
@@ -27,6 +30,12 @@ export default function BillingSuccess() {
   }, [stage, countdown, navigate])
 
   useEffect(() => {
+    if (dodoStatus && dodoStatus !== 'active' && dodoStatus !== 'pending') {
+      setErrorMessage('Your payment could not be completed. Please try again.')
+      setStage('failed')
+      return
+    }
+
     const processSubscription = async () => {
       try {
         const { data: subscription, error } = await supabase
@@ -90,7 +99,7 @@ export default function BillingSuccess() {
     if (!authLoading && user) {
       processSubscription()
     }
-  }, [user, authLoading])
+  }, [user, authLoading, dodoStatus])
 
   if (authLoading) {
     return (
@@ -129,7 +138,7 @@ export default function BillingSuccess() {
   }
 
   const steps = [
-    { label: 'Payment received', done: true },
+    { label: 'Payment received', done: stage === 'active' || stage === 'pending' },
     { label: 'Activating subscription', done: stage === 'active' },
     { label: 'Ready to go', done: stage === 'active' },
   ]
@@ -140,8 +149,7 @@ export default function BillingSuccess() {
       <Card className={`max-w-lg w-full opacity-0 animate-fade-in-up ${fancyCardClass}`}>
         <CardContent className="pt-8 pb-8">
           <div className="text-center space-y-6">
-            <div className="mx-auto h-16 w-16 rounded-full flex items-center justify-center
-              bg-accent/10">
+            <div className="mx-auto h-16 w-16 rounded-full flex items-center justify-center bg-accent/10">
               {stage === 'failed' ? (
                 <XCircle className="h-8 w-8 text-destructive" />
               ) : stage === 'active' ? (
@@ -154,17 +162,17 @@ export default function BillingSuccess() {
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent mb-2">
                 {stage === 'failed'
-                  ? 'Something went wrong'
+                  ? 'Payment Failed'
                   : stage === 'active'
-                  ? 'You\'re all set!'
-                  : 'Payment Successful!'}
+                  ? "You're all set!"
+                  : 'Processing Payment...'}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {stage === 'failed'
                   ? errorMessage
                   : stage === 'active'
                   ? `Redirecting to your dashboard in ${countdown}s...`
-                  : 'Your payment was received — activating your subscription now.'}
+                  : 'Please wait while we confirm your payment and activate your subscription.'}
               </p>
             </div>
 

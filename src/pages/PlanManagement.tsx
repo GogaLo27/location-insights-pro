@@ -66,6 +66,7 @@ const PlanManagement = () => {
   const [pendingPlanType, setPendingPlanType] = useState<BillingPlanRow["plan_type"] | null>(null);
   const [pendingPlanName, setPendingPlanName] = useState<string>("");
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -139,6 +140,7 @@ const PlanManagement = () => {
     const planType = pendingPlanType;
     setPendingPlanType(null);
     setPendingPlanName("");
+    setCheckoutLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('dodo-create-checkout', {
         body: { plan_type: planType, interval: billingInterval },
@@ -147,6 +149,7 @@ const PlanManagement = () => {
       if (!data?.checkout_url) throw new Error('No checkout URL returned');
       window.location.href = data.checkout_url;
     } catch (err: any) {
+      setCheckoutLoading(false);
       toast({
         title: 'Checkout Error',
         description: err.message || 'Failed to start checkout. Please try again.',
@@ -305,6 +308,13 @@ const PlanManagement = () => {
                 );
               })}
             </div>
+
+            {checkoutLoading && (
+              <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+                <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin mb-4" />
+                <p className="text-sm font-medium text-muted-foreground">Preparing your checkout...</p>
+              </div>
+            )}
 
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogContent>
