@@ -5,17 +5,30 @@ import { supabase } from '@/integrations/supabase/client'
 import { PageOrbs, fancyCardClass } from '@/components/PageLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { CheckCircle2, XCircle, LogIn, Loader2, Check } from 'lucide-react'
+
+type Stage = 'pending' | 'active' | 'failed'
 
 export default function BillingSuccess() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('Processing your subscription...')
+  const [stage, setStage] = useState<Stage>('pending')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState(3)
+
+  useEffect(() => {
+    if (stage !== 'active') return
+    if (countdown <= 0) {
+      navigate('/dashboard')
+      return
+    }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [stage, countdown, navigate])
 
   useEffect(() => {
     const processSubscription = async () => {
       try {
-        // Get the latest subscription
         const { data: subscription, error } = await supabase
           .from('subscriptions')
           .select('*')
@@ -25,27 +38,23 @@ export default function BillingSuccess() {
           .single()
 
         if (error) {
-          console.error('Error fetching subscription:', error)
-          setMessage('There was an issue processing your subscription. Please contact support.')
+          setErrorMessage('There was an issue processing your subscription. Please contact support.')
+          setStage('failed')
           return
         }
 
-        // Check subscription status based on provider
         if (subscription?.status === 'active') {
-          setMessage('Subscription activated successfully! Redirecting to dashboard...')
-          setTimeout(() => navigate('/dashboard'), 2000)
+          setStage('active')
           return
         }
 
         if (subscription?.status === 'failed') {
-          setMessage('Payment was not completed. Please try subscribing again.')
-          setLoading(false)
+          setErrorMessage('Payment was not completed. Please try subscribing again.')
+          setStage('failed')
           return
         }
 
-        // For Dodo (and any pending subscription): poll for webhook to activate it
         if (subscription?.status === 'pending') {
-          setMessage('Payment received — activating your subscription...')
           const checkStatus = setInterval(async () => {
             const { data: updated } = await supabase
               .from('subscriptions')
@@ -55,39 +64,34 @@ export default function BillingSuccess() {
 
             if (updated?.status === 'active') {
               clearInterval(checkStatus)
-              setMessage('Subscription activated! Redirecting to dashboard...')
-              setTimeout(() => navigate('/dashboard'), 2000)
+              setStage('active')
             } else if (updated?.status === 'failed') {
               clearInterval(checkStatus)
-              setMessage('Payment could not be confirmed. Please contact support.')
-              setLoading(false)
+              setErrorMessage('Payment could not be confirmed. Please contact support.')
+              setStage('failed')
             }
           }, 3000)
 
-          // Give up after 5 minutes
           setTimeout(() => {
             clearInterval(checkStatus)
-            setMessage('Activation is taking longer than expected. Check your dashboard or contact support.')
-            setLoading(false)
+            setErrorMessage('Activation is taking longer than expected. Check your dashboard or contact support.')
+            setStage('failed')
           }, 300000)
         } else {
-          setMessage('Subscription is being processed. Please check your dashboard.')
-          setTimeout(() => window.location.reload(), 10000)
+          setErrorMessage('Subscription is being processed. Please check your dashboard.')
+          setStage('failed')
         }
-      } catch (error) {
-        console.error('Error processing subscription:', error)
-        setMessage('There was an issue processing your subscription. Please contact support.')
-      } finally {
-        setLoading(false)
+      } catch {
+        setErrorMessage('There was an issue processing your subscription. Please contact support.')
+        setStage('failed')
       }
     }
 
     if (!authLoading && user) {
       processSubscription()
     }
-  }, [user, authLoading, navigate])
+  }, [user, authLoading])
 
-  // Auth is still initializing — don't render yet
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -96,20 +100,26 @@ export default function BillingSuccess() {
     )
   }
 
-  // Session was lost (e.g. www vs non-www mismatch) — send them to sign in
   if (!user) {
     return (
       <div className="min-h-screen relative overflow-x-hidden flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10 p-4">
         <PageOrbs />
-        <Card className={`max-w-md w-full ${fancyCardClass}`}>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <h1 className="text-lg font-semibold mb-2">Payment received!</h1>
-              <p className="text-sm text-muted-foreground mb-4">
-                Please sign in to activate your subscription.
-              </p>
+        <Card className={`max-w-lg w-full opacity-0 animate-fade-in-up ${fancyCardClass}`}>
+          <CardContent className="pt-8 pb-8">
+            <div className="text-center space-y-5">
+              <div className="mx-auto h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+                <LogIn className="h-8 w-8 text-accent" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent mb-2">
+                  Payment Received!
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Please sign in to activate your subscription.
+                </p>
+              </div>
               <Button onClick={() => navigate('/')} className="w-full">
-                Sign In
+                Sign In to Continue
               </Button>
             </div>
           </CardContent>
@@ -118,30 +128,81 @@ export default function BillingSuccess() {
     )
   }
 
+  const steps = [
+    { label: 'Payment received', done: true },
+    { label: 'Activating subscription', done: stage === 'active' },
+    { label: 'Ready to go', done: stage === 'active' },
+  ]
+
   return (
     <div className="min-h-screen relative overflow-x-hidden flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 dark:to-primary/10 p-4">
       <PageOrbs />
-      <Card className={`max-w-md w-full ${fancyCardClass}`}>
-        <CardContent className="pt-6">
-        <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
-            <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="text-lg font-semibold mb-2 bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Payment Successful!</h1>
-          <p className="text-sm text-muted-foreground mb-4">{message}</p>
-          {loading && (
-            <div className="flex justify-center">
-              <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <Card className={`max-w-lg w-full opacity-0 animate-fade-in-up ${fancyCardClass}`}>
+        <CardContent className="pt-8 pb-8">
+          <div className="text-center space-y-6">
+            <div className="mx-auto h-16 w-16 rounded-full flex items-center justify-center
+              bg-accent/10">
+              {stage === 'failed' ? (
+                <XCircle className="h-8 w-8 text-destructive" />
+              ) : stage === 'active' ? (
+                <CheckCircle2 className="h-8 w-8 text-accent" />
+              ) : (
+                <Loader2 className="h-8 w-8 text-accent animate-spin" />
+              )}
             </div>
-          )}
-          <div className="mt-4">
-            <Button onClick={() => navigate('/dashboard')} className="w-full">
-              Go to Dashboard
+
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent mb-2">
+                {stage === 'failed'
+                  ? 'Something went wrong'
+                  : stage === 'active'
+                  ? 'You\'re all set!'
+                  : 'Payment Successful!'}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {stage === 'failed'
+                  ? errorMessage
+                  : stage === 'active'
+                  ? `Redirecting to your dashboard in ${countdown}s...`
+                  : 'Your payment was received — activating your subscription now.'}
+              </p>
+            </div>
+
+            {stage !== 'failed' && (
+              <div className="space-y-3 text-left">
+                {steps.map((step, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className={`h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 ${
+                      step.done
+                        ? 'bg-accent'
+                        : i === 1 && stage === 'pending'
+                        ? 'bg-primary/20 ring-2 ring-primary/40'
+                        : 'bg-muted'
+                    }`}>
+                      {step.done ? (
+                        <Check className="h-3.5 w-3.5 text-white" />
+                      ) : i === 1 && stage === 'pending' ? (
+                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      ) : (
+                        <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                      )}
+                    </div>
+                    <span className={`text-sm ${step.done ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              onClick={() => navigate(stage === 'failed' ? '/plan-selection' : '/dashboard')}
+              variant={stage === 'failed' ? 'destructive' : 'default'}
+              className="w-full"
+            >
+              {stage === 'failed' ? 'Try Again' : 'Go to Dashboard'}
             </Button>
           </div>
-        </div>
         </CardContent>
       </Card>
     </div>

@@ -21,14 +21,14 @@ interface BillingPlan {
   updated_at: string
 }
 
-export function useBillingPlans(provider?: 'paypal' | 'keepz' | 'dodo') {
+export function useBillingPlans(provider?: 'paypal' | 'keepz' | 'dodo', interval?: 'month' | 'year') {
   const [plans, setPlans] = useState<BillingPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPlans()
-  }, [provider])
+  }, [provider, interval])
 
   const fetchPlans = async () => {
     try {
@@ -43,6 +43,10 @@ export function useBillingPlans(provider?: 'paypal' | 'keepz' | 'dodo') {
 
       if (provider) {
         query = query.eq('provider', provider)
+      }
+
+      if (interval) {
+        query = query.eq('interval', interval)
       }
 
       const { data, error } = await query

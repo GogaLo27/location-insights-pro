@@ -64,13 +64,14 @@ const PlanManagement = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingPlanType, setPendingPlanType] = useState<BillingPlanRow["plan_type"] | null>(null);
   const [pendingPlanName, setPendingPlanName] = useState<string>("");
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
 
   useEffect(() => {
     if (user) {
       fetchCurrentPlan();
       fetchPlans();
     }
-  }, [user]);
+  }, [user, billingInterval]);
 
   const fetchPlans = async () => {
     try {
@@ -78,6 +79,7 @@ const PlanManagement = () => {
         .from("billing_plans")
         .select("id,plan_type,provider,provider_plan_id,price_cents,currency,interval,metadata,created_at,updated_at")
         .eq("provider", "dodo")
+        .eq("interval", billingInterval)
         .order("price_cents", { ascending: true });
 
       if (error) throw error;
@@ -126,7 +128,7 @@ const PlanManagement = () => {
     setPendingPlanName("");
     try {
       const { data, error } = await supabase.functions.invoke('dodo-create-checkout', {
-        body: { plan_type: planType },
+        body: { plan_type: planType, interval: billingInterval },
       });
       if (error) throw error;
       if (!data?.checkout_url) throw new Error('No checkout URL returned');
@@ -204,6 +206,32 @@ const PlanManagement = () => {
                 </CardHeader>
               </Card>
             )}
+
+            <div className="flex justify-center opacity-0 animate-fade-in-up" style={{ animationDelay: '60ms' }}>
+              <div className="bg-muted rounded-full p-1 flex gap-1">
+                <button
+                  onClick={() => setBillingInterval('month')}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    billingInterval === 'month'
+                      ? 'bg-background shadow text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingInterval('year')}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                    billingInterval === 'year'
+                      ? 'bg-background shadow text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Yearly
+                  <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">Save 20%</span>
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               {plans.map((p, i) => {

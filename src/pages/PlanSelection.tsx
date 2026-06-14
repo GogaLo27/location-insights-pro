@@ -19,8 +19,9 @@ export default function PlanSelection() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
 
-  const { plans, loading, error, refetch } = useBillingPlans();
+  const { plans, loading, error, refetch } = useBillingPlans('dodo', billingInterval);
 
   // Manual refresh function
   const handleRefresh = async () => {
@@ -35,7 +36,7 @@ export default function PlanSelection() {
     setSubmittingPlan(planType);
     try {
       const { data, error } = await supabase.functions.invoke('dodo-create-checkout', {
-        body: { plan_type: planType },
+        body: { plan_type: planType, interval: billingInterval },
       });
       if (error) throw error;
       if (!data?.checkout_url) throw new Error('No checkout URL returned');
@@ -125,6 +126,32 @@ export default function PlanSelection() {
                   <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
                     Select a plan that fits your needs and start managing your online reputation today.
                   </p>
+                </div>
+
+                <div className="flex justify-center mb-8 opacity-0 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+                  <div className="bg-muted rounded-full p-1 flex gap-1">
+                    <button
+                      onClick={() => setBillingInterval('month')}
+                      className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                        billingInterval === 'month'
+                          ? 'bg-background shadow text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setBillingInterval('year')}
+                      className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                        billingInterval === 'year'
+                          ? 'bg-background shadow text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Yearly
+                      <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">Save 20%</span>
+                    </button>
+                  </div>
                 </div>
 
                 {plans.length > 0 ? (

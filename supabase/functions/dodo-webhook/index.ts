@@ -198,17 +198,62 @@ async function handlePaymentSucceeded(data: any) {
 
   const dodoSubscriptionId = data.subscription_id
   const dodoPaymentId = data.payment_id ?? data.id
+  const customerEmail = data.customer?.email ?? data.customer_email ?? data.email
 
-  if (!dodoPaymentId || !dodoSubscriptionId) return
+  if (!dodoPaymentId) return
 
-  const { data: subscription } = await supabase
+  // Check if subscription already activated by subscription.active event
+  let { data: subscription } = await supabase
     .from('subscriptions')
-    .select('id')
+    .select('*')
     .eq('dodo_subscription_id', dodoSubscriptionId)
     .maybeSingle()
 
+  // subscription.active hasn't fired yet (or won't) — activate now using payer_email
+  if (!subscription && customerEmail) {
+    console.log('payment.succeeded: subscription.active not yet received, activating via payer_email')
+    const pending = await findPendingSubscription(customerEmail)
+    if (pending) {
+      const now = new Date()
+      await supabase.from('subscriptions').update({
+        status: 'active',
+        dodo_subscription_id: dodoSubscriptionId,
+        dodo_payment_id: dodoPaymentId,
+        dodo_customer_id: data.customer?.customer_id ?? null,
+        start_date: now.toISOString(),
+        current_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: now.toISOString(),
+      }).eq('id', pending.id)
+
+      const { error: upsertErr } = await supabase.from('user_plans').upsert({
+        user_id: pending.user_id,
+        plan_type: pending.plan_type,
+        updated_at: now.toISOString(),
+      }, { onConflict: 'user_id' })
+
+      if (upsertErr) {
+        console.error('user_plans upsert failed:', upsertErr)
+      } else {
+        console.log('user_plans activated — user:', pending.user_id, 'plan:', pending.plan_type)
+      }
+
+      await generateInvoiceForDodo({ ...pending, dodo_subscription_id: dodoSubscriptionId })
+
+      await supabase.from('subscription_events').insert({
+        subscription_id: pending.id,
+        event_type: 'subscription_activated',
+        dodo_event_id: dodoPaymentId,
+        event_data: data,
+      })
+      return
+    }
+    console.error('payment.succeeded: no pending subscription found for email:', customerEmail)
+    return
+  }
+
   if (!subscription) return
 
+  // Subscription already active — just store the payment ID
   await supabase
     .from('subscriptions')
     .update({ dodo_payment_id: dodoPaymentId, updated_at: new Date().toISOString() })
@@ -379,6 +424,7 @@ async function generateInvoiceForDodo(subscription: any) {
       .select('price_cents')
       .eq('plan_type', subscription.plan_type)
       .eq('provider', 'dodo')
+      .eq('interval', subscription.billing_interval ?? 'month')
       .eq('is_active', true)
       .maybeSingle()
 

@@ -39,6 +39,7 @@ serve(async (req) => {
 
     const {
       plan_type,
+      interval,
       campaign_code,
       referral_source,
       referral_medium,
@@ -55,14 +56,16 @@ serve(async (req) => {
       })
     }
 
-    // Fetch Dodo billing plan
+    const billingInterval = interval === 'year' ? 'year' : 'month'
+
     const { data: billingPlan, error: planErr } = await supabase
       .from('billing_plans')
       .select('dodo_product_id, price_cents, plan_name')
       .eq('provider', 'dodo')
       .eq('plan_type', plan_type)
+      .eq('interval', billingInterval)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
 
     if (planErr || !billingPlan?.dodo_product_id) {
       return new Response(JSON.stringify({ error: 'Plan not available' }), {
@@ -92,6 +95,7 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         plan_type,
+        billing_interval: billingInterval,
         status: 'pending',
         provider: 'dodo',
         payment_method: 'dodo',
