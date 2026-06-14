@@ -59,6 +59,7 @@ const PlanManagement = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [currentPlan, setCurrentPlan] = useState<UserPlan | null>(null);
+  const [currentInterval, setCurrentInterval] = useState<string>('month');
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<BillingPlanRow[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -108,6 +109,18 @@ const PlanManagement = () => {
         throw error;
       }
       setCurrentPlan(data as any);
+
+      if (data) {
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("billing_interval")
+          .eq("user_id", user?.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setCurrentInterval(sub?.billing_interval ?? 'month');
+      }
     } catch (error) {
       console.error("Error fetching plan:", error);
     }
@@ -238,7 +251,7 @@ const PlanManagement = () => {
                 const IconComponent = icons[p.plan_type] || Zap;
                 const bullets = featureMap[p.plan_type]?.features || [];
                 const price = currencyFmt(p.price_cents, p.currency);
-                const isCurrent = currentPlan?.plan_type === p.plan_type;
+                const isCurrent = currentPlan?.plan_type === p.plan_type && currentInterval === p.interval;
 
                 return (
                   <Card key={p.id} className={`relative rounded-2xl ${fancyCardClass} opacity-0 animate-fade-in-up ${isCurrent ? "bg-accent/5" : ""}`} style={{ animationDelay: `${80 + i * 100}ms` }}>

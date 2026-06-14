@@ -99,7 +99,7 @@ const Upgrade = () => {
       icon: Users
     })),
     popular: dbPlan.plan_type === 'professional',
-    current: plan?.plan_type === dbPlan.plan_type,
+    current: plan?.plan_type === dbPlan.plan_type && (plan as any)?.billing_interval === dbPlan.interval,
   }));
 
   const handleUpgrade = async (planId: string) => {

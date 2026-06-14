@@ -65,7 +65,7 @@ export const usePlan = () => {
         // Also fetch subscription status to check expiration
         const { data: subscriptionData } = await supabase
           .from("subscriptions")
-          .select("status, current_period_end")
+          .select("status, current_period_end, billing_interval")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -86,6 +86,7 @@ export const usePlan = () => {
             ...data,
             subscription_status: subscriptionData.status as any,
             current_period_end: subscriptionData.current_period_end,
+            billing_interval: subscriptionData.billing_interval ?? 'month',
           } as any);
         } else {
           setPlan(data as any);
